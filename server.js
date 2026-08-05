@@ -103,7 +103,14 @@ function insertSorted(timeline, card) {
 // headers, and preview URLs it returns are time-limited, so we never store
 // them long-term: the catalog only keeps the permanent Deezer track id, and
 // we fetch a fresh preview URL + cover art right when a card is drawn) ----------
+// FAKE_DEEZER=1 is a test-only seam: it lets the automated test suite (and any
+// environment without real internet access to Deezer) exercise the full game
+// logic without depending on api.deezer.com actually being reachable. It is
+// never set in production — Render will just never define this variable.
+const FAKE_DEEZER = process.env.FAKE_DEEZER === '1';
+
 async function deezerSearch(query) {
+  if (FAKE_DEEZER) return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12) }];
   const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
   if (!res.ok) throw new Error('Deezer search HTTP ' + res.status);
   const data = await res.json();
@@ -111,6 +118,7 @@ async function deezerSearch(query) {
   return data.data || [];
 }
 async function deezerTrack(id) {
+  if (FAKE_DEEZER) return { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' } };
   const res = await fetch(`https://api.deezer.com/track/${id}`);
   if (!res.ok) throw new Error('Deezer track HTTP ' + res.status);
   const data = await res.json();
@@ -129,6 +137,25 @@ async function attachFreshPreview(card) {
     console.warn('Deezer preview fetch failed for', card.title, '-', e.message);
     return { ...card, previewUrl: null, cover: null };
   }
+}
+// Draws the next card from the deck, but never hands back one with no playable
+// preview — those get quietly set aside (and re-tried later, after a reshuffle,
+// in case it was just a transient hiccup) so a player never gets stuck guessing
+// a song they can't hear.
+async function drawPlayableCard(room, maxAttempts = 6) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (room.deck.length === 0) {
+      if (room.discard.length === 0) return null;
+      room.deck = shuffle(room.discard);
+      room.discard = [];
+    }
+    const raw = room.deck.pop();
+    const card = await attachFreshPreview(raw);
+    if (card.previewUrl) return card;
+    console.warn(`Carte sans aperçu audio, mise de côté: ${raw.artist} – ${raw.title}`);
+    room.discard.push(raw);
+  }
+  return null;
 }
 // Fills in missing deezerId for any catalog entry that doesn't have one yet
 // (runs at boot, and again whenever a song is added without a match).
@@ -227,13 +254,8 @@ function resolveReveal(room) {
 async function botPlayTurn(room) {
   const bot = activePlayer(room);
   if (!bot || !bot.isBot) return;
-  if (room.deck.length === 0) {
-    if (room.discard.length === 0) return;
-    room.deck = shuffle(room.discard);
-    room.discard = [];
-  }
-  const rawCard = room.deck.pop();
-  const card = await attachFreshPreview(rawCard);
+  const card = await drawPlayableCard(room);
+  if (!card) return;
   const years = timelineYears(bot.timeline);
   const correctGaps = [];
   for (let i = 0; i <= years.length; i++) { if (gapCorrect(years, i, card.year)) correctGaps.push(i); }
@@ -357,9 +379,9 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', withRoom((room) => {
     if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
-    const pool = catalog.filter(s => songMatchesFilters(s, room.filters));
+    const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
     if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
-      return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres.`);
+      return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).`);
     }
     let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
     const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
@@ -387,12 +409,8 @@ io.on('connection', (socket) => {
     const playerId = socket.data.playerId;
     const active = activePlayer(room);
     if (!active || active.id !== playerId || room.pending) return;
-    if (room.deck.length === 0) {
-      if (room.discard.length === 0) return socket.emit('error-msg', 'Plus de chansons dans la pioche !');
-      room.deck = shuffle(room.discard); room.discard = [];
-    }
-    const rawCard = room.deck.pop();
-    const card = await attachFreshPreview(rawCard);
+    const card = await drawPlayableCard(room);
+    if (!card) return socket.emit('error-msg', 'Plus de chansons avec un aperçu audio jouable dans la pioche !');
     room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null };
     room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} pioche une chanson.` });
   }));
@@ -405,10 +423,8 @@ io.on('connection', (socket) => {
     room.discard.push(room.pending.card);
     room.log.push({ ts: nowStr(), text: `${p.name} dépense 1 jeton pour passer la chanson.` });
     room.pending = null;
-    if (room.deck.length === 0 && room.discard.length > 0) { room.deck = shuffle(room.discard); room.discard = []; }
-    if (room.deck.length > 0) {
-      const rawCard = room.deck.pop();
-      const card = await attachFreshPreview(rawCard);
+    const card = await drawPlayableCard(room);
+    if (card) {
       room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null };
     }
   }));

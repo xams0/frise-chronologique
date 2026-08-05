@@ -58,7 +58,7 @@ function songMatchesFilters(song, filters) {
 }
 function matchCount(room) {
   if (!state.catalog) return null;
-  return state.catalog.filter(s => songMatchesFilters(s, room.filters)).length;
+  return state.catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters)).length;
 }
 function setFilters(room, filters) {
   socket.emit('set-filters', { filters });

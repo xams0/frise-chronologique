@@ -29,8 +29,11 @@ rechercher un lien frais à chaque fois qu'une carte est piochée en partie.
 Au premier lancement, regarde la console : elle affiche `Deezer ✓ ...` pour
 chaque chanson associée avec succès, et un avertissement pour celles qui n'ont
 pas été trouvées (rare, mais possible si le titre est mal orthographié ou trop
-peu connu). Une chanson sans correspondance reste jouable — elle apparaît
-juste sans extrait audio, avec un message "aperçu indisponible" dans le jeu.
+peu connu). Une chanson sans correspondance Deezer, ou dont l'aperçu audio
+n'est pas disponible au moment de la piocher, est **automatiquement mise de
+côté par le serveur** — les joueurs ne la voient jamais, une autre carte est
+piochée à la place. Elle sera retentée plus tard (après un remélange de la
+défausse), au cas où ce n'était qu'un problème passager.
 
 ## Bibliothèque et filtres (depuis la v1.3)
 

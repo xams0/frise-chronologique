@@ -42,7 +42,43 @@ function waitForRoomWhere(socket, predicate, timeoutMs = 4000) {
 }
 
 async function main() {
-  const server = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT) } });
+  // ---- Phase 0: confirm the actual fix — with zero real Deezer access (this
+  // sandbox's normal state), draw-card must NEVER hand back a silent card. ----
+  const noAudioServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 1) } });
+  let noAudioLog = '';
+  noAudioServer.stdout.on('data', d => { noAudioLog += d; });
+  noAudioServer.stderr.on('data', d => { noAudioLog += d; });
+  await new Promise(r => setTimeout(r, 900));
+  try {
+    const noAudioUrl = `http://localhost:${PORT + 1}`;
+    const p1 = io(noAudioUrl, { transports: ['websocket'] });
+    const p2 = io(noAudioUrl, { transports: ['websocket'] });
+    await Promise.all([waitFor(p1, 'connect'), waitFor(p2, 'connect')]);
+    p1.emit('create-room', { name: 'NoAudioA' });
+    const j1 = await waitFor(p1, 'joined');
+    p2.emit('join-room', { code: j1.code, name: 'NoAudioB' });
+    await waitFor(p2, 'joined');
+    // Real Deezer is unreachable here, so no song will ever have a resolved
+    // deezerId in time -> the pool should be empty -> start-game must refuse,
+    // never silently start a game full of unplayable cards.
+    let sawError = false;
+    p1.once('error-msg', () => { sawError = true; });
+    p1.emit('start-game');
+    await new Promise(r => setTimeout(r, 800));
+    if (sawError) ok('with no real Deezer access, start-game correctly refuses rather than dealing silent cards');
+    else fail('start-game should have refused when no songs have a resolved Deezer match');
+    p1.disconnect(); p2.disconnect();
+  } catch (e) {
+    fail('phase 0 (no-audio protection) exception: ' + e.message);
+  } finally {
+    noAudioServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // ---- Phase 1: full gameplay, with FAKE_DEEZER=1 so every song has a
+  // simulated-but-valid preview — this is what lets us actually exercise the
+  // audio-dependent code paths without needing real internet access to Deezer. ----
+  const server = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT), FAKE_DEEZER: '1' } });
   server.stdout.on('data', d => log('server>', d.toString().trim()));
   server.stderr.on('data', d => log('server-err>', d.toString().trim()));
   await new Promise(r => setTimeout(r, 900)); // let it boot
@@ -52,7 +88,7 @@ async function main() {
     const catRes = await fetch(`${URL}/api/songs`);
     const catalog = await catRes.json();
     if (Array.isArray(catalog) && catalog.length >= 300) ok(`catalog loaded with ${catalog.length} songs`);
-    else fail(`expected 20 songs in catalog, got ${JSON.stringify(catalog).slice(0,120)}`);
+    else fail(`expected 300+ songs in catalog, got ${JSON.stringify(catalog).slice(0,120)}`);
 
     // Adding a song now requires reaching api.deezer.com server-side to resolve a match.
     // That domain isn't reachable from this sandbox, so we only check the *validation*
