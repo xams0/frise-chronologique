@@ -27,15 +27,13 @@ const BRACKETS = [
   { from: 2000, to: 2019, label: '2000-2019' },
   { from: 2020, to: 2026, label: '2020-2026' }
 ];
-function emptyFilters() { return { brackets: [], genres: [], countries: [], artists: [] }; }
+function emptyFilters() { return { brackets: [], artists: [] }; }
 function songMatchesFilters(song, filters) {
   if (!filters) return true;
   if (filters.brackets && filters.brackets.length) {
     const inBracket = filters.brackets.some(b => song.year >= b.from && song.year <= b.to);
     if (!inBracket) return false;
   }
-  if (filters.genres && filters.genres.length && !filters.genres.includes(song.genre)) return false;
-  if (filters.countries && filters.countries.length && !filters.countries.includes(song.country)) return false;
   if (filters.artists && filters.artists.length && !filters.artists.includes(song.artist)) return false;
   return true;
 }
@@ -255,12 +253,10 @@ app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
 app.get('/api/brackets', (req, res) => res.json(BRACKETS));
 
 app.post('/api/songs', async (req, res) => {
-  const { title, artist, year, genre, country } = req.body || {};
+  const { title, artist, year } = req.body || {};
   const t = (title || '').trim();
   const a = (artist || '').trim();
   const y = parseInt(year, 10);
-  const g = (genre || '').trim() || 'Pop';
-  const c = (country || '').trim() || '?';
   if (!t || !a) return res.status(400).json({ error: 'Titre et artiste obligatoires.' });
   if (!y || y < 1900 || y > 2035) return res.status(400).json({ error: 'Année invalide.' });
   const dup = catalog.some(s => normalize(s.title) === normalize(t) && normalize(s.artist) === normalize(a));
@@ -273,7 +269,7 @@ app.post('/api/songs', async (req, res) => {
     return res.status(502).json({ error: "Impossible de joindre Deezer pour l'instant, réessaie." });
   }
   if (!deezerId) return res.status(400).json({ error: 'Introuvable sur Deezer — vérifie l\'orthographe du titre et de l\'artiste.' });
-  catalog.push({ title: t, artist: a, year: y, genre: g, country: c, deezerId });
+  catalog.push({ title: t, artist: a, year: y, deezerId });
   saveCatalog();
   res.json(catalog);
 });
@@ -383,8 +379,6 @@ io.on('connection', (socket) => {
     if (room.phase !== 'lobby' || !filters) return;
     room.filters = {
       brackets: Array.isArray(filters.brackets) ? filters.brackets : [],
-      genres: Array.isArray(filters.genres) ? filters.genres : [],
-      countries: Array.isArray(filters.countries) ? filters.countries : [],
       artists: Array.isArray(filters.artists) ? filters.artists : []
     };
   }));

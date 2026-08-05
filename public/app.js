@@ -22,7 +22,7 @@ const state = {
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
-  catalog: null, newSong: { title: '', artist: '', year: '', genre: '', country: '' }, libError: '', libBusy: false, importError: '',
+  catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
   brackets: null, showFilters: false, artistSearch: ''
 };
@@ -53,8 +53,6 @@ function songMatchesFilters(song, filters) {
     const inBracket = filters.brackets.some(b => song.year >= b.from && song.year <= b.to);
     if (!inBracket) return false;
   }
-  if (filters.genres && filters.genres.length && !filters.genres.includes(song.genre)) return false;
-  if (filters.countries && filters.countries.length && !filters.countries.includes(song.country)) return false;
   if (filters.artists && filters.artists.length && !filters.artists.includes(song.artist)) return false;
   return true;
 }
@@ -72,29 +70,18 @@ function toggleInArray(arr, value) {
   return next;
 }
 function toggleBracket(room, bracket) {
-  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  const f = room.filters || { brackets: [], artists: [] };
   setFilters(room, { ...f, brackets: toggleInArray(f.brackets, bracket) });
 }
-function toggleGenre(room, genre) {
-  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
-  setFilters(room, { ...f, genres: toggleInArray(f.genres, genre) });
-}
-function toggleCountry(room, country) {
-  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
-  setFilters(room, { ...f, countries: toggleInArray(f.countries, country) });
-}
 function toggleArtist(room, artist) {
-  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  const f = room.filters || { brackets: [], artists: [] };
   setFilters(room, { ...f, artists: toggleInArray(f.artists, artist) });
 }
 function resetFilters() {
-  socket.emit('set-filters', { filters: { brackets: [], genres: [], countries: [], artists: [] } });
+  socket.emit('set-filters', { filters: { brackets: [], artists: [] } });
 }
 async function addSongToCatalog() {
-  const body = {
-    title: state.newSong.title.trim(), artist: state.newSong.artist.trim(), year: state.newSong.year,
-    genre: state.newSong.genre.trim(), country: state.newSong.country.trim()
-  };
+  const body = { title: state.newSong.title.trim(), artist: state.newSong.artist.trim(), year: state.newSong.year };
   state.libBusy = true; render();
   try {
     const res = await fetch('/api/songs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -102,7 +89,7 @@ async function addSongToCatalog() {
     state.libBusy = false;
     if (!res.ok) { state.libError = data.error || 'Erreur.'; render(); return; }
     state.catalog = data;
-    state.newSong = { title: '', artist: '', year: '', genre: '', country: '' };
+    state.newSong = { title: '', artist: '', year: '' };
     state.libError = '';
     render();
   } catch (e) { state.libBusy = false; state.libError = 'Erreur réseau.'; render(); }
@@ -596,10 +583,8 @@ function renderPlacementModal(room) {
 }
 
 function renderFiltersModal(room) {
-  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  const f = room.filters || { brackets: [], artists: [] };
   const catalog = state.catalog || [];
-  const genres = [...new Set(catalog.map(s => s.genre).filter(Boolean))].sort();
-  const countries = [...new Set(catalog.map(s => s.country).filter(Boolean))].sort();
   const artists = [...new Set(catalog.map(s => s.artist).filter(Boolean))].sort();
   const search = state.artistSearch.trim().toLowerCase();
   const filteredArtists = search ? artists.filter(a => a.toLowerCase().includes(search)) : artists;
@@ -617,16 +602,6 @@ function renderFiltersModal(room) {
         ${(state.brackets || []).map(b => `
           <button data-act="toggle-bracket" data-from="${b.from}" data-to="${b.to}" style="${chip(f.brackets.some(x => x.from === b.from && x.to === b.to))}">${b.label}</button>
         `).join('')}
-      </div>
-
-      <h3 style="margin-top:16px;">Genres</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-        ${genres.map(g => `<button data-act="toggle-genre" data-val="${escapeHtml(g)}" style="${chip(f.genres.includes(g))}">${escapeHtml(g)}</button>`).join('')}
-      </div>
-
-      <h3 style="margin-top:16px;">Pays</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-        ${countries.map(c => `<button data-act="toggle-country" data-val="${escapeHtml(c)}" style="${chip(f.countries.includes(c))}">${escapeHtml(c)}</button>`).join('')}
       </div>
 
       <h3 style="margin-top:16px;">Artistes ${f.artists.length ? `(${f.artists.length} sélectionné${f.artists.length > 1 ? 's' : ''})` : ''}</h3>
@@ -678,11 +653,7 @@ function renderLibraryModal() {
         <div class="stack" style="gap:8px;margin-top:0;">
           <input id="lib-title" placeholder="Titre" value="${escapeHtml(state.newSong.title)}"/>
           <input id="lib-artist" placeholder="Artiste" value="${escapeHtml(state.newSong.artist)}"/>
-          <div class="row">
-            <input id="lib-year" placeholder="Année" inputmode="numeric" value="${escapeHtml(state.newSong.year)}"/>
-            <input id="lib-genre" placeholder="Genre (ex. Rock)" value="${escapeHtml(state.newSong.genre || '')}"/>
-          </div>
-          <input id="lib-country" placeholder="Pays (ex. France)" value="${escapeHtml(state.newSong.country || '')}"/>
+          <input id="lib-year" placeholder="Année (ex. 1999)" inputmode="numeric" value="${escapeHtml(state.newSong.year)}"/>
           ${state.libError ? `<div class="error-box">${escapeHtml(state.libError)}</div>` : ''}
           <button class="btn btn-gold btn-sm" data-act="add-song" ${state.libBusy ? 'disabled' : ''}>${state.libBusy ? 'Recherche sur Deezer…' : 'Ajouter à la bibliothèque'}</button>
         </div>
@@ -746,8 +717,6 @@ function attachHandlers() {
   bindNested('lib-title', 'newSong', 'title');
   bindNested('lib-artist', 'newSong', 'artist');
   bindNested('lib-year', 'newSong', 'year');
-  bindNested('lib-genre', 'newSong', 'genre');
-  bindNested('lib-country', 'newSong', 'country');
   const artistSearchEl = document.getElementById('inp-artist-search');
   if (artistSearchEl) artistSearchEl.oninput = e => { state.artistSearch = e.target.value; render(); };
 
@@ -778,8 +747,6 @@ function attachHandlers() {
       else if (act === 'show-filters') { state.showFilters = true; render(); }
       else if (act === 'close-filters') { state.showFilters = false; state.artistSearch = ''; render(); }
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
-      else if (act === 'toggle-genre') toggleGenre(state.room, elm.getAttribute('data-val'));
-      else if (act === 'toggle-country') toggleCountry(state.room, elm.getAttribute('data-val'));
       else if (act === 'toggle-artist') toggleArtist(state.room, elm.getAttribute('data-val'));
       else if (act === 'reset-filters') resetFilters();
       else if (act === 'pick-dj') setDj(elm.getAttribute('data-pid'));

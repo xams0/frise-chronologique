@@ -41,9 +41,9 @@ pour monter en volume) n'ont pas ces tags, ce qui est normal : elles restent
 jouables et filtrables par période et par artiste, juste pas par genre/pays.
 
 Dans le salon d'attente, **⚙️ Options de partie** permet de choisir une ou
-plusieurs tranches, genres, pays et/ou artistes avant de lancer la partie —
-rien de coché = tout le catalogue est utilisé. Le nombre de chansons
-correspondant aux filtres actifs s'affiche en direct.
+plusieurs tranches de 20 ans et/ou des artistes précis avant de lancer la
+partie — rien de coché = tout le catalogue est utilisé. Le nombre de
+chansons correspondant aux filtres actifs s'affiche en direct.
 
 ## Tester en local sur ton iPhone (via iSH)
 

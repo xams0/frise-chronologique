@@ -189,12 +189,12 @@ async function main() {
 
     const narrowBracket = brackets.find(b => b.label === '1900-1919');
     const expectedCount = fullCatalog.filter(s => s.year >= narrowBracket.from && s.year <= narrowBracket.to).length;
-    dave.emit('set-filters', { filters: { brackets: [narrowBracket], genres: [], countries: [], artists: [] } });
+    dave.emit('set-filters', { filters: { brackets: [narrowBracket], artists: [] } });
     await waitForRoomWhere(dave, r => r.filters.brackets.length === 1);
     ok(`set-filters accepted (1900-1919 bracket, ${expectedCount} matching songs in catalog)`);
 
     // A filter guaranteed to match zero songs must always be rejected, regardless of catalog size.
-    dave.emit('set-filters', { filters: { brackets: [], genres: [], countries: [], artists: ['Some Totally Unknown Artist XYZ'] } });
+    dave.emit('set-filters', { filters: { brackets: [], artists: ['Some Totally Unknown Artist XYZ'] } });
     await waitForRoomWhere(dave, r => r.filters.artists.length === 1);
     let zeroMatchErrorSeen = false;
     dave.once('error-msg', () => { zeroMatchErrorSeen = true; });
@@ -205,7 +205,7 @@ async function main() {
 
     // Reset filters back to "everything" — this room never successfully started a
     // game above, so it is still in lobby phase and set-filters will take effect.
-    dave.emit('set-filters', { filters: { brackets: [], genres: [], countries: [], artists: [] } });
+    dave.emit('set-filters', { filters: { brackets: [], artists: [] } });
     await waitForRoomWhere(dave, r => r.filters.brackets.length === 0 && r.filters.artists.length === 0);
     dave.emit('start-game');
     const filteredGameStarted = await waitForRoomWhere(dave, r => r.phase === 'playing');
