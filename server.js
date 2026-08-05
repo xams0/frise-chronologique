@@ -9,6 +9,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
+const APP_VERSION = require('./package.json').version;
 const DATA_DIR = __dirname;
 const SONGS_FILE = path.join(DATA_DIR, 'songs.json');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
@@ -224,6 +225,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/songs', (req, res) => res.json(catalog));
+app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
 
 app.post('/api/songs', async (req, res) => {
   const { title, artist, year } = req.body || {};
@@ -472,7 +474,7 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Frise Musicale server running:`);
+  console.log(`Frise Musicale v${APP_VERSION} — server running:`);
   console.log(`  - sur cet appareil : http://localhost:${PORT}`);
   console.log(`  - depuis le même Wi-Fi : http://<IP de ce téléphone>:${PORT}`);
   ensureDeezerIds().then(() => console.log('Catalogue Deezer synchronisé.'));

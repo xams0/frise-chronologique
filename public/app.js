@@ -684,5 +684,17 @@ function attachHandlers() {
   });
 }
 
+async function loadVersion() {
+  try {
+    const res = await fetch('/api/version');
+    const data = await res.json();
+    const badge = document.createElement('div');
+    badge.className = 'version-badge';
+    badge.textContent = 'v' + data.version;
+    document.body.appendChild(badge);
+  } catch (e) { /* not critical */ }
+}
+
 render();
 loadCatalog();
+loadVersion();
