@@ -24,7 +24,8 @@ const state = {
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showFilters: false, artistSearch: ''
+  brackets: null, showFilters: false, artistSearch: '',
+  healthReport: null, healthChecking: false
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -93,6 +94,28 @@ async function addSongToCatalog() {
     state.libError = '';
     render();
   } catch (e) { state.libBusy = false; state.libError = 'Erreur réseau.'; render(); }
+}
+async function checkCatalogHealth() {
+  state.healthChecking = true; state.healthReport = null; render();
+  try {
+    const res = await fetch('/api/songs/health');
+    state.healthReport = await res.json();
+  } catch (e) { state.healthReport = null; }
+  state.healthChecking = false;
+  render();
+}
+async function removeSong(title, artist) {
+  try {
+    await fetch('/api/songs', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, artist }) });
+    const res = await fetch('/api/songs');
+    state.catalog = await res.json();
+    if (state.healthReport) {
+      state.healthReport.noMatch = state.healthReport.noMatch.filter(s => !(s.title === title && s.artist === artist));
+      state.healthReport.noPreview = state.healthReport.noPreview.filter(s => !(s.title === title && s.artist === artist));
+      state.healthReport.total -= 1;
+    }
+    render();
+  } catch (e) { /* non-critical */ }
 }
 function exportCatalog() {
   const blob = new Blob([JSON.stringify(state.catalog, null, 2)], { type: 'application/json' });
@@ -675,9 +698,37 @@ function renderLibraryModal() {
         <button class="btn btn-teal btn-sm" data-act="import-catalog">Fusionner dans la bibliothèque</button>
       </div>` : ''}
 
+      <div class="card-section" style="background:var(--surface2);margin-top:14px;">
+        <h3>Vérifier les extraits audio</h3>
+        <p class="subtitle" style="margin:0 0 10px;">Interroge Deezer en direct pour chaque chanson — peut prendre une minute pour ${list.length} titres.</p>
+        <button class="btn btn-teal btn-sm" data-act="check-health" ${state.healthChecking ? 'disabled' : ''}>${state.healthChecking ? 'Vérification en cours…' : '🔍 Vérifier la bibliothèque'}</button>
+        ${renderHealthReport()}
+      </div>
+
       <button class="btn btn-ghost" style="margin-top:14px;" data-act="close-library">Fermer</button>
     </div>
   </div>`;
+}
+
+function renderHealthReport() {
+  const r = state.healthReport;
+  if (!r) return '';
+  const problems = [...r.noMatch.map(s => ({ ...s, reason: 'Aucune correspondance Deezer' })), ...r.noPreview.map(s => ({ ...s, reason: 'Pas d\'extrait audio disponible' }))];
+  return `
+    <div style="margin-top:12px;">
+      <p style="font-size:13px;color:${problems.length ? 'var(--red)' : 'var(--teal)'};margin:0 0 8px;font-weight:600;">
+        ${r.ok} / ${r.total} chansons ont un extrait audio confirmé jouable en ce moment.
+      </p>
+      ${problems.length === 0 ? '<p class="subtitle" style="margin:0;">Tout est bon, aucune chanson à corriger.</p>' : `
+      <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+        ${problems.map(s => `
+          <div class="log-line" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <span><b>${s.year}</b> — ${escapeHtml(s.title)} · ${escapeHtml(s.artist)}<br><span style="color:var(--red);font-size:11px;">${s.reason}</span></span>
+            <button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="remove-song" data-title="${escapeHtml(s.title)}" data-artist="${escapeHtml(s.artist)}">Retirer</button>
+          </div>
+        `).join('')}
+      </div>`}
+    </div>`;
 }
 
 function renderRulesModal() {
@@ -740,6 +791,8 @@ function attachHandlers() {
       else if (act === 'export-catalog') exportCatalog();
       else if (act === 'toggle-import') { state.showImport = !state.showImport; state.importError = ''; render(); }
       else if (act === 'import-catalog') importCatalog();
+      else if (act === 'check-health') checkCatalogHealth();
+      else if (act === 'remove-song') removeSong(elm.getAttribute('data-title'), elm.getAttribute('data-artist'));
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
       else if (act === 'open-dj') { state.showDjPicker = true; render(); }

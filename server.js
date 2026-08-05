@@ -311,6 +311,41 @@ app.post('/api/songs/import', async (req, res) => {
   res.json({ catalog, added });
 });
 
+app.delete('/api/songs', (req, res) => {
+  const { title, artist } = req.body || {};
+  const before = catalog.length;
+  catalog = catalog.filter(s => !(normalize(s.title) === normalize(title) && normalize(s.artist) === normalize(artist)));
+  if (catalog.length === before) return res.status(404).json({ error: 'Chanson introuvable.' });
+  saveCatalog();
+  res.json(catalog);
+});
+
+// Scans the WHOLE catalog against Deezer right now and reports exactly which
+// songs are missing a match, and which have a match but no playable preview
+// clip at this moment (previews can come and go — regional licensing, etc).
+// This is a real-time check, not cached, so it can take a little while for a
+// few hundred songs — batched in parallel groups to keep it reasonable.
+app.get('/api/songs/health', async (req, res) => {
+  const noMatch = [];
+  const noPreview = [];
+  let okCount = 0;
+  const BATCH = 10;
+  for (let i = 0; i < catalog.length; i += BATCH) {
+    const batch = catalog.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (song) => {
+      if (!song.deezerId) { noMatch.push({ title: song.title, artist: song.artist, year: song.year }); return; }
+      try {
+        const t = await deezerTrack(song.deezerId);
+        if (t.preview) okCount++;
+        else noPreview.push({ title: song.title, artist: song.artist, year: song.year });
+      } catch (e) {
+        noPreview.push({ title: song.title, artist: song.artist, year: song.year });
+      }
+    }));
+  }
+  res.json({ total: catalog.length, ok: okCount, noMatch, noPreview });
+});
+
 // ---------- socket.io: real-time game events ----------
 io.on('connection', (socket) => {
 

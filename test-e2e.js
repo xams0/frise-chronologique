@@ -109,6 +109,30 @@ async function main() {
     if (badRes.status === 400) ok('invalid song correctly rejected (400) before ever touching Deezer');
     else fail('invalid song was not rejected, status=' + badRes.status);
 
+    // ---- catalog health check + delete ----
+    const catBefore = await (await fetch(`${URL}/api/songs`)).json();
+    const healthRes = await fetch(`${URL}/api/songs/health`);
+    const health = await healthRes.json();
+    if (typeof health.total === 'number' && Array.isArray(health.noMatch) && Array.isArray(health.noPreview)) {
+      ok(`health check ran: ${health.ok}/${health.total} songs confirmed playable (FAKE_DEEZER, so this should be ~all of them)`);
+    } else {
+      fail('health check response missing expected fields: ' + JSON.stringify(health).slice(0, 200));
+    }
+    if (health.total === catBefore.length) ok('health check covered the whole catalog');
+    else fail(`health check total (${health.total}) does not match catalog length (${catBefore.length})`);
+
+    if (addRes.ok) {
+      const delRes = await fetch(`${URL}/api/songs`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Test Song', artist: 'Test Artist' })
+      });
+      const afterDelete = await delRes.json();
+      if (delRes.ok && afterDelete.length === catBefore.length - 1) ok('DELETE /api/songs correctly removed the test entry');
+      else fail('DELETE /api/songs did not behave as expected: status=' + delRes.status);
+    } else {
+      log('  (skipping delete test — the earlier add-song attempt did not succeed, nothing to delete)');
+    }
+
     // ---- socket gameplay ----
     const alice = io(URL, { transports: ['websocket'] });
     const bob = io(URL, { transports: ['websocket'] });

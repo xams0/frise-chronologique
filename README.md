@@ -35,6 +35,12 @@ côté par le serveur** — les joueurs ne la voient jamais, une autre carte est
 piochée à la place. Elle sera retentée plus tard (après un remélange de la
 défausse), au cas où ce n'était qu'un problème passager.
 
+**Pour être sûr que tout le catalogue est jouable :** dans le salon d'attente
+→ 📚 Bibliothèque → **🔍 Vérifier la bibliothèque**. Ça interroge Deezer en
+direct pour chaque chanson (peut prendre une minute pour 300+ titres) et
+affiche celles sans correspondance ou sans extrait audio, avec un bouton pour
+les retirer directement.
+
 ## Bibliothèque et filtres (depuis la v1.3)
 
 Le catalogue de départ contient **309 chansons**, de 1900 à 2026, réparties en
