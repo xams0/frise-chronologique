@@ -167,3 +167,15 @@ Le serveur cherche automatiquement la correspondance sur Deezer — pas de lien
 à coller. Tu peux aussi exporter/importer un fichier JSON depuis cet écran,
 ou éditer `songs.json` directement (redémarre le serveur après, pour qu'il
 associe les nouvelles entrées à Deezer).
+
+## Où êtes-vous ? (depuis la v1.12)
+
+Dans le salon d'attente, choisis entre deux modes d'écoute :
+- **🎉 Tous ensemble** — un DJ unique diffuse la musique à voix haute pour
+  toute la pièce, comme avant. Le rôle de DJ reste réassignable.
+- **🏠 Chacun chez soi** — pas de DJ : chaque joueur entend l'extrait
+  directement sur son propre téléphone, pratique si vous n'êtes pas dans la
+  même pièce.
+
+Le choix se fait avant de lancer la partie et peut être changé tant que le
+salon est en attente.

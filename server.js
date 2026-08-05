@@ -427,6 +427,7 @@ io.on('connection', (socket) => {
       turnOrder: [], turnIndex: 0,
       deck: [], discard: [], pending: null, lastResult: null,
       djId: playerId,
+      listenMode: 'together', // 'together' = one DJ plays for the room | 'remote' = everyone hears it on their own device
       filters: emptyFilters(),
       log: [{ ts: nowStr(), text: `${name} a créé le salon.` }],
       history: []
@@ -505,6 +506,18 @@ io.on('connection', (socket) => {
       brackets: Array.isArray(filters.brackets) ? filters.brackets : [],
       artists: Array.isArray(filters.artists) ? filters.artists : []
     };
+  }));
+
+  socket.on('set-listen-mode', withRoom((room, { mode }) => {
+    if (room.phase !== 'lobby') return;
+    if (mode !== 'together' && mode !== 'remote') return;
+    room.listenMode = mode;
+    room.log.push({
+      ts: nowStr(),
+      text: mode === 'remote'
+        ? '🏠 Mode "Chacun chez soi" activé — la musique joue sur l\'appareil de chaque joueur.'
+        : '🎉 Mode "Tous ensemble" activé — un DJ unique diffuse la musique pour la salle.'
+    });
   }));
 
   socket.on('draw-card', withRoom(async (room) => {

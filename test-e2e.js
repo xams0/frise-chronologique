@@ -202,6 +202,8 @@ async function main() {
     const bobJoined = await waitFor(bob, 'joined');
     if (bobJoined.room.players.length === 2) ok('Bob joined, 2 players in room');
     else fail('expected 2 players after join, got ' + bobJoined.room.players.length);
+    if (bobJoined.room.listenMode === 'together') ok('room defaults to "together" listen mode');
+    else fail('expected default listenMode "together", got ' + bobJoined.room.listenMode);
 
     // reconnection-by-name check
     const aliceAgain = io(URL, { transports: ['websocket'] });
@@ -281,6 +283,19 @@ async function main() {
     carol.emit('set-dj', { playerId: targetDjId });
     const djRoom = await waitForRoomWhere(carol, r => r.djId === targetDjId);
     ok('set-dj accepted, djId=' + djRoom.djId);
+
+    // ---- listen mode (needs a fresh room still in lobby phase) ----
+    const erin = io(URL, { transports: ['websocket'] });
+    await waitFor(erin, 'connect');
+    erin.emit('create-room', { name: 'Erin' });
+    await waitFor(erin, 'joined');
+    erin.emit('set-listen-mode', { mode: 'remote' });
+    const remoteRoom = await waitForRoomWhere(erin, r => r.listenMode === 'remote');
+    ok('set-listen-mode "remote" accepted, listenMode=' + remoteRoom.listenMode);
+    erin.emit('set-listen-mode', { mode: 'together' });
+    const togetherRoom = await waitForRoomWhere(erin, r => r.listenMode === 'together');
+    ok('set-listen-mode "together" accepted, listenMode=' + togetherRoom.listenMode);
+    erin.disconnect();
 
     // ---- filters (tested in a fresh room, kept in lobby phase throughout) ----
     const catRes2 = await fetch(`${URL}/api/songs`);

@@ -302,6 +302,7 @@ function renderLobby() {
   const isMe = id => id === state.playerId;
   const djId = getDjId(room);
   const hasBot = room.players.some(p => p.isBot);
+  const listenMode = room.listenMode || 'together';
   return `
   <div class="screen">
     <div class="topbar">
@@ -316,12 +317,24 @@ function renderLobby() {
       ${room.players.map(p => `
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}">
           <div class="dot"></div>
-          <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === djId ? ' 🎚️' : ''}</div>
+          <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
         </div>`).join('')}
       ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">🧪 Ajouter un bot pour tester seul</button>` : ''}
       ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">Retirer le bot de test</button>` : ''}
     </div>
 
+    <div class="card-section">
+      <h3>Où êtes-vous ?</h3>
+      <div class="row" style="margin-top:8px;">
+        <button class="btn ${listenMode === 'together' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-together">🎉 Tous ensemble</button>
+        <button class="btn ${listenMode === 'remote' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-remote">🏠 Chacun chez soi</button>
+      </div>
+      <p class="subtitle" style="margin:10px 0 0;">${listenMode === 'together'
+        ? 'Un DJ unique diffuse la musique à voix haute pour toute la pièce.'
+        : 'Pas de DJ — chaque joueur entend l\'extrait directement sur son propre téléphone.'}</p>
+    </div>
+
+    ${listenMode === 'together' ? `
     <div class="card-section">
       <h3>DJ actuel</h3>
       <p class="subtitle" style="margin:0 0 10px;">Le DJ fait jouer la musique sur son téléphone pour toute la salle.</p>
@@ -329,7 +342,7 @@ function renderLobby() {
         <div class="code-pill" style="justify-content:center;">🎚️ ${escapeHtml(getDjName(room))}</div>
         <button class="btn btn-ghost btn-sm" data-act="open-dj">Changer</button>
       </div>
-    </div>
+    </div>` : ''}
 
     ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
 
@@ -375,7 +388,7 @@ function renderGame() {
     <div class="topbar">
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="code-pill">${room.code}</div>
-        <button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>
+        ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>` : ''}
       </div>
       <button class="iconbtn" data-act="leave">✕</button>
     </div>
@@ -389,7 +402,7 @@ function renderGame() {
           <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
           <div class="who">${escapeHtml(active.name)}</div>
         </div>
-        <div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>
+        ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">🏠 chacun chez soi</div>`}
       </div>
 
       ${renderTurnAction(room, pend, isActive, myself)}
@@ -406,6 +419,7 @@ function renderGame() {
 function renderTurnAction(room, pend, isActive, myself) {
   const active = activePlayer(room);
   const isDj = getDjId(room) === state.playerId;
+  const isRemote = (room.listenMode || 'together') === 'remote';
 
   if (!pend) {
     if (active.isBot) {
@@ -426,10 +440,9 @@ function renderTurnAction(room, pend, isActive, myself) {
   const guessDone = !!pend.guessBy;
   let html = '';
 
-  // Audio plays on the DJ's device from draw until reveal. For a bot's turn
-  // (solo test mode) there's no DJ device involved, so play it for whichever
-  // human is testing so they can judge whether to challenge.
-  if (isDj || active.isBot) {
+  // "Tous ensemble": audio plays on the DJ's device only (or the tester's, for
+  // a bot's turn). "Chacun chez soi": audio plays on every player's own device.
+  if (isRemote || isDj || active.isBot) {
     if (pend.card.previewUrl) {
       html += `
       <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
@@ -450,8 +463,8 @@ function renderTurnAction(room, pend, isActive, myself) {
         <button class="btn btn-gold" data-act="open-placement">Placer la carte</button>
         ${myself.tokens >= 1 ? `<button class="btn btn-ghost btn-sm" data-act="skip-card">Passer (1 🪙)</button>` : ''}
       </div>`;
-      if (!isDj && !active.isBot) html += `<p class="subtitle" style="margin-top:8px;">🔊 Écoute sur l'appareil du DJ (${escapeHtml(getDjName(room))}).</p>`;
-    } else if (!isDj && !active.isBot) {
+      if (!isRemote && !isDj && !active.isBot) html += `<p class="subtitle" style="margin-top:8px;">🔊 Écoute sur l'appareil du DJ (${escapeHtml(getDjName(room))}).</p>`;
+    } else if (!isRemote && !isDj && !active.isBot) {
       html += `<p class="subtitle" style="margin-top:10px;">🔊 La chanson joue chez ${escapeHtml(getDjName(room))} — ${escapeHtml(active.name)} réfléchit à son placement…</p>`;
     }
   }
@@ -799,6 +812,8 @@ function attachHandlers() {
       else if (act === 'remove-bot') removeTestBot();
       else if (act === 'open-dj') { state.showDjPicker = true; render(); }
       else if (act === 'close-dj') { state.showDjPicker = false; render(); }
+      else if (act === 'set-listen-together') socket.emit('set-listen-mode', { mode: 'together' });
+      else if (act === 'set-listen-remote') socket.emit('set-listen-mode', { mode: 'remote' });
       else if (act === 'show-filters') { state.showFilters = true; render(); }
       else if (act === 'close-filters') { state.showFilters = false; state.artistSearch = ''; render(); }
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
