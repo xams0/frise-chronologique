@@ -225,6 +225,9 @@ function render() {
       a.id = 'audio-slot';
       a.src = wantSrc;
       a.loop = true;
+      // Native `loop` is unreliable on some mobile browsers for remote/short
+      // clips — restarting manually on 'ended' makes the loop actually work.
+      a.addEventListener('ended', () => { a.currentTime = 0; a.play().catch(() => {}); });
       slot.replaceWith(a);
       audioEl = a;
       a.play().catch(() => { /* autoplay blocked — the manual play button covers this */ });
