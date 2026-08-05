@@ -22,8 +22,9 @@ const state = {
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
-  catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
-  seenResultAt: 0, ytMuted: true
+  catalog: null, newSong: { title: '', artist: '', year: '', genre: '', country: '' }, libError: '', libBusy: false, importError: '',
+  seenResultAt: 0, ytMuted: true,
+  brackets: null, showFilters: false, artistSearch: ''
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -39,8 +40,61 @@ async function loadCatalog() {
   } catch (e) { state.catalog = []; }
   render();
 }
+async function loadBrackets() {
+  try {
+    const res = await fetch('/api/brackets');
+    state.brackets = await res.json();
+  } catch (e) { state.brackets = []; }
+  render();
+}
+function songMatchesFilters(song, filters) {
+  if (!filters) return true;
+  if (filters.brackets && filters.brackets.length) {
+    const inBracket = filters.brackets.some(b => song.year >= b.from && song.year <= b.to);
+    if (!inBracket) return false;
+  }
+  if (filters.genres && filters.genres.length && !filters.genres.includes(song.genre)) return false;
+  if (filters.countries && filters.countries.length && !filters.countries.includes(song.country)) return false;
+  if (filters.artists && filters.artists.length && !filters.artists.includes(song.artist)) return false;
+  return true;
+}
+function matchCount(room) {
+  if (!state.catalog) return null;
+  return state.catalog.filter(s => songMatchesFilters(s, room.filters)).length;
+}
+function setFilters(room, filters) {
+  socket.emit('set-filters', { filters });
+}
+function toggleInArray(arr, value) {
+  const i = arr.findIndex(x => JSON.stringify(x) === JSON.stringify(value));
+  const next = arr.slice();
+  if (i === -1) next.push(value); else next.splice(i, 1);
+  return next;
+}
+function toggleBracket(room, bracket) {
+  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  setFilters(room, { ...f, brackets: toggleInArray(f.brackets, bracket) });
+}
+function toggleGenre(room, genre) {
+  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  setFilters(room, { ...f, genres: toggleInArray(f.genres, genre) });
+}
+function toggleCountry(room, country) {
+  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  setFilters(room, { ...f, countries: toggleInArray(f.countries, country) });
+}
+function toggleArtist(room, artist) {
+  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  setFilters(room, { ...f, artists: toggleInArray(f.artists, artist) });
+}
+function resetFilters() {
+  socket.emit('set-filters', { filters: { brackets: [], genres: [], countries: [], artists: [] } });
+}
 async function addSongToCatalog() {
-  const body = { title: state.newSong.title.trim(), artist: state.newSong.artist.trim(), year: state.newSong.year };
+  const body = {
+    title: state.newSong.title.trim(), artist: state.newSong.artist.trim(), year: state.newSong.year,
+    genre: state.newSong.genre.trim(), country: state.newSong.country.trim()
+  };
   state.libBusy = true; render();
   try {
     const res = await fetch('/api/songs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -48,7 +102,7 @@ async function addSongToCatalog() {
     state.libBusy = false;
     if (!res.ok) { state.libError = data.error || 'Erreur.'; render(); return; }
     state.catalog = data;
-    state.newSong = { title: '', artist: '', year: '' };
+    state.newSong = { title: '', artist: '', year: '', genre: '', country: '' };
     state.libError = '';
     render();
   } catch (e) { state.libBusy = false; state.libError = 'Erreur réseau.'; render(); }
@@ -243,6 +297,12 @@ function renderLobby() {
 
     ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
 
+    <div class="card-section">
+      <h3>Options de partie</h3>
+      <p class="subtitle" style="margin:0 0 10px;">${matchCount(room) === null ? '…' : matchCount(room)} chanson${matchCount(room) === 1 ? '' : 's'} disponible${matchCount(room) === 1 ? '' : 's'} avec les filtres actuels.</p>
+      <button class="btn btn-ghost btn-sm" data-act="show-filters">⚙️ Choisir périodes / genres / pays / artistes</button>
+    </div>
+
     <button class="btn btn-primary" data-act="start-game" ${room.players.length < 2 ? 'disabled' : ''}>
       ${room.players.length < 2 ? "En attente d'un 2e joueur…" : 'Lancer la partie'}
     </button>
@@ -260,6 +320,7 @@ function renderLobby() {
     ${state.showRules ? renderRulesModal() : ''}
     ${state.showLibrary ? renderLibraryModal() : ''}
     ${state.showDjPicker ? renderDjModal(room) : ''}
+    ${state.showFilters ? renderFiltersModal(room) : ''}
   </div>`;
 }
 
@@ -534,6 +595,57 @@ function renderPlacementModal(room) {
   </div>`;
 }
 
+function renderFiltersModal(room) {
+  const f = room.filters || { brackets: [], genres: [], countries: [], artists: [] };
+  const catalog = state.catalog || [];
+  const genres = [...new Set(catalog.map(s => s.genre).filter(Boolean))].sort();
+  const countries = [...new Set(catalog.map(s => s.country).filter(Boolean))].sort();
+  const artists = [...new Set(catalog.map(s => s.artist).filter(Boolean))].sort();
+  const search = state.artistSearch.trim().toLowerCase();
+  const filteredArtists = search ? artists.filter(a => a.toLowerCase().includes(search)) : artists;
+
+  const chip = (active) => `padding:8px 12px;border-radius:999px;font-size:13px;border:1px solid ${active ? 'var(--pink)' : 'var(--line)'};background:${active ? 'rgba(255,79,129,0.15)' : 'var(--surface2)'};color:${active ? 'var(--pink)' : 'var(--text)'};`;
+
+  return `
+  <div class="modal-bg" data-act="close-filters">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Options de partie</h2>
+      <p class="subtitle" style="margin-top:0;">${matchCount(room)} chanson${matchCount(room) === 1 ? '' : 's'} correspondent — rien coché = tout est inclus.</p>
+
+      <h3 style="margin-top:16px;">Périodes</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        ${(state.brackets || []).map(b => `
+          <button data-act="toggle-bracket" data-from="${b.from}" data-to="${b.to}" style="${chip(f.brackets.some(x => x.from === b.from && x.to === b.to))}">${b.label}</button>
+        `).join('')}
+      </div>
+
+      <h3 style="margin-top:16px;">Genres</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        ${genres.map(g => `<button data-act="toggle-genre" data-val="${escapeHtml(g)}" style="${chip(f.genres.includes(g))}">${escapeHtml(g)}</button>`).join('')}
+      </div>
+
+      <h3 style="margin-top:16px;">Pays</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        ${countries.map(c => `<button data-act="toggle-country" data-val="${escapeHtml(c)}" style="${chip(f.countries.includes(c))}">${escapeHtml(c)}</button>`).join('')}
+      </div>
+
+      <h3 style="margin-top:16px;">Artistes ${f.artists.length ? `(${f.artists.length} sélectionné${f.artists.length > 1 ? 's' : ''})` : ''}</h3>
+      <input id="inp-artist-search" placeholder="Chercher un artiste…" value="${escapeHtml(state.artistSearch)}" style="width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;margin-top:8px;box-sizing:border-box;"/>
+      <div style="max-height:160px;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:2px;">
+        ${filteredArtists.slice(0, 60).map(a => `
+          <button data-act="toggle-artist" data-val="${escapeHtml(a)}" style="text-align:left;padding:8px 10px;border-radius:8px;font-size:13px;background:${f.artists.includes(a) ? 'rgba(255,79,129,0.15)' : 'transparent'};color:${f.artists.includes(a) ? 'var(--pink)' : 'var(--text)'};">${f.artists.includes(a) ? '✓ ' : ''}${escapeHtml(a)}</button>
+        `).join('')}
+        ${filteredArtists.length === 0 ? '<div class="empty">Aucun artiste trouvé</div>' : ''}
+      </div>
+
+      <div class="row" style="margin-top:16px;">
+        <button class="btn btn-ghost btn-sm" data-act="reset-filters">Réinitialiser</button>
+        <button class="btn btn-gold btn-sm" data-act="close-filters">Fermer (${matchCount(room)})</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderDjModal(room) {
   const djId = getDjId(room);
   return `
@@ -566,7 +678,11 @@ function renderLibraryModal() {
         <div class="stack" style="gap:8px;margin-top:0;">
           <input id="lib-title" placeholder="Titre" value="${escapeHtml(state.newSong.title)}"/>
           <input id="lib-artist" placeholder="Artiste" value="${escapeHtml(state.newSong.artist)}"/>
-          <input id="lib-year" placeholder="Année (ex. 1999)" inputmode="numeric" value="${escapeHtml(state.newSong.year)}"/>
+          <div class="row">
+            <input id="lib-year" placeholder="Année" inputmode="numeric" value="${escapeHtml(state.newSong.year)}"/>
+            <input id="lib-genre" placeholder="Genre (ex. Rock)" value="${escapeHtml(state.newSong.genre || '')}"/>
+          </div>
+          <input id="lib-country" placeholder="Pays (ex. France)" value="${escapeHtml(state.newSong.country || '')}"/>
           ${state.libError ? `<div class="error-box">${escapeHtml(state.libError)}</div>` : ''}
           <button class="btn btn-gold btn-sm" data-act="add-song" ${state.libBusy ? 'disabled' : ''}>${state.libBusy ? 'Recherche sur Deezer…' : 'Ajouter à la bibliothèque'}</button>
         </div>
@@ -630,6 +746,10 @@ function attachHandlers() {
   bindNested('lib-title', 'newSong', 'title');
   bindNested('lib-artist', 'newSong', 'artist');
   bindNested('lib-year', 'newSong', 'year');
+  bindNested('lib-genre', 'newSong', 'genre');
+  bindNested('lib-country', 'newSong', 'country');
+  const artistSearchEl = document.getElementById('inp-artist-search');
+  if (artistSearchEl) artistSearchEl.oninput = e => { state.artistSearch = e.target.value; render(); };
 
   root.querySelectorAll('[data-act]').forEach(elm => {
     elm.addEventListener('click', (e) => {
@@ -655,6 +775,13 @@ function attachHandlers() {
       else if (act === 'remove-bot') removeTestBot();
       else if (act === 'open-dj') { state.showDjPicker = true; render(); }
       else if (act === 'close-dj') { state.showDjPicker = false; render(); }
+      else if (act === 'show-filters') { state.showFilters = true; render(); }
+      else if (act === 'close-filters') { state.showFilters = false; state.artistSearch = ''; render(); }
+      else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
+      else if (act === 'toggle-genre') toggleGenre(state.room, elm.getAttribute('data-val'));
+      else if (act === 'toggle-country') toggleCountry(state.room, elm.getAttribute('data-val'));
+      else if (act === 'toggle-artist') toggleArtist(state.room, elm.getAttribute('data-val'));
+      else if (act === 'reset-filters') resetFilters();
       else if (act === 'pick-dj') setDj(elm.getAttribute('data-pid'));
       else if (act === 'bot-play') botPlayTurn();
       else if (act === 'dismiss-result') { state.seenResultAt = parseInt(elm.getAttribute('data-ts'), 10); render(); }
@@ -697,4 +824,5 @@ async function loadVersion() {
 
 render();
 loadCatalog();
+loadBrackets();
 loadVersion();

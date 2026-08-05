@@ -4,6 +4,7 @@ const fs = require('fs');
 const { io } = require('socket.io-client');
 
 const PORT = 3210;
+const CARDS_TO_WIN = 10; // mirrors the server-side constant, kept in sync manually since this is a standalone test script
 const URL = `http://localhost:${PORT}`;
 
 // Start from a clean slate each run, exactly like a first-ever launch.
@@ -50,7 +51,7 @@ async function main() {
     // ---- REST catalog checks ----
     const catRes = await fetch(`${URL}/api/songs`);
     const catalog = await catRes.json();
-    if (Array.isArray(catalog) && catalog.length === 20) ok(`catalog loaded with ${catalog.length} songs`);
+    if (Array.isArray(catalog) && catalog.length >= 300) ok(`catalog loaded with ${catalog.length} songs`);
     else fail(`expected 20 songs in catalog, got ${JSON.stringify(catalog).slice(0,120)}`);
 
     // Adding a song now requires reaching api.deezer.com server-side to resolve a match.
@@ -167,6 +168,50 @@ async function main() {
     carol.emit('set-dj', { playerId: targetDjId });
     const djRoom = await waitForRoomWhere(carol, r => r.djId === targetDjId);
     ok('set-dj accepted, djId=' + djRoom.djId);
+
+    // ---- filters (tested in a fresh room, kept in lobby phase throughout) ----
+    const catRes2 = await fetch(`${URL}/api/songs`);
+    const fullCatalog = await catRes2.json();
+    if (fullCatalog.length >= 300) ok(`expanded catalog present: ${fullCatalog.length} songs`);
+    else fail(`expected 150+ songs, got ${fullCatalog.length}`);
+
+    const bracketsRes = await fetch(`${URL}/api/brackets`);
+    const brackets = await bracketsRes.json();
+    if (brackets.length === 7) ok('7 brackets exposed via /api/brackets');
+    else fail('expected 7 brackets, got ' + brackets.length);
+
+    const dave = io(URL, { transports: ['websocket'] });
+    await waitFor(dave, 'connect');
+    dave.emit('create-room', { name: 'Dave' });
+    await waitFor(dave, 'joined');
+    dave.emit('add-bot');
+    await waitForRoomWhere(dave, r => r.players.some(p => p.isBot));
+
+    const narrowBracket = brackets.find(b => b.label === '1900-1919');
+    const expectedCount = fullCatalog.filter(s => s.year >= narrowBracket.from && s.year <= narrowBracket.to).length;
+    dave.emit('set-filters', { filters: { brackets: [narrowBracket], genres: [], countries: [], artists: [] } });
+    await waitForRoomWhere(dave, r => r.filters.brackets.length === 1);
+    ok(`set-filters accepted (1900-1919 bracket, ${expectedCount} matching songs in catalog)`);
+
+    // A filter guaranteed to match zero songs must always be rejected, regardless of catalog size.
+    dave.emit('set-filters', { filters: { brackets: [], genres: [], countries: [], artists: ['Some Totally Unknown Artist XYZ'] } });
+    await waitForRoomWhere(dave, r => r.filters.artists.length === 1);
+    let zeroMatchErrorSeen = false;
+    dave.once('error-msg', () => { zeroMatchErrorSeen = true; });
+    dave.emit('start-game');
+    await new Promise(r => setTimeout(r, 500));
+    if (zeroMatchErrorSeen) ok('start-game correctly rejected for a filter matching zero songs (room stayed in lobby)');
+    else fail('start-game should have been rejected for a zero-match filter');
+
+    // Reset filters back to "everything" — this room never successfully started a
+    // game above, so it is still in lobby phase and set-filters will take effect.
+    dave.emit('set-filters', { filters: { brackets: [], genres: [], countries: [], artists: [] } });
+    await waitForRoomWhere(dave, r => r.filters.brackets.length === 0 && r.filters.artists.length === 0);
+    dave.emit('start-game');
+    const filteredGameStarted = await waitForRoomWhere(dave, r => r.phase === 'playing');
+    if (filteredGameStarted.phase === 'playing') ok('start-game succeeds once filters are reset to "all songs"');
+    else fail('start-game did not succeed after resetting filters');
+    dave.disconnect();
 
     alice.disconnect(); bob.disconnect(); carol.disconnect();
     ok('ALL TESTS COMPLETED');

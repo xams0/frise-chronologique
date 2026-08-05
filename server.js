@@ -18,6 +18,27 @@ const CARDS_TO_WIN = 10;
 const START_TOKENS = 2;
 const MAX_TOKENS = 5;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const BRACKETS = [
+  { from: 1900, to: 1919, label: '1900-1919' },
+  { from: 1920, to: 1939, label: '1920-1939' },
+  { from: 1940, to: 1959, label: '1940-1959' },
+  { from: 1960, to: 1979, label: '1960-1979' },
+  { from: 1980, to: 1999, label: '1980-1999' },
+  { from: 2000, to: 2019, label: '2000-2019' },
+  { from: 2020, to: 2026, label: '2020-2026' }
+];
+function emptyFilters() { return { brackets: [], genres: [], countries: [], artists: [] }; }
+function songMatchesFilters(song, filters) {
+  if (!filters) return true;
+  if (filters.brackets && filters.brackets.length) {
+    const inBracket = filters.brackets.some(b => song.year >= b.from && song.year <= b.to);
+    if (!inBracket) return false;
+  }
+  if (filters.genres && filters.genres.length && !filters.genres.includes(song.genre)) return false;
+  if (filters.countries && filters.countries.length && !filters.countries.includes(song.country)) return false;
+  if (filters.artists && filters.artists.length && !filters.artists.includes(song.artist)) return false;
+  return true;
+}
 
 // ---------- persistence (flat JSON files, no DB needed) ----------
 function loadJson(file, fallback) {
@@ -114,21 +135,26 @@ async function attachFreshPreview(card) {
 // Fills in missing deezerId for any catalog entry that doesn't have one yet
 // (runs at boot, and again whenever a song is added without a match).
 async function ensureDeezerIds() {
+  const todo = catalog.filter(s => !s.deezerId);
+  if (!todo.length) return;
   let changed = false;
-  for (const song of catalog) {
-    if (song.deezerId) continue;
-    try {
-      const results = await deezerSearch(`${song.artist} ${song.title}`);
-      if (results.length) {
-        song.deezerId = results[0].id;
-        changed = true;
-        console.log(`Deezer ✓ ${song.artist} – ${song.title} -> id ${song.deezerId}`);
-      } else {
-        console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
+  const BATCH = 10; // stay well under Deezer's public rate limit while still going much faster than one-by-one
+  for (let i = 0; i < todo.length; i += BATCH) {
+    const batch = todo.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (song) => {
+      try {
+        const results = await deezerSearch(`${song.artist} ${song.title}`);
+        if (results.length) {
+          song.deezerId = results[0].id;
+          changed = true;
+          console.log(`Deezer ✓ ${song.artist} – ${song.title} -> id ${song.deezerId}`);
+        } else {
+          console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
+        }
+      } catch (e) {
+        console.warn(`Deezer: recherche échouée pour ${song.artist} – ${song.title}:`, e.message);
       }
-    } catch (e) {
-      console.warn(`Deezer: recherche échouée pour ${song.artist} – ${song.title}:`, e.message);
-    }
+    }));
   }
   if (changed) saveCatalog();
 }
@@ -226,12 +252,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/songs', (req, res) => res.json(catalog));
 app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
+app.get('/api/brackets', (req, res) => res.json(BRACKETS));
 
 app.post('/api/songs', async (req, res) => {
-  const { title, artist, year } = req.body || {};
+  const { title, artist, year, genre, country } = req.body || {};
   const t = (title || '').trim();
   const a = (artist || '').trim();
   const y = parseInt(year, 10);
+  const g = (genre || '').trim() || 'Pop';
+  const c = (country || '').trim() || '?';
   if (!t || !a) return res.status(400).json({ error: 'Titre et artiste obligatoires.' });
   if (!y || y < 1900 || y > 2035) return res.status(400).json({ error: 'Année invalide.' });
   const dup = catalog.some(s => normalize(s.title) === normalize(t) && normalize(s.artist) === normalize(a));
@@ -244,7 +273,7 @@ app.post('/api/songs', async (req, res) => {
     return res.status(502).json({ error: "Impossible de joindre Deezer pour l'instant, réessaie." });
   }
   if (!deezerId) return res.status(400).json({ error: 'Introuvable sur Deezer — vérifie l\'orthographe du titre et de l\'artiste.' });
-  catalog.push({ title: t, artist: a, year: y, deezerId });
+  catalog.push({ title: t, artist: a, year: y, genre: g, country: c, deezerId });
   saveCatalog();
   res.json(catalog);
 });
@@ -279,6 +308,7 @@ io.on('connection', (socket) => {
       turnOrder: [], turnIndex: 0,
       deck: [], discard: [], pending: null, lastResult: null,
       djId: playerId,
+      filters: emptyFilters(),
       log: [{ ts: nowStr(), text: `${name} a créé le salon.` }],
       history: []
     };
@@ -331,8 +361,11 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', withRoom((room) => {
     if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
-    if (!catalog.length || catalog.length < CARDS_TO_WIN + 2) return socket.emit('error-msg', 'Bibliothèque de chansons trop courte.');
-    let deck = shuffle(catalog.map((s, i) => ({ ...s, uid: 's' + i })));
+    const pool = catalog.filter(s => songMatchesFilters(s, room.filters));
+    if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
+      return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres.`);
+    }
+    let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
     const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
     players.forEach(p => { p.timeline = [deck.pop()]; });
     room.players = players;
@@ -343,7 +376,17 @@ io.on('connection', (socket) => {
     room.pending = null;
     room.lastResult = null;
     room.phase = 'playing';
-    room.log.push({ ts: nowStr(), text: 'La partie commence — chaque joueur a reçu une chanson de départ !' });
+    room.log.push({ ts: nowStr(), text: `La partie commence (${pool.length} chansons disponibles avec les filtres actifs) — chaque joueur a reçu une chanson de départ !` });
+  }));
+
+  socket.on('set-filters', withRoom((room, { filters }) => {
+    if (room.phase !== 'lobby' || !filters) return;
+    room.filters = {
+      brackets: Array.isArray(filters.brackets) ? filters.brackets : [],
+      genres: Array.isArray(filters.genres) ? filters.genres : [],
+      countries: Array.isArray(filters.countries) ? filters.countries : [],
+      artists: Array.isArray(filters.artists) ? filters.artists : []
+    };
   }));
 
   socket.on('draw-card', withRoom(async (room) => {

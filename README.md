@@ -32,6 +32,19 @@ pas été trouvées (rare, mais possible si le titre est mal orthographié ou tr
 peu connu). Une chanson sans correspondance reste jouable — elle apparaît
 juste sans extrait audio, avec un message "aperçu indisponible" dans le jeu.
 
+## Bibliothèque et filtres (depuis la v1.3)
+
+Le catalogue de départ contient **309 chansons**, de 1900 à 2026, réparties en
+7 tranches de 20 ans. Chaque chanson est taguée avec un genre et un pays quand
+c'est connu de façon fiable — certaines (surtout celles ajoutées en gros lot
+pour monter en volume) n'ont pas ces tags, ce qui est normal : elles restent
+jouables et filtrables par période et par artiste, juste pas par genre/pays.
+
+Dans le salon d'attente, **⚙️ Options de partie** permet de choisir une ou
+plusieurs tranches, genres, pays et/ou artistes avant de lancer la partie —
+rien de coché = tout le catalogue est utilisé. Le nombre de chansons
+correspondant aux filtres actifs s'affiche en direct.
+
 ## Tester en local sur ton iPhone (via iSH)
 
 1. Installe **iSH** depuis l'App Store (gratuit).
