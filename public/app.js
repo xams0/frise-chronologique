@@ -84,7 +84,11 @@ socket.on('joined', ({ playerId, code, room }) => {
   state.error = ''; state.busy = false;
   render();
 });
-socket.on('room', (room) => { state.room = room; render(); });
+socket.on('room', (room) => {
+  state.room = room;
+  state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
+  render();
+});
 socket.on('error-msg', (msg) => setError(msg));
 socket.on('connect_error', () => setError('Connexion au serveur perdue — vérifie que le serveur tourne et que tu es sur le même Wi-Fi.'));
 
