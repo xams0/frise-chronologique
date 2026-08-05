@@ -1,0 +1,479 @@
+const path = require('path');
+const fs = require('fs');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+const PORT = process.env.PORT || 3000;
+const DATA_DIR = __dirname;
+const SONGS_FILE = path.join(DATA_DIR, 'songs.json');
+const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
+
+const CARDS_TO_WIN = 10;
+const START_TOKENS = 2;
+const MAX_TOKENS = 5;
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+// ---------- persistence (flat JSON files, no DB needed) ----------
+function loadJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch (e) { return fallback; }
+}
+function saveJson(file, data) {
+  try { fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
+  catch (e) { console.error('save failed', file, e.message); }
+}
+
+let catalog = loadJson(SONGS_FILE, []);
+let rooms = loadJson(ROOMS_FILE, {});
+function saveRooms() { saveJson(ROOMS_FILE, rooms); }
+function saveCatalog() { saveJson(SONGS_FILE, catalog); }
+
+// ---------- small utils ----------
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function genCode() {
+  let s = '';
+  for (let i = 0; i < 4; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return s;
+}
+function genId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+function nowStr() {
+  const d = new Date();
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' +
+    d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+function normalize(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+}
+function matchGuess(gt, ga, real) {
+  const nt = normalize(gt), na = normalize(ga);
+  const rt = normalize(real.title), ra = normalize(real.artist.split(' ft.')[0].split(' feat.')[0]);
+  const titleOk = nt.length > 2 && (rt.includes(nt) || nt.includes(rt));
+  const artistOk = na.length > 2 && (ra.includes(na) || na.includes(ra));
+  return titleOk && artistOk;
+}
+function timelineYears(timeline) { return timeline.map(c => c.year).sort((a, b) => a - b); }
+function gapCorrect(sortedYears, gapIndex, year) {
+  const lower = gapIndex > 0 ? sortedYears[gapIndex - 1] : -Infinity;
+  const upper = gapIndex < sortedYears.length ? sortedYears[gapIndex] : Infinity;
+  return year >= lower && year <= upper;
+}
+function insertSorted(timeline, card) {
+  const arr = timeline.slice();
+  let i = 0;
+  while (i < arr.length && arr[i].year <= card.year) i++;
+  arr.splice(i, 0, card);
+  return arr;
+}
+
+// ---------- Deezer (proxied server-side — the Deezer API doesn't send CORS
+// headers, and preview URLs it returns are time-limited, so we never store
+// them long-term: the catalog only keeps the permanent Deezer track id, and
+// we fetch a fresh preview URL + cover art right when a card is drawn) ----------
+async function deezerSearch(query) {
+  const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
+  if (!res.ok) throw new Error('Deezer search HTTP ' + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error('Deezer error: ' + data.error.message);
+  return data.data || [];
+}
+async function deezerTrack(id) {
+  const res = await fetch(`https://api.deezer.com/track/${id}`);
+  if (!res.ok) throw new Error('Deezer track HTTP ' + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error('Deezer error: ' + data.error.message);
+  return data;
+}
+// Best-effort: attach {previewUrl, cover} to a card object for THIS turn only.
+// Never throws — on any failure the card just plays without audio and the
+// game continues (better than blocking the whole turn on a flaky lookup).
+async function attachFreshPreview(card) {
+  if (!card.deezerId) return card;
+  try {
+    const t = await deezerTrack(card.deezerId);
+    return { ...card, previewUrl: t.preview || null, cover: (t.album && t.album.cover_medium) || null };
+  } catch (e) {
+    console.warn('Deezer preview fetch failed for', card.title, '-', e.message);
+    return { ...card, previewUrl: null, cover: null };
+  }
+}
+// Fills in missing deezerId for any catalog entry that doesn't have one yet
+// (runs at boot, and again whenever a song is added without a match).
+async function ensureDeezerIds() {
+  let changed = false;
+  for (const song of catalog) {
+    if (song.deezerId) continue;
+    try {
+      const results = await deezerSearch(`${song.artist} ${song.title}`);
+      if (results.length) {
+        song.deezerId = results[0].id;
+        changed = true;
+        console.log(`Deezer ✓ ${song.artist} – ${song.title} -> id ${song.deezerId}`);
+      } else {
+        console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
+      }
+    } catch (e) {
+      console.warn(`Deezer: recherche échouée pour ${song.artist} – ${song.title}:`, e.message);
+    }
+  }
+  if (changed) saveCatalog();
+}
+
+// ---------- room helpers ----------
+function me(room, playerId) { return room.players.find(p => p.id === playerId); }
+function activePlayer(room) { return room.players.find(p => p.id === room.turnOrder[room.turnIndex % room.turnOrder.length]); }
+function getDjId(room) { return room.djId || (room.players[0] && room.players[0].id); }
+function publicRoom(room) { return room; } // everything is safe to broadcast (no secrets server-side beyond the drawn card, which is fine to reveal once drawn)
+
+function broadcast(code) {
+  const room = rooms[code];
+  if (!room) return;
+  io.to(code).emit('room', room);
+}
+
+function advanceTurn(room) {
+  room.turnIndex = (room.turnIndex + 1) % room.turnOrder.length;
+  room.pending = null;
+}
+
+async function finishGame(room, winner) {
+  room.phase = 'finished';
+  room.history.unshift({
+    ts: nowStr(),
+    winnerName: winner.name,
+    players: room.players.map(p => ({ name: p.name, cards: p.timeline.length }))
+  });
+  room.log.push({ ts: nowStr(), text: `🏆 ${winner.name} gagne la partie avec ${winner.timeline.length} cartes !` });
+}
+
+function resolveReveal(room) {
+  const pend = room.pending;
+  const active = room.players.find(pl => pl.id === pend.activePlayerId);
+  const activeYears = timelineYears(active.timeline);
+  const activeCorrect = pend.placement ? gapCorrect(activeYears, pend.placement.gapIndex, pend.card.year) : false;
+  let winner = null;
+
+  if (activeCorrect) {
+    active.timeline = insertSorted(active.timeline, pend.card);
+    winner = active;
+    room.log.push({ ts: nowStr(), text: `✅ Correct ! "${pend.card.title}" (${pend.card.year}) rejoint la frise de ${active.name}.` });
+    room.lastResult = { ts: Date.now(), kind: 'correct', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
+  } else if (pend.challenge) {
+    const challenger = room.players.find(pl => pl.id === pend.challenge.playerId);
+    const challengeCorrect = gapCorrect(activeYears, pend.challenge.gapIndex, pend.card.year);
+    if (challengeCorrect) {
+      challenger.timeline = insertSorted(challenger.timeline, pend.card);
+      winner = challenger;
+      room.log.push({ ts: nowStr(), text: `🎯 ${active.name} s'est trompé, mais ${challenger.name} avait raison — la carte "${pend.card.title}" (${pend.card.year}) file dans sa frise !` });
+      room.lastResult = { ts: Date.now(), kind: 'stolen', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, extraName: challenger.name, cover: pend.card.cover || null };
+    } else {
+      room.discard.push(pend.card);
+      room.log.push({ ts: nowStr(), text: `❌ Mauvais placement des deux côtés — "${pend.card.title}" (${pend.card.year}) est défaussée.` });
+      room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
+    }
+  } else {
+    room.discard.push(pend.card);
+    room.log.push({ ts: nowStr(), text: `❌ Raté — "${pend.card.title}" (${pend.card.year}) était mal placée et est défaussée.` });
+    room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
+  }
+
+  room.pending = null;
+
+  if (winner && winner.timeline.length >= CARDS_TO_WIN) {
+    finishGame(room, winner);
+  } else {
+    advanceTurn(room);
+  }
+}
+
+async function botPlayTurn(room) {
+  const bot = activePlayer(room);
+  if (!bot || !bot.isBot) return;
+  if (room.deck.length === 0) {
+    if (room.discard.length === 0) return;
+    room.deck = shuffle(room.discard);
+    room.discard = [];
+  }
+  const rawCard = room.deck.pop();
+  const card = await attachFreshPreview(rawCard);
+  const years = timelineYears(bot.timeline);
+  const correctGaps = [];
+  for (let i = 0; i <= years.length; i++) { if (gapCorrect(years, i, card.year)) correctGaps.push(i); }
+  let gap;
+  if (Math.random() < 0.55 && correctGaps.length) gap = correctGaps[Math.floor(Math.random() * correctGaps.length)];
+  else gap = Math.floor(Math.random() * (years.length + 1));
+  room.pending = { card, activePlayerId: bot.id, stage: 'placed', placement: { gapIndex: gap }, challenge: null, guessCorrect: null, guessBy: 'bot-na' };
+  room.log.push({ ts: nowStr(), text: `🤖 Le Bot pioche et place une chanson (${card.year}) sur sa frise. À vous de décider si vous le croyez !` });
+}
+
+// ---------- express: static files + catalog REST ----------
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/songs', (req, res) => res.json(catalog));
+
+app.post('/api/songs', async (req, res) => {
+  const { title, artist, year } = req.body || {};
+  const t = (title || '').trim();
+  const a = (artist || '').trim();
+  const y = parseInt(year, 10);
+  if (!t || !a) return res.status(400).json({ error: 'Titre et artiste obligatoires.' });
+  if (!y || y < 1900 || y > 2035) return res.status(400).json({ error: 'Année invalide.' });
+  const dup = catalog.some(s => normalize(s.title) === normalize(t) && normalize(s.artist) === normalize(a));
+  if (dup) return res.status(400).json({ error: 'Cette chanson est déjà dans la bibliothèque.' });
+  let deezerId = null;
+  try {
+    const results = await deezerSearch(`${a} ${t}`);
+    if (results.length) deezerId = results[0].id;
+  } catch (e) {
+    return res.status(502).json({ error: "Impossible de joindre Deezer pour l'instant, réessaie." });
+  }
+  if (!deezerId) return res.status(400).json({ error: 'Introuvable sur Deezer — vérifie l\'orthographe du titre et de l\'artiste.' });
+  catalog.push({ title: t, artist: a, year: y, deezerId });
+  saveCatalog();
+  res.json(catalog);
+});
+
+app.post('/api/songs/import', async (req, res) => {
+  const list = req.body;
+  if (!Array.isArray(list)) return res.status(400).json({ error: 'JSON invalide.' });
+  let added = 0;
+  for (const s of list) {
+    if (!s || !s.title || !s.artist || !s.year) continue;
+    const dup = catalog.some(x => normalize(x.title) === normalize(s.title) && normalize(x.artist) === normalize(s.artist));
+    if (dup) continue;
+    catalog.push({ title: String(s.title), artist: String(s.artist), year: parseInt(s.year, 10), deezerId: s.deezerId || null });
+    added++;
+  }
+  if (added > 0) { saveCatalog(); ensureDeezerIds(); } // resolve any missing deezerId in the background
+  res.json({ catalog, added });
+});
+
+// ---------- socket.io: real-time game events ----------
+io.on('connection', (socket) => {
+
+  socket.on('create-room', ({ name }) => {
+    name = (name || '').trim().slice(0, 20);
+    if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
+    let code;
+    do { code = genCode(); } while (rooms[code]);
+    const playerId = genId();
+    const room = {
+      code, phase: 'lobby',
+      players: [{ id: playerId, name, tokens: START_TOKENS, timeline: [] }],
+      turnOrder: [], turnIndex: 0,
+      deck: [], discard: [], pending: null, lastResult: null,
+      djId: playerId,
+      log: [{ ts: nowStr(), text: `${name} a créé le salon.` }],
+      history: []
+    };
+    rooms[code] = room;
+    saveRooms();
+    socket.join(code);
+    socket.data.code = code;
+    socket.data.playerId = playerId;
+    socket.emit('joined', { playerId, code, room });
+    broadcast(code);
+  });
+
+  socket.on('join-room', ({ code, name }) => {
+    code = (code || '').trim().toUpperCase();
+    name = (name || '').trim().slice(0, 20);
+    const room = rooms[code];
+    if (!room) return socket.emit('error-msg', 'Aucun salon avec ce code.');
+    if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
+    const existing = room.players.find(p => p.name.trim().toLowerCase() === name.toLowerCase());
+    socket.join(code);
+    socket.data.code = code;
+    if (existing) {
+      socket.data.playerId = existing.id;
+      socket.emit('joined', { playerId: existing.id, code, room });
+      return;
+    }
+    if (room.phase !== 'lobby') {
+      return socket.emit('error-msg', 'La partie a déjà commencé. Ressaisis exactement le prénom utilisé pour reprendre ta place.');
+    }
+    const playerId = genId();
+    room.players.push({ id: playerId, name, tokens: START_TOKENS, timeline: [] });
+    room.log.push({ ts: nowStr(), text: `${name} a rejoint le salon.` });
+    saveRooms();
+    socket.data.playerId = playerId;
+    socket.emit('joined', { playerId, code, room });
+    broadcast(code);
+  });
+
+  function withRoom(handler) {
+    return async (payload) => {
+      const code = socket.data.code;
+      const room = rooms[code];
+      if (!room) return socket.emit('error-msg', 'Salon introuvable.');
+      try { await handler(room, payload || {}); }
+      catch (e) { console.error(e); socket.emit('error-msg', 'Erreur serveur.'); }
+      saveRooms();
+      broadcast(code);
+    };
+  }
+
+  socket.on('start-game', withRoom((room) => {
+    if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
+    if (!catalog.length || catalog.length < CARDS_TO_WIN + 2) return socket.emit('error-msg', 'Bibliothèque de chansons trop courte.');
+    let deck = shuffle(catalog.map((s, i) => ({ ...s, uid: 's' + i })));
+    const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
+    players.forEach(p => { p.timeline = [deck.pop()]; });
+    room.players = players;
+    room.deck = deck;
+    room.discard = [];
+    room.turnOrder = shuffle(players.map(p => p.id));
+    room.turnIndex = 0;
+    room.pending = null;
+    room.lastResult = null;
+    room.phase = 'playing';
+    room.log.push({ ts: nowStr(), text: 'La partie commence — chaque joueur a reçu une chanson de départ !' });
+  }));
+
+  socket.on('draw-card', withRoom(async (room) => {
+    const playerId = socket.data.playerId;
+    const active = activePlayer(room);
+    if (!active || active.id !== playerId || room.pending) return;
+    if (room.deck.length === 0) {
+      if (room.discard.length === 0) return socket.emit('error-msg', 'Plus de chansons dans la pioche !');
+      room.deck = shuffle(room.discard); room.discard = [];
+    }
+    const rawCard = room.deck.pop();
+    const card = await attachFreshPreview(rawCard);
+    room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null };
+    room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} pioche une chanson.` });
+  }));
+
+  socket.on('skip-card', withRoom(async (room) => {
+    const playerId = socket.data.playerId;
+    const p = me(room, playerId);
+    if (!p || !room.pending || room.pending.activePlayerId !== playerId || p.tokens < 1) return;
+    p.tokens -= 1;
+    room.discard.push(room.pending.card);
+    room.log.push({ ts: nowStr(), text: `${p.name} dépense 1 jeton pour passer la chanson.` });
+    room.pending = null;
+    if (room.deck.length === 0 && room.discard.length > 0) { room.deck = shuffle(room.discard); room.discard = []; }
+    if (room.deck.length > 0) {
+      const rawCard = room.deck.pop();
+      const card = await attachFreshPreview(rawCard);
+      room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null };
+    }
+  }));
+
+  socket.on('free-card', withRoom((room) => {
+    const playerId = socket.data.playerId;
+    const p = me(room, playerId);
+    const active = activePlayer(room);
+    if (!p || !active || active.id !== playerId || room.pending || p.tokens < 3) return;
+    if (room.deck.length === 0) {
+      if (room.discard.length === 0) return socket.emit('error-msg', 'Plus de chansons disponibles !');
+      room.deck = shuffle(room.discard); room.discard = [];
+    }
+    const card = room.deck.pop();
+    p.tokens -= 3;
+    p.timeline = insertSorted(p.timeline, card);
+    room.log.push({ ts: nowStr(), text: `${p.name} échange 3 jetons contre une carte posée directement (${card.year}).` });
+    if (p.timeline.length >= CARDS_TO_WIN) finishGame(room, p);
+    else advanceTurn(room);
+  }));
+
+  socket.on('place-card', withRoom((room, { gapIndex }) => {
+    const playerId = socket.data.playerId;
+    if (!room.pending || room.pending.activePlayerId !== playerId || room.pending.stage !== 'listening') return;
+    room.pending.placement = { gapIndex };
+    room.pending.stage = 'placed';
+    room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} a placé sa carte sur sa frise.` });
+  }));
+
+  socket.on('submit-challenge', withRoom((room, { gapIndex }) => {
+    const playerId = socket.data.playerId;
+    const p = me(room, playerId);
+    if (!p || !room.pending || room.pending.stage !== 'placed' || room.pending.challenge) return;
+    if (room.pending.activePlayerId === playerId || p.tokens < 1) return;
+    if (room.pending.placement && gapIndex === room.pending.placement.gapIndex) {
+      return socket.emit('error-msg', 'Choisis un autre emplacement que celui déjà posé.');
+    }
+    p.tokens -= 1;
+    room.pending.challenge = { playerId, gapIndex };
+    room.log.push({ ts: nowStr(), text: `${p.name} crie "Défi !" et parie 1 jeton.` });
+  }));
+
+  socket.on('submit-guess', withRoom((room, { title, artist }) => {
+    const playerId = socket.data.playerId;
+    if (!room.pending || room.pending.guessBy || room.pending.activePlayerId !== playerId) return;
+    const correct = matchGuess(title, artist, room.pending.card);
+    room.pending.guessCorrect = correct;
+    room.pending.guessBy = playerId;
+    const p = me(room, playerId);
+    if (correct) {
+      if (p.tokens < MAX_TOKENS) p.tokens += 1;
+      room.log.push({ ts: nowStr(), text: `${p.name} trouve le titre et l'artiste — +1 jeton !` });
+    } else {
+      room.log.push({ ts: nowStr(), text: `${p.name} n'a pas trouvé le titre/artiste.` });
+    }
+  }));
+
+  socket.on('reveal', withRoom((room) => {
+    const playerId = socket.data.playerId;
+    if (!room.pending || room.pending.stage !== 'placed') return;
+    const active = room.players.find(p => p.id === room.pending.activePlayerId);
+    if (!(active.id === playerId || active.isBot)) return; // only the active player, or anyone for a bot's turn
+    resolveReveal(room);
+  }));
+
+  socket.on('play-again', withRoom((room) => {
+    room.phase = 'lobby';
+    room.players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
+    room.deck = []; room.discard = []; room.pending = null; room.lastResult = null;
+    room.turnOrder = []; room.turnIndex = 0;
+    room.log.push({ ts: nowStr(), text: 'Nouvelle partie dans ce salon !' });
+  }));
+
+  socket.on('set-dj', withRoom((room, { playerId: targetId }) => {
+    const p = room.players.find(pl => pl.id === targetId);
+    if (!p || p.isBot) return;
+    room.djId = targetId;
+    room.log.push({ ts: nowStr(), text: `🎚️ ${p.name} est maintenant le DJ.` });
+  }));
+
+  socket.on('add-bot', withRoom((room) => {
+    if (room.players.some(p => p.isBot)) return;
+    const bot = { id: 'bot-' + genId(), name: 'Bot 🤖', tokens: START_TOKENS, timeline: [], isBot: true };
+    room.players.push(bot);
+    room.log.push({ ts: nowStr(), text: 'Bot de test ajouté — tu peux lancer une partie en solo.' });
+  }));
+
+  socket.on('remove-bot', withRoom((room) => {
+    room.players = room.players.filter(p => !p.isBot);
+    room.log.push({ ts: nowStr(), text: 'Bot de test retiré.' });
+  }));
+
+  socket.on('bot-play', withRoom(async (room) => {
+    await botPlayTurn(room);
+  }));
+
+  socket.on('disconnect', () => {
+    // Players stay in the room; they can rejoin with the same name from any device.
+  });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Frise Musicale server running:`);
+  console.log(`  - sur cet appareil : http://localhost:${PORT}`);
+  console.log(`  - depuis le même Wi-Fi : http://<IP de ce téléphone>:${PORT}`);
+  ensureDeezerIds().then(() => console.log('Catalogue Deezer synchronisé.'));
+});
