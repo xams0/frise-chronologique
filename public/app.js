@@ -18,7 +18,6 @@ const state = {
   mode: 'create',            // create | join
   nameInput: '', codeInput: '', error: '', busy: false,
   playerId: null, code: null, room: null,
-  tab: 'timelines',
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
@@ -372,7 +371,7 @@ function renderGame() {
   const myself = me(room);
 
   return `
-  <div class="screen">
+  <div class="screen game-screen">
     <div class="topbar">
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="code-pill">${room.code}</div>
@@ -381,30 +380,22 @@ function renderGame() {
       <button class="iconbtn" data-act="leave">✕</button>
     </div>
 
-    <div class="tabs">
-      <button class="tab ${state.tab === 'timelines' ? 'active' : ''}" data-act="tab-timelines">Frises</button>
-      <button class="tab ${state.tab === 'log' ? 'active' : ''}" data-act="tab-log">Journal</button>
-      <button class="tab ${state.tab === 'history' ? 'active' : ''}" data-act="tab-history">Historique</button>
-    </div>
-
     ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
 
-    <div class="card-section">
+    <div class="card-section compact">
       <div class="now-playing">
         <div class="vinyl ${pend ? 'spin' : ''}"></div>
         <div class="info">
           <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
           <div class="who">${escapeHtml(active.name)}</div>
         </div>
+        <div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>
       </div>
-      <p class="subtitle" style="margin:8px 0 0;">🎚️ DJ : ${escapeHtml(getDjName(room))}</p>
 
       ${renderTurnAction(room, pend, isActive, myself)}
     </div>
 
-    ${state.tab === 'timelines' ? renderAllTimelines(room) : ''}
-    ${state.tab === 'log' ? renderLog(room) : ''}
-    ${state.tab === 'history' ? renderHistoryTab(room) : ''}
+    ${renderAllTimelines(room)}
 
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
@@ -480,9 +471,9 @@ function renderTurnAction(room, pend, isActive, myself) {
   }
 
   if (pend.stage === 'placed') {
-    html += `<div class="card-section" style="margin-top:12px;background:var(--surface2);">
-      <h3>Carte en jeu</h3>
-      <p style="font-size:14px;color:var(--text-dim);margin:0 0 10px;">${escapeHtml(active.name)} a placé sa carte sur sa frise. Quelqu'un pense que c'est faux ?</p>
+    html += `<div class="card-section compact" style="margin-top:8px;background:var(--surface2);">
+      <h3 style="font-size:12px;">Carte en jeu</h3>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">${escapeHtml(active.name)} a placé sa carte. Quelqu'un pense que c'est faux ?</p>
       ${renderPendingParticipants(room, pend)}
     </div>`;
   }
@@ -541,6 +532,7 @@ function buildRibbonItems(sortedCards, markers) {
 
 function renderAllTimelines(room) {
   const pend = room.pending;
+  const activeId = room.turnOrder && room.turnOrder.length ? room.turnOrder[room.turnIndex % room.turnOrder.length] : null;
   return room.players.map(p => {
     const sorted = p.timeline.slice().sort((a, b) => a.year - b.year);
     let markers = [];
@@ -550,10 +542,11 @@ function renderAllTimelines(room) {
       markers.push({ gapIndex: pend.challenge.gapIndex, cls: 'challenge', label: `${challenger ? challenger.name : '?'} pense ici` });
     }
     const items = buildRibbonItems(sorted, markers);
+    const isTurn = p.id === activeId;
     return `
-    <div class="card-section">
+    <div class="card-section compact ${isTurn ? 'turn-active' : ''}">
       <div class="timeline-owner">
-        <span><b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${CARDS_TO_WIN}</span>
+        <span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${CARDS_TO_WIN}</span>
         <span class="mono" style="color:var(--gold)">${p.tokens} 🪙</span>
       </div>
       <div class="ribbon">
@@ -565,24 +558,6 @@ function renderAllTimelines(room) {
       </div>
     </div>`;
   }).join('');
-}
-
-function renderLog(room) {
-  const items = room.log.slice(-40);
-  return `<div class="card-section"><div class="log">
-    ${items.slice().reverse().map(l => `<div class="log-line">${escapeHtml(l.text)} <span style="opacity:0.5">· ${escapeHtml(l.ts)}</span></div>`).join('')}
-  </div></div>`;
-}
-
-function renderHistoryTab(room) {
-  if (!room.history.length) return `<div class="card-section"><div class="empty">Aucune partie terminée pour l'instant dans ce salon.</div></div>`;
-  return `<div class="card-section"><h3>Parties jouées</h3>
-    ${room.history.map(h => `
-      <div style="margin-bottom:12px;">
-        <div style="font-weight:700;">🏆 ${escapeHtml(h.winnerName)} <span style="color:var(--text-dim);font-weight:400;font-size:12px;">— ${h.ts}</span></div>
-        <div style="font-size:12.5px;color:var(--text-dim);">${h.players.map(pl => `${escapeHtml(pl.name)}: ${pl.cards}`).join(' · ')}</div>
-      </div>`).join('')}
-  </div>`;
 }
 
 function renderFinished() {
@@ -833,9 +808,6 @@ function attachHandlers() {
       else if (act === 'bot-play') botPlayTurn();
       else if (act === 'dismiss-result') { state.seenResultAt = parseInt(elm.getAttribute('data-ts'), 10); render(); }
       else if (act === 'play-preview') playPreviewManually();
-      else if (act === 'tab-timelines') { state.tab = 'timelines'; render(); }
-      else if (act === 'tab-log') { state.tab = 'log'; render(); }
-      else if (act === 'tab-history') { state.tab = 'history'; render(); }
       else if (act === 'draw-card') drawCard();
       else if (act === 'free-card') freeCardWithTokens();
       else if (act === 'skip-card') skipCard();
