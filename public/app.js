@@ -588,7 +588,7 @@ function renderPlacementModal(room) {
     const selected = state.selectedGap === i;
     if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta">Ta carte ira ici</div></div>`;
     else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''}>+</button></div>`;
-    if (i < sorted.length) slots += `<div class="ticket"><div class="year">?</div><div class="meta">${escapeHtml(sorted[i].title)}</div></div>`;
+    if (i < sorted.length) slots += `<div class="ticket"><div class="year">${sorted[i].year}</div><div class="meta">${escapeHtml(sorted[i].title)}<br>${escapeHtml(sorted[i].artist)}</div></div>`;
   }
 
   return `
