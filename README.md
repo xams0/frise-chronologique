@@ -37,9 +37,15 @@ défausse), au cas où ce n'était qu'un problème passager.
 
 **Pour être sûr que tout le catalogue est jouable :** dans le salon d'attente
 → 📚 Bibliothèque → **🔍 Vérifier la bibliothèque**. Ça interroge Deezer en
-direct pour chaque chanson (peut prendre une minute pour 300+ titres) et
-affiche celles sans correspondance ou sans extrait audio, avec un bouton pour
-les retirer directement.
+direct pour chaque chanson, avec un rythme volontairement lent (par petits
+lots espacés) pour rester sous la limite de débit de Deezer — compte 1 à 2
+minutes pour 300+ titres. Affiche celles sans correspondance ou sans extrait
+audio, avec un bouton pour les retirer directement.
+
+⚠️ Si la console affiche `Quota limit exceeded`, ce n'est **pas** un problème
+avec la chanson elle-même — c'est Deezer qui demande de ralentir. Le serveur
+réessaie automatiquement plusieurs fois avant d'abandonner une chanson, donc
+ce message seul n'est pas une raison de la supprimer.
 
 ## Bibliothèque et filtres (depuis la v1.3)
 

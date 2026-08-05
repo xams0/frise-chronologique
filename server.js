@@ -109,21 +109,38 @@ function insertSorted(timeline, card) {
 // never set in production — Render will just never define this variable.
 const FAKE_DEEZER = process.env.FAKE_DEEZER === '1';
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Deezer's public API allows roughly 50 requests / 5 seconds. A "Quota limit
+// exceeded" response is Deezer saying "slow down", NOT "this song doesn't
+// exist" — treating it as a real failure would wrongly flag perfectly good
+// songs as broken. So every Deezer call retries with backoff specifically on
+// quota errors before ever giving up.
+async function deezerFetchJson(url, retries = 4) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Deezer HTTP ' + res.status);
+    const data = await res.json();
+    if (data.error) {
+      const isQuota = /quota/i.test(data.error.message || '');
+      if (isQuota && attempt < retries) {
+        await sleep(2500 * (attempt + 1)); // 2.5s, 5s, 7.5s, 10s
+        continue;
+      }
+      throw new Error('Deezer error: ' + data.error.message);
+    }
+    return data;
+  }
+}
+
 async function deezerSearch(query) {
   if (FAKE_DEEZER) return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12) }];
-  const res = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
-  if (!res.ok) throw new Error('Deezer search HTTP ' + res.status);
-  const data = await res.json();
-  if (data.error) throw new Error('Deezer error: ' + data.error.message);
+  const data = await deezerFetchJson(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
   return data.data || [];
 }
 async function deezerTrack(id) {
   if (FAKE_DEEZER) return { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' } };
-  const res = await fetch(`https://api.deezer.com/track/${id}`);
-  if (!res.ok) throw new Error('Deezer track HTTP ' + res.status);
-  const data = await res.json();
-  if (data.error) throw new Error('Deezer error: ' + data.error.message);
-  return data;
+  return await deezerFetchJson(`https://api.deezer.com/track/${id}`);
 }
 // Best-effort: attach {previewUrl, cover} to a card object for THIS turn only.
 // Never throws — on any failure the card just plays without audio and the
@@ -163,7 +180,7 @@ async function ensureDeezerIds() {
   const todo = catalog.filter(s => !s.deezerId);
   if (!todo.length) return;
   let changed = false;
-  const BATCH = 10; // stay well under Deezer's public rate limit while still going much faster than one-by-one
+  const BATCH = 5; // small batches + a pause below keeps us well under Deezer's ~50 req/5s limit
   for (let i = 0; i < todo.length; i += BATCH) {
     const batch = todo.slice(i, i + BATCH);
     await Promise.all(batch.map(async (song) => {
@@ -180,6 +197,7 @@ async function ensureDeezerIds() {
         console.warn(`Deezer: recherche échouée pour ${song.artist} – ${song.title}:`, e.message);
       }
     }));
+    if (i + BATCH < todo.length && !FAKE_DEEZER) await sleep(1200);
   }
   if (changed) saveCatalog();
 }
@@ -329,7 +347,7 @@ app.get('/api/songs/health', async (req, res) => {
   const noMatch = [];
   const noPreview = [];
   let okCount = 0;
-  const BATCH = 10;
+  const BATCH = 5; // small batches + a pause keeps us well under Deezer's ~50 req/5s limit
   for (let i = 0; i < catalog.length; i += BATCH) {
     const batch = catalog.slice(i, i + BATCH);
     await Promise.all(batch.map(async (song) => {
@@ -339,9 +357,10 @@ app.get('/api/songs/health', async (req, res) => {
         if (t.preview) okCount++;
         else noPreview.push({ title: song.title, artist: song.artist, year: song.year });
       } catch (e) {
-        noPreview.push({ title: song.title, artist: song.artist, year: song.year });
+        noPreview.push({ title: song.title, artist: song.artist, year: song.year, reason: e.message });
       }
     }));
+    if (i + BATCH < catalog.length && !FAKE_DEEZER) await sleep(1200);
   }
   res.json({ total: catalog.length, ok: okCount, noMatch, noPreview });
 });
