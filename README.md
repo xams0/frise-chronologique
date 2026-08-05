@@ -47,6 +47,20 @@ avec la chanson elle-même — c'est Deezer qui demande de ralentir. Le serveur
 réessaie automatiquement plusieurs fois avant d'abandonner une chanson, donc
 ce message seul n'est pas une raison de la supprimer.
 
+## Vérification obligatoire au démarrage (depuis la v1.10)
+
+Personne ne peut créer ni rejoindre un salon tant que **toute la bibliothèque**
+n'a pas été vérifiée contre Deezer pour ce cycle de démarrage — un écran de
+chargement avec une barre de progression en temps réel (%, X/Y chansons)
+s'affiche en attendant. Cette vérification tourne à chaque démarrage du
+serveur (donc à chaque redéploiement, et à chaque réveil du tier gratuit
+Render après une période d'inactivité).
+
+**Contrepartie assumée :** comme le tier gratuit de Render s'endort après 15
+minutes d'inactivité, ça veut dire qu'un premier visiteur après une pause
+attendra 1 à 2 minutes avant de pouvoir jouer, à chaque fois. C'est le prix
+de la garantie "aucune chanson muette ne peut arriver en jeu".
+
 ## Bibliothèque et filtres (depuis la v1.3)
 
 Le catalogue de départ contient **309 chansons**, de 1900 à 2026, réparties en

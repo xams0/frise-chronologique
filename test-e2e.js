@@ -41,32 +41,82 @@ function waitForRoomWhere(socket, predicate, timeoutMs = 4000) {
   });
 }
 
+function waitForReady(baseUrl, timeoutMs = 40000) {
+  const start = Date.now();
+  return (async function poll() {
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const res = await fetch(`${baseUrl}/api/ready`);
+        const data = await res.json();
+        if (data.ready) return data;
+      } catch (e) { /* server might not be listening yet */ }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    throw new Error('timed out waiting for /api/ready');
+  })();
+}
+
 async function main() {
+  // ---- Phase -1: with REAL (unfaked) Deezer calls — blocked in this sandbox,
+  // so verification takes a while — confirm create-room is actually refused
+  // WHILE the scan is still in progress, not just "before the client polled". ----
+  const slowServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 2) } });
+  slowServer.stdout.on('data', () => {});
+  slowServer.stderr.on('data', () => {});
+  try {
+    const slowUrl = `http://localhost:${PORT + 2}`;
+    await new Promise(r => setTimeout(r, 1200)); // give it just enough time to start listening, well before verification can finish
+    const earlyRes = await fetch(`${slowUrl}/api/ready`);
+    const earlyData = await earlyRes.json();
+    if (earlyData.ready === false) ok('readiness gate correctly reports not-ready shortly after boot (real Deezer scan still running)');
+    else fail('expected ready:false shortly after boot, got ' + JSON.stringify(earlyData));
+
+    const p0 = io(slowUrl, { transports: ['websocket'] });
+    await waitFor(p0, 'connect');
+    let blockedMsg = null;
+    p0.once('error-msg', (msg) => { blockedMsg = msg; });
+    p0.emit('create-room', { name: 'TooEarly' });
+    await new Promise(r => setTimeout(r, 500));
+    if (blockedMsg) ok('create-room correctly refused while the catalog is still being verified: "' + blockedMsg + '"');
+    else fail('create-room should have been refused before the readiness gate opened');
+    p0.disconnect();
+  } catch (e) {
+    fail('phase -1 (pre-ready gate) exception: ' + e.message);
+  } finally {
+    slowServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+  }
+
   // ---- Phase 0: confirm the actual fix — with zero real Deezer access (this
-  // sandbox's normal state), draw-card must NEVER hand back a silent card. ----
-  const noAudioServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 1) } });
+  // sandbox's normal state), draw-card must NEVER hand back a silent card,
+  // AND the new readiness gate must still open (checked-but-all-failed still
+  // counts as "done checking") while correctly reporting zero playable songs. ----
+  const noAudioServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 1), FAKE_DEEZER: '1', FAKE_DEEZER_FAIL: '1' } });
   let noAudioLog = '';
   noAudioServer.stdout.on('data', d => { noAudioLog += d; });
   noAudioServer.stderr.on('data', d => { noAudioLog += d; });
-  await new Promise(r => setTimeout(r, 900));
   try {
     const noAudioUrl = `http://localhost:${PORT + 1}`;
+    const readyData = await waitForReady(noAudioUrl);
+    if (readyData.ok === 0) ok(`readiness gate completed even with Deezer unreachable (0/${readyData.total} playable, as expected)`);
+    else fail(`expected 0 playable songs with Deezer blocked, got ${readyData.ok}/${readyData.total}`);
+
     const p1 = io(noAudioUrl, { transports: ['websocket'] });
     const p2 = io(noAudioUrl, { transports: ['websocket'] });
     await Promise.all([waitFor(p1, 'connect'), waitFor(p2, 'connect')]);
     p1.emit('create-room', { name: 'NoAudioA' });
     const j1 = await waitFor(p1, 'joined');
+    ok('create-room succeeds once the readiness gate has opened (even with a 0-playable catalog)');
     p2.emit('join-room', { code: j1.code, name: 'NoAudioB' });
     await waitFor(p2, 'joined');
-    // Real Deezer is unreachable here, so no song will ever have a resolved
-    // deezerId in time -> the pool should be empty -> start-game must refuse,
-    // never silently start a game full of unplayable cards.
+    // Real Deezer is unreachable here, so no song is playable -> the pool is
+    // empty -> start-game must refuse, never silently deal unplayable cards.
     let sawError = false;
     p1.once('error-msg', () => { sawError = true; });
     p1.emit('start-game');
     await new Promise(r => setTimeout(r, 800));
-    if (sawError) ok('with no real Deezer access, start-game correctly refuses rather than dealing silent cards');
-    else fail('start-game should have refused when no songs have a resolved Deezer match');
+    if (sawError) ok('with zero playable songs, start-game correctly refuses rather than dealing silent cards');
+    else fail('start-game should have refused when no songs are confirmed playable');
     p1.disconnect(); p2.disconnect();
   } catch (e) {
     fail('phase 0 (no-audio protection) exception: ' + e.message);
@@ -81,9 +131,12 @@ async function main() {
   const server = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT), FAKE_DEEZER: '1' } });
   server.stdout.on('data', d => log('server>', d.toString().trim()));
   server.stderr.on('data', d => log('server-err>', d.toString().trim()));
-  await new Promise(r => setTimeout(r, 900)); // let it boot
 
   try {
+    const readyData = await waitForReady(URL);
+    if (readyData.ready && readyData.total >= 300) ok(`readiness gate opened: ${readyData.ok}/${readyData.total} songs confirmed playable`);
+    else fail('readiness gate did not report a sane ready state: ' + JSON.stringify(readyData));
+
     // ---- REST catalog checks ----
     const catRes = await fetch(`${URL}/api/songs`);
     const catalog = await catRes.json();

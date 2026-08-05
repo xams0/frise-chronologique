@@ -14,7 +14,7 @@ let audioKey = null; // uniquely identifies which pending card is currently load
 
 /* ---------- local UI state (never synced — purely this device's screen) ---------- */
 const state = {
-  screen: 'home',           // home | lobby | game
+  screen: 'loading',        // loading | home | lobby | game
   mode: 'create',            // create | join
   nameInput: '', codeInput: '', error: '', busy: false,
   playerId: null, code: null, room: null,
@@ -25,7 +25,8 @@ const state = {
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
   brackets: null, showFilters: false, artistSearch: '',
-  healthReport: null, healthChecking: false
+  healthReport: null, healthChecking: false,
+  ready: null
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -206,7 +207,8 @@ function render() {
   if (audioEl) { preservedAudio = audioEl; preservedAudio.remove(); }
 
   let html;
-  if (state.screen === 'home') html = renderHome();
+  if (state.screen === 'loading') html = renderLoading();
+  else if (state.screen === 'home') html = renderHome();
   else if (state.screen === 'lobby') html = renderLobby();
   else html = renderGame();
   root.innerHTML = html;
@@ -240,6 +242,28 @@ function render() {
   }
 
   attachHandlers();
+}
+
+function renderLoading() {
+  const r = state.ready;
+  const total = r && r.total ? r.total : null;
+  const checked = r && r.checked ? r.checked : 0;
+  const percent = total ? Math.round((checked / total) * 100) : 0;
+  return `
+  <div class="screen center">
+    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl">Frise Musicale</h1></div>
+    <p class="subtitle" style="margin-top:10px;">Vérification de la bibliothèque musicale sur Deezer avant d'ouvrir le salon…</p>
+
+    <div style="width:100%;max-width:280px;margin-top:28px;">
+      <div style="background:var(--surface2);border-radius:999px;height:14px;overflow:hidden;border:1px solid var(--line);">
+        <div style="background:var(--pink);height:100%;width:${percent}%;transition:width 0.4s ease;border-radius:999px;"></div>
+      </div>
+      <p class="mono" style="text-align:center;margin-top:10px;font-size:15px;color:var(--gold);font-weight:700;">${percent}%</p>
+      <p class="subtitle" style="text-align:center;margin-top:2px;">${total ? `${checked} / ${total} chansons vérifiées` : 'Démarrage…'}</p>
+    </div>
+
+    <p class="footer-note" style="margin-top:24px;">Ça prend en général 1 à 2 minutes — le serveur reste volontairement lent pour respecter la limite de débit de Deezer.</p>
+  </div>`;
 }
 
 function renderHome() {
@@ -845,7 +869,22 @@ async function loadVersion() {
   } catch (e) { /* not critical */ }
 }
 
+async function pollReady() {
+  try {
+    const res = await fetch('/api/ready');
+    state.ready = await res.json();
+  } catch (e) { state.ready = null; }
+  if (state.ready && state.ready.ready) {
+    state.screen = 'home';
+    render();
+    return;
+  }
+  render();
+  setTimeout(pollReady, 1000);
+}
+
 render();
+pollReady();
 loadCatalog();
 loadBrackets();
 loadVersion();

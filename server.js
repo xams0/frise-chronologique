@@ -133,13 +133,19 @@ async function deezerFetchJson(url, retries = 4) {
   }
 }
 
+// FAKE_DEEZER_FAIL=1 (only meaningful alongside FAKE_DEEZER=1) simulates every
+// song failing to match/preview — lets the test suite exercise the "zero
+// playable songs" path deterministically and fast, without waiting through
+// real pacing delays or depending on this sandbox's network being blocked.
+const FAKE_DEEZER_FAIL = process.env.FAKE_DEEZER_FAIL === '1';
+
 async function deezerSearch(query) {
-  if (FAKE_DEEZER) return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12) }];
+  if (FAKE_DEEZER) return FAKE_DEEZER_FAIL ? [] : [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12) }];
   const data = await deezerFetchJson(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
   return data.data || [];
 }
 async function deezerTrack(id) {
-  if (FAKE_DEEZER) return { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' } };
+  if (FAKE_DEEZER) return FAKE_DEEZER_FAIL ? { preview: null } : { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' } };
   return await deezerFetchJson(`https://api.deezer.com/track/${id}`);
 }
 // Best-effort: attach {previewUrl, cover} to a card object for THIS turn only.
@@ -200,6 +206,45 @@ async function ensureDeezerIds() {
     if (i + BATCH < todo.length && !FAKE_DEEZER) await sleep(1200);
   }
   if (changed) saveCatalog();
+}
+
+// ---------- startup readiness gate ----------
+// Nobody can create or join a room until EVERY song in the catalog has been
+// checked against Deezer this boot cycle (resolved match + confirmed playable
+// preview). `readyState` is polled by the client for the loading screen.
+let readyState = { ready: false, checked: 0, total: 0, ok: 0 };
+
+async function verifyAndPrepareCatalog() {
+  readyState = { ready: false, checked: 0, total: catalog.length, ok: 0 };
+  let catalogChanged = false;
+  const BATCH = 5;
+  for (let i = 0; i < catalog.length; i += BATCH) {
+    const batch = catalog.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (song) => {
+      try {
+        if (!song.deezerId) {
+          const results = await deezerSearch(`${song.artist} ${song.title}`);
+          if (results.length) { song.deezerId = results[0].id; catalogChanged = true; }
+        }
+        if (song.deezerId) {
+          const t = await deezerTrack(song.deezerId);
+          song._verifiedPreview = !!t.preview;
+          if (song._verifiedPreview) readyState.ok++;
+        } else {
+          song._verifiedPreview = false;
+        }
+      } catch (e) {
+        song._verifiedPreview = false;
+        console.warn(`Vérification échouée pour ${song.artist} – ${song.title}:`, e.message);
+      } finally {
+        readyState.checked++;
+      }
+    }));
+    if (i + BATCH < catalog.length && !FAKE_DEEZER) await sleep(1200);
+  }
+  if (catalogChanged) saveCatalog();
+  readyState.ready = true;
+  console.log(`Vérification terminée : ${readyState.ok}/${readyState.total} chansons confirmées jouables.`);
 }
 
 // ---------- room helpers ----------
@@ -290,6 +335,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/songs', (req, res) => res.json(catalog));
 app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
+app.get('/api/ready', (req, res) => res.json(readyState));
 app.get('/api/brackets', (req, res) => res.json(BRACKETS));
 
 app.post('/api/songs', async (req, res) => {
@@ -369,6 +415,7 @@ app.get('/api/songs/health', async (req, res) => {
 io.on('connection', (socket) => {
 
   socket.on('create-room', ({ name }) => {
+    if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
     name = (name || '').trim().slice(0, 20);
     if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
     let code;
@@ -394,6 +441,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('join-room', ({ code, name }) => {
+    if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
     code = (code || '').trim().toUpperCase();
     name = (name || '').trim().slice(0, 20);
     const room = rooms[code];
@@ -433,7 +481,7 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', withRoom((room) => {
     if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
-    const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
+    const pool = catalog.filter(s => s._verifiedPreview && songMatchesFilters(s, room.filters));
     if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
       return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).`);
     }
@@ -584,5 +632,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Frise Musicale v${APP_VERSION} — server running:`);
   console.log(`  - sur cet appareil : http://localhost:${PORT}`);
   console.log(`  - depuis le même Wi-Fi : http://<IP de ce téléphone>:${PORT}`);
-  ensureDeezerIds().then(() => console.log('Catalogue Deezer synchronisé.'));
+  verifyAndPrepareCatalog();
 });
