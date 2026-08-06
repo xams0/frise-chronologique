@@ -848,10 +848,10 @@ function renderAllTimelines(room) {
   return room.players.map(p => {
     const sorted = p.timeline.slice().sort((a, b) => a.year - b.year);
     let markers = [];
-    if (pend && pend.activePlayerId === p.id && pend.placement) markers.push({ gapIndex: pend.placement.gapIndex, cls: 'pending', label: `Carte de ${p.name} (en attente)` });
+    if (pend && pend.activePlayerId === p.id && pend.placement) markers.push({ gapIndex: pend.placement.gapIndex, cls: 'pending', label: 'En attente' });
     if (pend && pend.activePlayerId === p.id && pend.challenge) {
       const challenger = room.players.find(pl => pl.id === pend.challenge.playerId);
-      markers.push({ gapIndex: pend.challenge.gapIndex, cls: 'challenge', label: `${challenger ? challenger.name : '?'} pense ici` });
+      markers.push({ gapIndex: pend.challenge.gapIndex, cls: 'challenge', label: `${challenger ? challenger.name : '?'} ?` });
     }
     const items = buildRibbonItems(sorted, markers);
     const isTurn = p.id === activeId;
@@ -865,7 +865,7 @@ function renderAllTimelines(room) {
       <div class="ribbon">
         ${items.length === 0 ? '<div class="empty">Pas encore de carte</div>' :
           items.map(it => {
-            if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta">${escapeHtml(it.label)}</div></div>`;
+            if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(it.label)}</div></div></div>`;
             const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
             return `<div class="ticket ${isWonCard ? 'ticket-won' : ''}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div></div></div>`;
           }).join('')}
@@ -907,7 +907,7 @@ function renderPlacementModal(room) {
   for (let i = 0; i <= sorted.length; i++) {
     const disabled = i === excludeGap;
     const selected = state.selectedGap === i;
-    if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta">Ta carte ira ici</div></div>`;
+    if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">Ici</div></div></div>`;
     else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''}>+</button></div>`;
     if (i < sorted.length) slots += `<div class="ticket"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div></div></div>`;
   }
