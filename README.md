@@ -325,3 +325,15 @@ l'écran de victoire. Il sert aussi de :
   d'accueil" dans Safari) — fond bleu marine assorti au thème, comme une
   vraie app
 - **Icône Android/PWA** via `manifest.json` (192px et 512px)
+
+## v1.24 — carte gagnée qui clignote, lecteur audio simplifié, notifs auto
+
+- La carte qui vient d'être gagnée ou volée **clignote en doré** dans la
+  frise pendant quelques secondes, pour bien la repérer.
+- Lecteur audio simplifié : texte explicatif retiré, remplacé par une petite
+  **animation d'égaliseur** (barres qui bougent) montrant que le son joue,
+  et un **compteur "Xs / 30s"** en direct. Le bouton "🔊 Appuyer si pas de
+  son" reste disponible en secours.
+- Les notifications de résultat (bien placé / raté / volé) **disparaissent
+  seules après 3,5 secondes** — plus besoin de cliquer "OK" — et sont
+  maintenant affichées **sous les frises**, pas au-dessus.

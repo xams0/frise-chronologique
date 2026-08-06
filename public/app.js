@@ -188,6 +188,9 @@ socket.on('joined', ({ playerId, code, room }) => {
   saveLastName(name);
   render();
 });
+const RESULT_NOTICE_MS = 3500; // how long the reveal-outcome notice (and the matching card highlight) stays up before auto-clearing
+let lastNotifiedResultTs = null;
+
 socket.on('room', (room) => {
   // Robust fallback: if we're no longer in the player list for whatever
   // reason (kicked, or the "kicked" event above didn't arrive for some
@@ -198,6 +201,13 @@ socket.on('room', (room) => {
     Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: 'Tu ne fais plus partie de ce salon (exclu·e, ou le salon a été fermé).' });
     render();
     return;
+  }
+  if (room.lastResult && room.lastResult.ts !== lastNotifiedResultTs) {
+    lastNotifiedResultTs = room.lastResult.ts;
+    const ts = room.lastResult.ts;
+    setTimeout(() => {
+      if (state.seenResultAt !== ts) { state.seenResultAt = ts; render(); }
+    }, RESULT_NOTICE_MS);
   }
   state.room = room;
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
@@ -308,6 +318,14 @@ function render() {
       // clips — restarting manually on 'ended' makes the loop actually work.
       // In "once" mode we deliberately do NOT restart, so it plays exactly once.
       if (shouldLoop) a.addEventListener('ended', () => { a.currentTime = 0; a.play().catch(() => {}); });
+      // Drives the "Xs / 30s" counter directly via the DOM, independent of
+      // the render cycle — timeupdate fires ~4x/sec, far too often to run a
+      // full page re-render for. Always re-queries the element fresh so it
+      // still finds the right node even if the page got rebuilt meanwhile.
+      a.addEventListener('timeupdate', () => {
+        const counterEl = document.getElementById('audio-counter');
+        if (counterEl) counterEl.textContent = Math.min(30, Math.floor(a.currentTime)) + 's / 30s';
+      });
       slot.replaceWith(a);
       audioEl = a;
       a.play().catch(() => { /* autoplay blocked — the manual play button covers this */ });
@@ -628,8 +646,6 @@ function renderGame() {
       <button class="iconbtn" data-act="leave">✕</button>
     </div>
 
-    ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
-
     <div class="card-section compact">
       <div class="now-playing">
         <div class="vinyl ${pend ? 'spin' : ''}"></div>
@@ -644,6 +660,8 @@ function renderGame() {
     </div>
 
     ${renderAllTimelines(room)}
+
+    ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
 
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
@@ -682,9 +700,9 @@ function renderTurnAction(room, pend, isActive, myself) {
       html += `
       <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
-        <div class="vinyl spin" style="width:40px;height:40px;"></div>
-        <button class="btn btn-ghost btn-sm" data-act="play-preview">▶️ Lecture (si le son ne démarre pas seul)</button>
-        <div class="hint">Extrait audio de 30 secondes${(room.audioMode || 'loop') === 'loop' ? ', en boucle' : ', une seule fois'}. Rien à voir à l'écran — seul le son compte.</div>
+        <div class="sound-bars"><span></span><span></span><span></span><span></span></div>
+        <div id="audio-counter" class="mono" style="color:var(--gold);font-size:13px;">0s / 30s</div>
+        <button class="btn btn-ghost btn-sm" data-act="play-preview">🔊 Appuyer si pas de son</button>
       </div>`;
     } else {
       html += `<p class="subtitle" style="margin-top:10px;">🔇 Aperçu audio indisponible pour cette chanson sur Deezer — devinez à partir du titre/artiste une fois révélé, ou passez-la.</p>`;
@@ -806,6 +824,10 @@ function renderAllTimelines(room) {
   const pend = room.pending;
   const activeId = room.turnOrder && room.turnOrder.length ? room.turnOrder[room.turnIndex % room.turnOrder.length] : null;
   const missed = room.missedCards || [];
+  const lr = room.lastResult;
+  const showWonHighlight = lr && lr.kind !== 'wrong' && (Date.now() - lr.ts) < RESULT_NOTICE_MS;
+  const wonPlayerName = showWonHighlight ? (lr.kind === 'stolen' ? lr.extraName : lr.activeName) : null;
+
   return room.players.map(p => {
     const sorted = p.timeline.slice().sort((a, b) => a.year - b.year);
     let markers = [];
@@ -825,10 +847,11 @@ function renderAllTimelines(room) {
       </div>
       <div class="ribbon">
         ${items.length === 0 ? '<div class="empty">Pas encore de carte</div>' :
-          items.map(it => it.type === 'card'
-            ? `<div class="ticket"><div class="year">${it.card.year}</div><div class="meta">${escapeHtml(it.card.title)}<br>${escapeHtml(it.card.artist)}</div></div>`
-            : `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta">${escapeHtml(it.label)}</div></div>`
-          ).join('')}
+          items.map(it => {
+            if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta">${escapeHtml(it.label)}</div></div>`;
+            const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
+            return `<div class="ticket ${isWonCard ? 'ticket-won' : ''}"><div class="year">${it.card.year}</div><div class="meta">${escapeHtml(it.card.title)}<br>${escapeHtml(it.card.artist)}</div></div>`;
+          }).join('')}
       </div>
       ${playerMissed.length ? `
       <div class="missed-history">

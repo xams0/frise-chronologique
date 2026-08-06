@@ -131,6 +131,14 @@
   .yt-overlay{position:absolute;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:2;}
   .yt-overlay .hint{color:var(--text-dim);font-size:12px;text-align:center;padding:0 20px;}
 
+  .sound-bars{display:flex;align-items:flex-end;gap:4px;height:28px;}
+  .sound-bars span{width:5px;background:linear-gradient(180deg,var(--teal),var(--pink));border-radius:3px;animation:soundBar 1s ease-in-out infinite;}
+  .sound-bars span:nth-child(1){animation-delay:0s;height:10px;}
+  .sound-bars span:nth-child(2){animation-delay:0.15s;height:22px;}
+  .sound-bars span:nth-child(3){animation-delay:0.3s;height:14px;}
+  .sound-bars span:nth-child(4){animation-delay:0.45s;height:26px;}
+  @keyframes soundBar{0%,100%{transform:scaleY(0.35);}50%{transform:scaleY(1);}}
+
   .guess-box{display:flex;gap:8px;margin-top:12px;}
   .guess-box input{flex:1;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;}
   .guess-ok{color:var(--teal);font-size:13px;margin-top:8px;font-weight:600;}
@@ -145,6 +153,8 @@
   .ticket.pending .year{color:var(--pink);}
   .ticket.challenge{border-color:var(--teal);border-style:solid;background:rgba(63,217,196,0.12);}
   .ticket.challenge .year{color:var(--teal);}
+  .ticket.ticket-won{border-color:var(--gold);border-style:solid;animation:ticketWon 0.6s ease-in-out infinite alternate;}
+  @keyframes ticketWon{0%{box-shadow:0 0 0 0 rgba(242,184,75,0);background:var(--surface2);}100%{box-shadow:0 0 16px 4px rgba(242,184,75,0.6);background:rgba(242,184,75,0.18);}}
   .slot{flex:0 0 auto;width:26px;display:flex;align-items:center;justify-content:center;}
   .slot button{width:22px;height:22px;border-radius:50%;background:var(--surface);border:1px dashed var(--line);color:var(--text-dim);font-size:14px;line-height:1;}
   .slot button.active{background:var(--pink);border-color:var(--pink);color:#fff;}
