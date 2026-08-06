@@ -11,6 +11,7 @@ const socket = io();
 /* ---------- audio preview player (survives re-renders without restarting) ---------- */
 let audioEl = null;
 let audioKey = null; // uniquely identifies which pending card is currently loaded
+let revealTicker = null; // interval id for animating the reveal-button countdown
 
 /* ---------- local UI state (never synced — purely this device's screen) ---------- */
 const state = {
@@ -240,6 +241,22 @@ function render() {
     audioEl = null; audioKey = null;
   }
 
+  // Keep the "Révéler" countdown bar animating smoothly by re-rendering a
+  // few times a second while a card is placed and still within its delay —
+  // and stop as soon as it's not needed, so this never runs idle forever.
+  const pend = state.room && state.room.pending;
+  if (pend && pend.stage === 'placed' && pend.placedAt) {
+    const delayMs = ((state.room.revealDelaySeconds || 15) * 1000);
+    const elapsed = Date.now() - pend.placedAt;
+    if (elapsed < delayMs) {
+      if (!revealTicker) revealTicker = setInterval(render, 250);
+    } else if (revealTicker) {
+      clearInterval(revealTicker); revealTicker = null;
+    }
+  } else if (revealTicker) {
+    clearInterval(revealTicker); revealTicker = null;
+  }
+
   attachHandlers();
 }
 
@@ -269,7 +286,6 @@ function renderHome() {
   return `
   <div class="screen center">
     <div class="brand"><div class="vinyl"></div><h1 class="title-xl">Frise Musicale</h1></div>
-    <p class="subtitle">Devinez l'année de la chanson et placez-la sur votre frise avant vos amis.<br>Serveur local — connectez-vous depuis le même Wi-Fi.</p>
 
     <div class="tabs" style="margin-top:26px;max-width:280px;">
       <button class="tab ${state.mode === 'create' ? 'active' : ''}" data-act="mode-create">Créer un salon</button>
@@ -291,8 +307,6 @@ function renderHome() {
         ${state.busy ? '…' : (state.mode === 'create' ? 'Créer le salon' : 'Rejoindre')}
       </button>
     </div>
-
-    <p class="footer-note">Extraits audio Deezer — rien à voir à l'écran, seul le son compte pour deviner.</p>
   </div>`;
 }
 
@@ -300,9 +314,11 @@ function renderLobby() {
   const room = state.room;
   if (!room) return renderHome();
   const isMe = id => id === state.playerId;
+  const isHost = room.hostId === state.playerId;
   const djId = getDjId(room);
   const hasBot = room.players.some(p => p.isBot);
   const listenMode = room.listenMode || 'together';
+  const revealDelay = room.revealDelaySeconds || 15;
   return `
   <div class="screen">
     <div class="topbar">
@@ -317,18 +333,21 @@ function renderLobby() {
       ${room.players.map(p => `
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}">
           <div class="dot"></div>
-          <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
+          <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
         </div>`).join('')}
       ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">🧪 Ajouter un bot pour tester seul</button>` : ''}
       ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">Retirer le bot de test</button>` : ''}
+      ${!isHost ? `<p class="subtitle" style="margin:8px 0 0;">👑 ${escapeHtml(room.players.find(p => p.id === room.hostId)?.name || '?')} est l'hôte — seul·e à pouvoir changer les réglages et lancer la partie.</p>` : ''}
     </div>
 
     <div class="card-section">
       <h3>Où êtes-vous ?</h3>
+      ${isHost ? `
       <div class="row" style="margin-top:8px;">
         <button class="btn ${listenMode === 'together' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-together">🎉 Tous ensemble</button>
         <button class="btn ${listenMode === 'remote' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-remote">🏠 Chacun chez soi</button>
-      </div>
+      </div>` : `
+      <div class="code-pill" style="margin-top:8px;justify-content:center;">${listenMode === 'together' ? '🎉 Tous ensemble' : '🏠 Chacun chez soi'}</div>`}
       <p class="subtitle" style="margin:10px 0 0;">${listenMode === 'together'
         ? 'Un DJ unique diffuse la musique à voix haute pour toute la pièce.'
         : 'Pas de DJ — chaque joueur entend l\'extrait directement sur son propre téléphone.'}</p>
@@ -340,21 +359,34 @@ function renderLobby() {
       <p class="subtitle" style="margin:0 0 10px;">Le DJ fait jouer la musique sur son téléphone pour toute la salle.</p>
       <div class="row">
         <div class="code-pill" style="justify-content:center;">🎚️ ${escapeHtml(getDjName(room))}</div>
-        <button class="btn btn-ghost btn-sm" data-act="open-dj">Changer</button>
+        ${isHost ? `<button class="btn btn-ghost btn-sm" data-act="open-dj">Changer</button>` : ''}
       </div>
     </div>` : ''}
+
+    <div class="card-section">
+      <h3>Délai avant de pouvoir révéler</h3>
+      <p class="subtitle" style="margin:0 0 10px;">Le temps laissé aux autres pour défier avant que la carte puisse être révélée.</p>
+      ${isHost ? `
+      <div class="row" style="align-items:center;">
+        <button class="btn btn-ghost btn-sm" data-act="reveal-delay-minus" ${revealDelay <= 5 ? 'disabled' : ''}>−5s</button>
+        <div class="code-pill" style="justify-content:center;">${revealDelay}s</div>
+        <button class="btn btn-ghost btn-sm" data-act="reveal-delay-plus" ${revealDelay >= 60 ? 'disabled' : ''}>+5s</button>
+      </div>` : `<div class="code-pill" style="justify-content:center;">${revealDelay}s</div>`}
+    </div>
 
     ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
 
     <div class="card-section">
       <h3>Options de partie</h3>
       <p class="subtitle" style="margin:0 0 10px;">${matchCount(room) === null ? '…' : matchCount(room)} chanson${matchCount(room) === 1 ? '' : 's'} disponible${matchCount(room) === 1 ? '' : 's'} avec les filtres actuels.</p>
-      <button class="btn btn-ghost btn-sm" data-act="show-filters">⚙️ Choisir périodes / genres / pays / artistes</button>
+      ${isHost ? `<button class="btn btn-ghost btn-sm" data-act="show-filters">⚙️ Choisir périodes / artistes</button>` : ''}
     </div>
 
+    ${isHost ? `
     <button class="btn btn-primary" data-act="start-game" ${room.players.length < 2 ? 'disabled' : ''}>
       ${room.players.length < 2 ? "En attente d'un 2e joueur…" : 'Lancer la partie'}
-    </button>
+    </button>` : `
+    <button class="btn btn-primary" disabled>En attente que l'hôte lance la partie…</button>`}
     <div class="row" style="margin-top:10px;">
       <button class="btn btn-ghost btn-sm" data-act="show-rules">Règles</button>
       <button class="btn btn-ghost btn-sm" data-act="show-library">📚 Bibliothèque (${state.catalog ? state.catalog.length : '…'})</button>
@@ -494,6 +526,20 @@ function renderTurnAction(room, pend, isActive, myself) {
   return html;
 }
 
+function renderRevealButton(room, pend, label) {
+  const delayMs = (room.revealDelaySeconds || 15) * 1000;
+  const elapsed = Date.now() - (pend.placedAt || Date.now());
+  const remaining = Math.max(0, delayMs - elapsed);
+  const ready = remaining <= 0;
+  const percent = Math.min(100, (elapsed / delayMs) * 100);
+  const secondsLeft = Math.ceil(remaining / 1000);
+  return `
+  <button class="btn btn-primary reveal-btn" data-act="reveal" ${ready ? '' : 'disabled'}>
+    <div class="reveal-fill" style="width:${percent}%;"></div>
+    <span class="reveal-label">${ready ? label : `${label} (${secondsLeft}s)`}</span>
+  </button>`;
+}
+
 function renderPendingParticipants(room, pend) {
   const activePl = room.players.find(p => p.id === pend.activePlayerId);
   const activeIsBot = !!activePl.isBot;
@@ -504,9 +550,9 @@ function renderPendingParticipants(room, pend) {
   if (activeIsBot) {
     if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier le Bot (1 🪙)</button>`;
     if (pend.challenge) html += `<p class="subtitle" style="margin:6px 0 0;">Tu as déjà défié ce placement.</p>`;
-    html += `<button class="btn btn-primary" data-act="reveal">🤖 Révéler pour le Bot</button>`;
+    html += renderRevealButton(room, pend, '🤖 Révéler pour le Bot');
   } else if (iAmActive) {
-    html += `<button class="btn btn-primary" data-act="reveal">Révéler la carte</button>`;
+    html += renderRevealButton(room, pend, 'Révéler la carte');
   } else {
     if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier (1 🪙)</button>`;
     if (pend.challenge) {
@@ -814,6 +860,8 @@ function attachHandlers() {
       else if (act === 'close-dj') { state.showDjPicker = false; render(); }
       else if (act === 'set-listen-together') socket.emit('set-listen-mode', { mode: 'together' });
       else if (act === 'set-listen-remote') socket.emit('set-listen-mode', { mode: 'remote' });
+      else if (act === 'reveal-delay-minus') socket.emit('set-reveal-delay', { seconds: Math.max(5, (state.room.revealDelaySeconds || 15) - 5) });
+      else if (act === 'reveal-delay-plus') socket.emit('set-reveal-delay', { seconds: Math.min(60, (state.room.revealDelaySeconds || 15) + 5) });
       else if (act === 'show-filters') { state.showFilters = true; render(); }
       else if (act === 'close-filters') { state.showFilters = false; state.artistSearch = ''; render(); }
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });

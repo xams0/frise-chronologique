@@ -56,6 +56,10 @@
   .field input.code{text-transform:uppercase;letter-spacing:0.3em;font-family:'IBM Plex Mono',monospace;text-align:center;font-size:22px;}
 
   .btn{border-radius:14px;padding:15px 20px;font-size:16px;font-weight:700;width:100%;transition:transform .1s;display:inline-block;text-decoration:none;text-align:center;box-sizing:border-box;}
+  .reveal-btn{position:relative;overflow:hidden;}
+  .btn.reveal-btn:disabled{opacity:1;}
+  .reveal-fill{position:absolute;top:0;left:0;bottom:0;background:rgba(255,255,255,0.28);transition:width 0.25s linear;z-index:1;}
+  .reveal-label{position:relative;z-index:2;}
   .btn:active{transform:scale(0.97);}
   .btn-primary{background:var(--pink);color:#fff;}
   .btn-gold{background:var(--gold);color:#241205;}

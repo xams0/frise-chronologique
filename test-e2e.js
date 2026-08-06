@@ -204,6 +204,24 @@ async function main() {
     else fail('expected 2 players after join, got ' + bobJoined.room.players.length);
     if (bobJoined.room.listenMode === 'together') ok('room defaults to "together" listen mode');
     else fail('expected default listenMode "together", got ' + bobJoined.room.listenMode);
+    if (bobJoined.room.hostId === aliceJoined.playerId) ok('room creator (Alice) is recorded as host');
+    else fail('expected hostId to be Alice, got ' + bobJoined.room.hostId);
+
+    // ---- host-only gating: Bob (non-host) must be refused on every admin action ----
+    let bobBlocked = 0;
+    const expectBlocked = (socket) => new Promise((resolve) => { socket.once('error-msg', () => { bobBlocked++; resolve(); }); });
+    await Promise.all([expectBlocked(bob), (async () => { bob.emit('start-game'); })()]);
+    await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-listen-mode', { mode: 'remote' }); })()]);
+    await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-filters', { filters: { brackets: [], artists: [] } }); })()]);
+    await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-dj', { playerId: bobJoined.playerId }); })()]);
+    await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-reveal-delay', { seconds: 5 }); })()]);
+    if (bobBlocked === 5) ok('non-host correctly refused on all 5 admin actions (start-game, listen-mode, filters, dj, reveal-delay)');
+    else fail(`expected 5 refusals for non-host actions, got ${bobBlocked}`);
+
+    // host actions should still work for Alice
+    alice.emit('set-reveal-delay', { seconds: 3 }); // shrink the reveal delay so this test suite doesn't sit idle for 15s per reveal
+    const shortDelayRoom = await waitForRoomWhere(alice, r => r.revealDelaySeconds === 3);
+    ok('host (Alice) successfully changed reveal delay to ' + shortDelayRoom.revealDelaySeconds + 's');
 
     // reconnection-by-name check
     const aliceAgain = io(URL, { transports: ['websocket'] });
@@ -240,14 +258,24 @@ async function main() {
 
     activeSocket.emit('place-card', { gapIndex: 0 });
     let roomAfterPlace = await waitForRoomWhere(activeSocket, r => r.pending && r.pending.stage === 'placed');
-    if (roomAfterPlace.pending && roomAfterPlace.pending.stage === 'placed') ok('place-card moved pending to "placed" stage');
-    else fail('place-card did not move to placed: ' + JSON.stringify(roomAfterPlace.pending));
+    if (roomAfterPlace.pending && roomAfterPlace.pending.stage === 'placed' && roomAfterPlace.pending.placedAt) {
+      ok('place-card moved pending to "placed" stage with a placedAt timestamp');
+    } else fail('place-card did not move to placed correctly: ' + JSON.stringify(roomAfterPlace.pending));
 
-    // reveal by the active player
+    // reveal-delay enforcement: an immediate reveal must be refused...
+    let tooEarlyMsg = null;
+    activeSocket.once('error-msg', (msg) => { tooEarlyMsg = msg; });
+    activeSocket.emit('reveal');
+    await new Promise(r => setTimeout(r, 400));
+    if (tooEarlyMsg) ok('reveal correctly refused before the delay elapses: "' + tooEarlyMsg + '"');
+    else fail('reveal should have been refused immediately after placement (3s delay not yet elapsed)');
+
+    // ...but succeeds once the (shortened, 3s) delay has passed
+    await new Promise(r => setTimeout(r, 3000));
     activeSocket.emit('reveal');
     let roomAfterReveal = await waitForRoomWhere(activeSocket, r => r.pending === null && r.lastResult);
     if (roomAfterReveal.pending === null && roomAfterReveal.lastResult) {
-      ok('reveal resolved: pending cleared, lastResult=' + roomAfterReveal.lastResult.kind);
+      ok('reveal resolved after the delay elapsed: pending cleared, lastResult=' + roomAfterReveal.lastResult.kind);
     } else fail('reveal did not resolve correctly: ' + JSON.stringify(roomAfterReveal.pending));
 
     // ---- bot flow ----
@@ -260,6 +288,9 @@ async function main() {
     if (roomWithBot.players.length === 2 && roomWithBot.players.some(p => p.isBot)) ok('bot added to solo room');
     else fail('add-bot failed: ' + JSON.stringify(roomWithBot.players));
 
+    carol.emit('set-reveal-delay', { seconds: 3 });
+    await waitForRoomWhere(carol, r => r.revealDelaySeconds === 3);
+
     carol.emit('start-game');
     const botGameRoom = await waitForRoomWhere(carol, r => r.phase === 'playing');
     const botActiveId = botGameRoom.turnOrder[botGameRoom.turnIndex];
@@ -267,11 +298,12 @@ async function main() {
     if (botIsActive) {
       carol.emit('bot-play');
       const afterBot = await waitForRoomWhere(carol, r => !!r.pending);
-      if (afterBot.pending && afterBot.pending.stage === 'placed' && afterBot.pending.activePlayerId === botActiveId) {
-        ok('bot-play produced a placed pending card for the bot');
+      if (afterBot.pending && afterBot.pending.stage === 'placed' && afterBot.pending.activePlayerId === botActiveId && afterBot.pending.placedAt) {
+        ok('bot-play produced a placed pending card for the bot, with a placedAt timestamp');
+        await new Promise(r => setTimeout(r, 3200)); // respect the (shortened) reveal delay
         carol.emit('reveal'); // human allowed to reveal for the bot
         const afterBotReveal = await waitForRoomWhere(carol, r => r.pending === null);
-        if (afterBotReveal.pending === null) ok('human successfully revealed on behalf of the bot');
+        if (afterBotReveal.pending === null) ok('human successfully revealed on behalf of the bot, after the delay');
         else fail('reveal-for-bot did not clear pending');
       } else fail('bot-play did not produce expected pending: ' + JSON.stringify(afterBot.pending));
     } else {

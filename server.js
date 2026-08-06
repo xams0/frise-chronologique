@@ -251,6 +251,7 @@ async function verifyAndPrepareCatalog() {
 function me(room, playerId) { return room.players.find(p => p.id === playerId); }
 function activePlayer(room) { return room.players.find(p => p.id === room.turnOrder[room.turnIndex % room.turnOrder.length]); }
 function getDjId(room) { return room.djId || (room.players[0] && room.players[0].id); }
+function isHost(room, playerId) { return room.hostId === playerId; }
 function publicRoom(room) { return room; } // everything is safe to broadcast (no secrets server-side beyond the drawn card, which is fine to reveal once drawn)
 
 function broadcast(code) {
@@ -325,7 +326,7 @@ async function botPlayTurn(room) {
   let gap;
   if (Math.random() < 0.55 && correctGaps.length) gap = correctGaps[Math.floor(Math.random() * correctGaps.length)];
   else gap = Math.floor(Math.random() * (years.length + 1));
-  room.pending = { card, activePlayerId: bot.id, stage: 'placed', placement: { gapIndex: gap }, challenge: null, guessCorrect: null, guessBy: 'bot-na' };
+  room.pending = { card, activePlayerId: bot.id, stage: 'placed', placement: { gapIndex: gap }, challenge: null, guessCorrect: null, guessBy: 'bot-na', placedAt: Date.now() };
   room.log.push({ ts: nowStr(), text: `🤖 Le Bot pioche et place une chanson (${card.year}) sur sa frise. À vous de décider si vous le croyez !` });
 }
 
@@ -423,11 +424,13 @@ io.on('connection', (socket) => {
     const playerId = genId();
     const room = {
       code, phase: 'lobby',
+      hostId: playerId, // the creator — only they can start the game or change settings
       players: [{ id: playerId, name, tokens: START_TOKENS, timeline: [] }],
       turnOrder: [], turnIndex: 0,
       deck: [], discard: [], pending: null, lastResult: null,
       djId: playerId,
       listenMode: 'together', // 'together' = one DJ plays for the room | 'remote' = everyone hears it on their own device
+      revealDelaySeconds: 15, // minimum wait before "Révéler" can be pressed, so others have time to challenge
       filters: emptyFilters(),
       log: [{ ts: nowStr(), text: `${name} a créé le salon.` }],
       history: []
@@ -481,6 +484,7 @@ io.on('connection', (socket) => {
   }
 
   socket.on('start-game', withRoom((room) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut lancer la partie.');
     if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
     const pool = catalog.filter(s => s._verifiedPreview && songMatchesFilters(s, room.filters));
     if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
@@ -501,6 +505,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-filters', withRoom((room, { filters }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer les filtres.');
     if (room.phase !== 'lobby' || !filters) return;
     room.filters = {
       brackets: Array.isArray(filters.brackets) ? filters.brackets : [],
@@ -509,6 +514,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-listen-mode', withRoom((room, { mode }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer le mode d\'écoute.');
     if (room.phase !== 'lobby') return;
     if (mode !== 'together' && mode !== 'remote') return;
     room.listenMode = mode;
@@ -518,6 +524,15 @@ io.on('connection', (socket) => {
         ? '🏠 Mode "Chacun chez soi" activé — la musique joue sur l\'appareil de chaque joueur.'
         : '🎉 Mode "Tous ensemble" activé — un DJ unique diffuse la musique pour la salle.'
     });
+  }));
+
+  socket.on('set-reveal-delay', withRoom((room, { seconds }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    const s = parseInt(seconds, 10);
+    if (!Number.isFinite(s) || s < 3 || s > 60) return socket.emit('error-msg', 'Le délai doit être entre 3 et 60 secondes.');
+    room.revealDelaySeconds = s;
+    room.log.push({ ts: nowStr(), text: `⏱️ Délai avant de pouvoir révéler réglé sur ${s} secondes.` });
   }));
 
   socket.on('draw-card', withRoom(async (room) => {
@@ -566,6 +581,7 @@ io.on('connection', (socket) => {
     if (!room.pending || room.pending.activePlayerId !== playerId || room.pending.stage !== 'listening') return;
     room.pending.placement = { gapIndex };
     room.pending.stage = 'placed';
+    room.pending.placedAt = Date.now();
     room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} a placé sa carte sur sa frise.` });
   }));
 
@@ -602,6 +618,11 @@ io.on('connection', (socket) => {
     if (!room.pending || room.pending.stage !== 'placed') return;
     const active = room.players.find(p => p.id === room.pending.activePlayerId);
     if (!(active.id === playerId || active.isBot)) return; // only the active player, or anyone for a bot's turn
+    const delayMs = (room.revealDelaySeconds || 15) * 1000;
+    const elapsed = Date.now() - (room.pending.placedAt || 0);
+    if (elapsed < delayMs) {
+      return socket.emit('error-msg', `Attends encore ${Math.ceil((delayMs - elapsed) / 1000)}s avant de pouvoir révéler — ça laisse une chance de défier.`);
+    }
     resolveReveal(room);
   }));
 
@@ -614,6 +635,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-dj', withRoom((room, { playerId: targetId }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer le DJ.');
     const p = room.players.find(pl => pl.id === targetId);
     if (!p || p.isBot) return;
     room.djId = targetId;

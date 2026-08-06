@@ -179,3 +179,16 @@ Dans le salon d'attente, choisis entre deux modes d'écoute :
 
 Le choix se fait avant de lancer la partie et peut être changé tant que le
 salon est en attente.
+
+## Hôte du salon et délai de révélation (depuis la v1.13)
+
+Le créateur du salon (👑) est le seul à pouvoir lancer la partie, changer le
+mode d'écoute, le DJ, les filtres et le délai de révélation — les autres
+joueurs voient ces réglages mais ne peuvent pas les modifier.
+
+Un délai (15 secondes par défaut, réglable de 5 à 60s dans le salon
+d'attente) s'écoule entre le moment où une carte est posée et celui où le
+bouton **Révéler** devient cliquable — une barre de progression se remplit
+dans le bouton en attendant. Ça laisse toujours le temps aux autres de
+défier avant que la carte ne soit révélée. Le délai est aussi vérifié côté
+serveur, pas seulement affiché côté client.
