@@ -353,7 +353,16 @@ async function main() {
     const realTitle = fgDrawn.pending.card.title;
     const realArtist = fgDrawn.pending.card.artist;
     // inject one deliberate typo into each (swap the last two characters, or drop one) — small enough to still be "close enough"
-    const typo = (s) => s.length > 4 ? (s.slice(0, -2) + s.slice(-1) + s.slice(-2, -1)) : s + 'x';
+    // A single-character substitution always costs exactly 1 in Levenshtein
+    // distance, which is always within tolerance (min tolerance is 1) —
+    // unlike a transposition (costs 2), which can exceed tolerance on short
+    // words and make this test flaky depending on which song gets drawn.
+    const typo = (s) => {
+      if (s.length < 2) return s + 'x';
+      const mid = Math.floor(s.length / 2);
+      const repl = s[mid].toLowerCase() === 'x' ? 'z' : 'x';
+      return s.slice(0, mid) + repl + s.slice(mid + 1);
+    };
     fgActive.emit('submit-guess', { title: typo(realTitle), artist: typo(realArtist) });
     const fgAfterGuess = await waitForRoomWhere(fgActive, r => r.pending && r.pending.guessBy);
     if (fgAfterGuess.pending.guessCorrect === true) {

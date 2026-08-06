@@ -20,6 +20,36 @@ let audioAutoplayBlocked = false; // true when the browser refused to auto-start
 let revealTicker = null; // interval id for animating the reveal-button countdown
 let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
 
+/* ---------- audio unlock ----------
+   Browsers refuse to auto-start sound unless playback was triggered by (or
+   shortly after) a direct user gesture on THIS page. Later song playback is
+   triggered by a socket event, not a click, so it gets blocked more often —
+   especially in "chacun chez soi" mode where most listeners never clicked
+   anything right before their device needs to play. The fix isn't to fight
+   the browser: it's to spend the page's very first tap/click (typing a
+   name, tapping a button, anything) on briefly playing-then-pausing a real
+   audio element. Most browsers then treat the REST of the page session as
+   having "user activation" for audio, so every later programmatic play()
+   call — even ones triggered from a network event — is allowed. */
+let audioUnlocked = false;
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    const unlock = new Audio();
+    // Shortest possible valid silent MP3 — nothing to actually hear, this
+    // exists purely to give the browser a real successful play() to anchor
+    // "user activation" to.
+    unlock.src = 'data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAAAAA8TEFNRTMuMTAwA8MAAAAAAAAAABQgJAJAQgAAgAAAAnHNCF6ZAAAAAAAAAAAAAAAAAAAA//tQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuMTAw';
+    unlock.volume = 0.01;
+    const p = unlock.play();
+    if (p && p.catch) p.catch(() => {});
+    setTimeout(() => { try { unlock.pause(); } catch (e) {} }, 50);
+  } catch (e) {}
+}
+document.addEventListener('pointerdown', unlockAudioOnce, { once: true, passive: true });
+document.addEventListener('keydown', unlockAudioOnce, { once: true });
+
 /* ---------- session persistence (survives the phone fully discarding the page
    while backgrounded — a common mobile Safari behavior, not just a network blip) ---------- */
 function saveSession(code, name) {

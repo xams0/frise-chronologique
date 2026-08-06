@@ -431,3 +431,17 @@ tout premier démarrage après un déploiement quasi instantané.
 - Petit fix additionnel : les artistes à 2 caractères (ex. "U2") étaient
   auparavant impossibles à deviner correctement à cause d'un seuil de
   longueur trop strict.
+
+## v1.32 — déblocage audio dès le premier tap
+
+Il n'existe pas de vrai moyen de forcer un son sans aucune interaction —
+c'est une restriction volontaire des navigateurs. Mais dès le tout premier
+tap/clic/touche sur la page (même juste taper son prénom), l'app joue
+maintenant brièvement un son silencieux inaudible. La plupart des
+navigateurs considèrent ensuite que la page a "l'autorisation audio" pour le
+reste de la session — donc les lectures automatiques déclenchées plus tard
+par le jeu (via le serveur, pas un clic direct) ont beaucoup plus de chances
+de fonctionner sans intervention, y compris en mode "chacun chez soi".
+
+(Petit bonus : un test de bout en bout qui pouvait échouer au hasard selon
+la chanson tirée a été rendu déterministe.)
