@@ -16,7 +16,7 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;
-    width:100%;overflow-x:hidden;overscroll-behavior:none;touch-action:pan-y;position:relative;}
+    width:100%;overflow-x:hidden;overscroll-behavior:none;touch-action:manipulation;position:relative;}
   #root{min-height:100vh;display:flex;flex-direction:column;width:100%;max-width:100vw;overflow-x:hidden;}
   h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;margin:0;}
   .mono{font-family:'IBM Plex Mono',monospace;}

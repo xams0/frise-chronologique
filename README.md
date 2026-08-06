@@ -497,3 +497,19 @@ réservé musical s'affiche à la place.
 - **Lancement automatique** : si tous les joueurs (bots inclus, toujours
   comptés prêts) appuient sur "Prêt", la partie démarre toute seule, sans
   que l'hôte ait besoin de cliquer sur "Lancer la partie".
+
+## v1.37 — vraie tentative de fix du scroll bloqué sur Chrome
+
+Ma précédente correction (`pointer-events:none` sur le fond animé, v1.36)
+n'a pas suffi. Le suspect suivant : `touch-action:pan-y` sur `html,body` —
+une restriction assez stricte ("uniquement le défilement vertical, rien
+d'autre") ajoutée il y a longtemps contre un tout autre bug de glissement
+horizontal parasite, et Chrome peut l'interpréter différemment de Safari.
+Remplacée par `touch-action:manipulation`, la valeur standard pour ce genre
+d'app (autorise le défilement dans toutes les directions, désactive juste le
+délai de double-tap pour zoomer). La protection contre le glissement
+horizontal reste assurée par `overflow-x:hidden`, qui ne dépend pas de
+touch-action.
+
+Si ça ne suffit toujours pas, dis-le — je creuserai plus profondément (test
+sur un appareil réel serait idéal, que je ne peux pas faire moi-même).
