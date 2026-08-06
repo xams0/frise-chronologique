@@ -556,6 +556,41 @@ async function main() {
     const uncappedRoom = await waitForRoomWhere(mallory, r => r.maxPlayers === null);
     ok('host successfully removed the player limit again, maxPlayers=' + uncappedRoom.maxPlayers);
 
+    // ---- cards-to-win / start-tokens ----
+    if (uncappedRoom.cardsToWin === 10) ok('room defaults to cardsToWin=10');
+    else fail('expected default cardsToWin=10, got ' + uncappedRoom.cardsToWin);
+    if (uncappedRoom.startTokens === 2) ok('room defaults to startTokens=2');
+    else fail('expected default startTokens=2, got ' + uncappedRoom.startTokens);
+
+    let nathanCardsRefused = null;
+    nathan.once('error-msg', (msg) => { nathanCardsRefused = msg; });
+    nathan.emit('set-cards-to-win', { count: 6 });
+    await new Promise(r => setTimeout(r, 400));
+    if (nathanCardsRefused) ok('non-host correctly refused when trying to set cards-to-win');
+    else fail('expected non-host set-cards-to-win attempt to be refused');
+
+    mallory.emit('set-cards-to-win', { count: 6 });
+    const cardsRoom = await waitForRoomWhere(mallory, r => r.cardsToWin === 6);
+    ok('host successfully set cardsToWin=' + cardsRoom.cardsToWin);
+
+    let nathanTokensRefused = null;
+    nathan.once('error-msg', (msg) => { nathanTokensRefused = msg; });
+    nathan.emit('set-start-tokens', { count: 5 });
+    await new Promise(r => setTimeout(r, 400));
+    if (nathanTokensRefused) ok('non-host correctly refused when trying to set start-tokens');
+    else fail('expected non-host set-start-tokens attempt to be refused');
+
+    mallory.emit('set-start-tokens', { count: 5 });
+    const tokensRoom = await waitForRoomWhere(mallory, r => r.startTokens === 5);
+    ok('host successfully set startTokens=' + tokensRoom.startTokens);
+
+    mallory.emit('set-reveal-delay', { seconds: 3 });
+    await waitForRoomWhere(mallory, r => r.revealDelaySeconds === 3);
+    mallory.emit('start-game');
+    const customGame = await waitForRoomWhere(mallory, r => r.phase === 'playing');
+    if (customGame.players.every(p => p.tokens === 5)) ok('custom startTokens=5 correctly applied to every player at game start');
+    else fail('expected every player to start with 5 tokens: ' + JSON.stringify(customGame.players.map(p => p.tokens)));
+
     mallory.disconnect(); nathan.disconnect(); nathanAgain.disconnect(); oscar.disconnect();
 
     // ---- leave-room: game ends when too few players remain, host reassigned if needed ----

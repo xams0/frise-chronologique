@@ -513,3 +513,17 @@ touch-action.
 
 Si ça ne suffit toujours pas, dis-le — je creuserai plus profondément (test
 sur un appareil réel serait idéal, que je ne peux pas faire moi-même).
+
+## v1.38 — options réorganisées avec sous-onglets + nouveaux réglages
+
+- **Cartes pour gagner** (4-20, 10 par défaut) et **jetons de départ**
+  (0-10, 2 par défaut) sont maintenant réglables par l'hôte.
+- **Gros ménage dans le salon d'attente** : tous les réglages (mode
+  d'écoute, DJ, musique, délais, joueurs max, visibilité, périodes) sont
+  regroupés derrière un seul bouton **"⚙️ Options de la partie"**, organisé
+  en 4 sous-onglets (🎮 Partie, 🔊 Écoute, ⏱️ Temps, 🎵 Chansons) — fini le
+  salon interminable à faire défiler.
+- Ne reste directement visible dans le salon : la liste des joueurs, le
+  bouton **"Prêt(e)"** (renommé), et une **rangée de pastilles-résumé**
+  (🏆10 🪙2 👥∞ 🔒Privé 🎉Ensemble 🔁Boucle ⏱️15s ⏳60s) pour voir l'essentiel
+  d'un coup d'œil sans ouvrir le menu.

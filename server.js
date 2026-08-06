@@ -443,7 +443,7 @@ function resolveReveal(room) {
   room.pending = null;
   clearAutoReveal(room.code);
 
-  if (winner && winner.timeline.length >= CARDS_TO_WIN) {
+  if (winner && winner.timeline.length >= (room.cardsToWin || CARDS_TO_WIN)) {
     finishGame(room, winner);
   } else {
     advanceTurn(room);
@@ -565,11 +565,13 @@ app.get('/api/songs/health', async (req, res) => {
 function tryStartGame(room) {
   if (room.players.length < 2) return { ok: false, error: 'Il faut au moins 2 joueurs.' };
   const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
-  if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
-    return { ok: false, error: `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).` };
+  const winCount = room.cardsToWin || CARDS_TO_WIN;
+  if (!pool.length || pool.length < winCount + 2) {
+    return { ok: false, error: `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${winCount + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).` };
   }
   let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
-  const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
+  const startingTokens = room.startTokens != null ? room.startTokens : START_TOKENS;
+  const players = room.players.map(p => ({ ...p, tokens: startingTokens, timeline: [], ready: false }));
   players.forEach(p => { p.timeline = [deck.pop()]; });
   room.players = players;
   room.deck = deck;
@@ -603,6 +605,8 @@ io.on('connection', (socket) => {
       listenMode: 'together', // 'together' = one DJ plays for the room | 'remote' = everyone hears it on their own device
       revealDelaySeconds: 15, // minimum wait before "Révéler" can be pressed, so others have time to challenge
       turnDecisionSeconds: 60, // time the active player has to place (or pass) a drawn card before it auto-passes
+      cardsToWin: CARDS_TO_WIN, // configurable win condition
+      startTokens: START_TOKENS, // configurable starting token count
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
       maxPlayers: null, // null = no limit
@@ -754,6 +758,24 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: `👥 Nombre de joueurs maximum réglé sur ${m}.` });
   }));
 
+  socket.on('set-cards-to-win', withRoom((room, { count }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    const n = parseInt(count, 10);
+    if (!Number.isFinite(n) || n < 4 || n > 20) return socket.emit('error-msg', 'Le nombre de cartes pour gagner doit être entre 4 et 20.');
+    room.cardsToWin = n;
+    room.log.push({ ts: nowStr(), text: `🏆 Il faudra ${n} cartes pour gagner.` });
+  }));
+
+  socket.on('set-start-tokens', withRoom((room, { count }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    const n = parseInt(count, 10);
+    if (!Number.isFinite(n) || n < 0 || n > 10) return socket.emit('error-msg', 'Le nombre de jetons de départ doit être entre 0 et 10.');
+    room.startTokens = n;
+    room.log.push({ ts: nowStr(), text: `🪙 Jetons de départ réglés sur ${n}.` });
+  }));
+
   socket.on('leave-room', withRoom(async (room) => {
     const targetId = socket.data.playerId;
     const left = removePlayerFromRoom(room, targetId);
@@ -821,7 +843,7 @@ io.on('connection', (socket) => {
     p.tokens -= 3;
     p.timeline = insertSorted(p.timeline, card);
     room.log.push({ ts: nowStr(), text: `${p.name} échange 3 jetons contre une carte posée directement (${card.year}).` });
-    if (p.timeline.length >= CARDS_TO_WIN) finishGame(room, p);
+    if (p.timeline.length >= (room.cardsToWin || CARDS_TO_WIN)) finishGame(room, p);
     else advanceTurn(room);
   }));
 
@@ -892,7 +914,7 @@ io.on('connection', (socket) => {
     clearAutoReveal(room.code);
     clearAutoPass(room.code);
     room.phase = 'lobby';
-    room.players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
+    room.players = room.players.map(p => ({ ...p, tokens: (room.startTokens != null ? room.startTokens : START_TOKENS), timeline: [], ready: false }));
     room.deck = []; room.discard = []; room.pending = null; room.lastResult = null;
     room.missedCards = [];
     room.turnOrder = []; room.turnIndex = 0;
@@ -909,7 +931,7 @@ io.on('connection', (socket) => {
 
   socket.on('add-bot', withRoom((room) => {
     if (room.players.some(p => p.isBot)) return;
-    const bot = { id: 'bot-' + genId(), name: 'Bot 🤖', tokens: START_TOKENS, timeline: [], isBot: true };
+    const bot = { id: 'bot-' + genId(), name: 'Bot 🤖', tokens: (room.startTokens != null ? room.startTokens : START_TOKENS), timeline: [], isBot: true };
     room.players.push(bot);
     room.log.push({ ts: nowStr(), text: 'Bot de test ajouté — tu peux lancer une partie en solo.' });
   }));
