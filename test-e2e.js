@@ -297,6 +297,72 @@ async function main() {
     } else fail('mid-game reconnect did not resume correctly: playerId=' + revivedJoin.playerId + ' expected=' + activePlayerIdBefore + ' phase=' + revivedJoin.room.phase);
     revived.disconnect();
 
+    // ---- early reveal by a non-active player (new: bypasses the timer on purpose) ----
+    const wendy = io(URL, { transports: ['websocket'] });
+    const xander = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(wendy, 'connect'), waitFor(xander, 'connect')]);
+    wendy.emit('create-room', { name: 'Wendy' });
+    const wendyJoined = await waitFor(wendy, 'joined');
+    xander.emit('join-room', { code: wendyJoined.code, name: 'Xander' });
+    await waitFor(xander, 'joined');
+    wendy.emit('set-reveal-delay', { seconds: 30 }); // deliberately long, so an early reveal is unambiguous
+    await waitForRoomWhere(wendy, r => r.revealDelaySeconds === 30);
+    wendy.emit('start-game');
+    const erGame = await waitForRoomWhere(wendy, r => r.phase === 'playing');
+    const erActiveId = erGame.turnOrder[erGame.turnIndex];
+    const erActive = erActiveId === wendyJoined.playerId ? wendy : xander;
+    const erOther = erActive === wendy ? xander : wendy;
+
+    erActive.emit('draw-card');
+    await waitForRoomWhere(erActive, r => !!r.pending);
+    erActive.emit('place-card', { gapIndex: 0 });
+    await waitForRoomWhere(erActive, r => r.pending && r.pending.stage === 'placed');
+
+    // the ACTIVE player must still be blocked (unchanged behavior)
+    let activeStillBlocked = null;
+    erActive.once('error-msg', (msg) => { activeStillBlocked = msg; });
+    erActive.emit('reveal');
+    await new Promise(r => setTimeout(r, 400));
+    if (activeStillBlocked) ok('active player is still bound by the 30s delay for their own card');
+    else fail('active player should still be refused an early reveal of their own card');
+
+    // the OTHER player reveals early, on purpose, well before the 30s delay — must succeed immediately
+    const startWait = Date.now();
+    erOther.emit('reveal');
+    const erResolved = await waitForRoomWhere(erOther, r => r.pending === null && r.lastResult, 3000);
+    const tookMs = Date.now() - startWait;
+    if (erResolved.pending === null && tookMs < 3000) ok(`non-active player successfully triggered an early reveal, bypassing the 30s delay (resolved in ${tookMs}ms)`);
+    else fail('non-active player early-reveal did not resolve promptly');
+    wendy.disconnect(); xander.disconnect();
+
+    // ---- fuzzy guess matching (small typos should still count) ----
+    const yara = io(URL, { transports: ['websocket'] });
+    const zack = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(yara, 'connect'), waitFor(zack, 'connect')]);
+    yara.emit('create-room', { name: 'Yara' });
+    const yaraJoined = await waitFor(yara, 'joined');
+    zack.emit('join-room', { code: yaraJoined.code, name: 'Zack' });
+    await waitFor(zack, 'joined');
+    yara.emit('start-game');
+    const fgGame = await waitForRoomWhere(yara, r => r.phase === 'playing');
+    const fgActiveId = fgGame.turnOrder[fgGame.turnIndex];
+    const fgActive = fgActiveId === yaraJoined.playerId ? yara : zack;
+
+    fgActive.emit('draw-card');
+    const fgDrawn = await waitForRoomWhere(fgActive, r => !!r.pending);
+    const realTitle = fgDrawn.pending.card.title;
+    const realArtist = fgDrawn.pending.card.artist;
+    // inject one deliberate typo into each (swap the last two characters, or drop one) — small enough to still be "close enough"
+    const typo = (s) => s.length > 4 ? (s.slice(0, -2) + s.slice(-1) + s.slice(-2, -1)) : s + 'x';
+    fgActive.emit('submit-guess', { title: typo(realTitle), artist: typo(realArtist) });
+    const fgAfterGuess = await waitForRoomWhere(fgActive, r => r.pending && r.pending.guessBy);
+    if (fgAfterGuess.pending.guessCorrect === true) {
+      ok(`fuzzy match accepted a typo'd guess: "${typo(realTitle)}" / "${typo(realArtist)}" for real "${realTitle}" / "${realArtist}"`);
+    } else {
+      fail(`fuzzy match rejected a minor typo — real: "${realTitle}"/"${realArtist}", guessed: "${typo(realTitle)}"/"${typo(realArtist)}"`);
+    }
+    yara.disconnect(); zack.disconnect();
+
     // ---- bot flow ----
     const carol = io(URL, { transports: ['websocket'] });
     await waitFor(carol, 'connect');

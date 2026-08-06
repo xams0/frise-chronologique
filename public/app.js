@@ -15,6 +15,7 @@ let hasConnectedOnce = false;
 /* ---------- audio preview player (survives re-renders without restarting) ---------- */
 let audioEl = null;
 let audioKey = null; // uniquely identifies which pending card is currently loaded
+let audioSecondsDisplay = 0; // last-known playback position — used as the template's starting value so a re-render never visibly resets the counter to 0
 let revealTicker = null; // interval id for animating the reveal-button countdown
 let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
 
@@ -310,6 +311,7 @@ function render() {
     } else {
       const shouldLoop = (state.room && state.room.audioMode) !== 'once';
       audioKey = wantKey;
+      audioSecondsDisplay = 0; // fresh track — reset the last-known playback position
       const a = document.createElement('audio');
       a.id = 'audio-slot';
       a.src = wantSrc;
@@ -323,8 +325,9 @@ function render() {
       // full page re-render for. Always re-queries the element fresh so it
       // still finds the right node even if the page got rebuilt meanwhile.
       a.addEventListener('timeupdate', () => {
+        audioSecondsDisplay = Math.min(30, Math.floor(a.currentTime));
         const counterEl = document.getElementById('audio-counter');
-        if (counterEl) counterEl.textContent = Math.min(30, Math.floor(a.currentTime)) + 's / 30s';
+        if (counterEl) counterEl.textContent = audioSecondsDisplay + 's / 30s';
       });
       slot.replaceWith(a);
       audioEl = a;
@@ -401,7 +404,7 @@ function renderLoading() {
   <div class="screen center">
     ${renderBgPremium()}
     <div class="brand"><img src="/logo.png" class="brand-logo spin" alt="Chronolozik"/><h1 class="title-xl title-shine">Chronolozik</h1></div>
-    <p class="subtitle" style="margin-top:10px;">Vérification de la bibliothèque musicale sur Deezer avant d'ouvrir le salon…</p>
+    <p class="subtitle" style="margin-top:10px;">Chargement, veuillez patienter.</p>
 
     <div style="width:100%;max-width:280px;margin-top:28px;">
       <div style="background:var(--surface2);border-radius:999px;height:14px;overflow:hidden;border:1px solid var(--line);">
@@ -701,7 +704,7 @@ function renderTurnAction(room, pend, isActive, myself) {
       <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         <div class="sound-bars"><span></span><span></span><span></span><span></span></div>
-        <div id="audio-counter" class="mono" style="color:var(--gold);font-size:13px;">0s / 30s</div>
+        <div id="audio-counter" class="mono" style="color:var(--gold);font-size:13px;">${audioSecondsDisplay}s / 30s</div>
         <button class="btn btn-ghost btn-sm" data-act="play-preview">🔊 Appuyer si pas de son</button>
       </div>`;
     } else {
@@ -784,7 +787,7 @@ function renderPendingParticipants(room, pend) {
       const c = room.players.find(p => p.id === pend.challenge.playerId);
       html += `<p class="subtitle" style="margin:6px 0 0;">${escapeHtml(c.name)} a déjà défié ce placement.</p>`;
     }
-    html += `<p class="subtitle" style="margin:6px 0 0;">Seul ${escapeHtml(activePl.name)} peut révéler la carte.</p>`;
+    html += `<button class="btn btn-gold btn-sm" data-act="reveal">✅ Ça a l'air bon, révéler maintenant</button>`;
   }
   html += '</div>';
   return html;
@@ -850,7 +853,7 @@ function renderAllTimelines(room) {
           items.map(it => {
             if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta">${escapeHtml(it.label)}</div></div>`;
             const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
-            return `<div class="ticket ${isWonCard ? 'ticket-won' : ''}"><div class="year">${it.card.year}</div><div class="meta">${escapeHtml(it.card.title)}<br>${escapeHtml(it.card.artist)}</div></div>`;
+            return `<div class="ticket ${isWonCard ? 'ticket-won' : ''}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div></div></div>`;
           }).join('')}
       </div>
       ${playerMissed.length ? `
@@ -892,7 +895,7 @@ function renderPlacementModal(room) {
     const selected = state.selectedGap === i;
     if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta">Ta carte ira ici</div></div>`;
     else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''}>+</button></div>`;
-    if (i < sorted.length) slots += `<div class="ticket"><div class="year">${sorted[i].year}</div><div class="meta">${escapeHtml(sorted[i].title)}<br>${escapeHtml(sorted[i].artist)}</div></div>`;
+    if (i < sorted.length) slots += `<div class="ticket"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div></div></div>`;
   }
 
   return `

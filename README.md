@@ -337,3 +337,20 @@ l'écran de victoire. Il sert aussi de :
 - Les notifications de résultat (bien placé / raté / volé) **disparaissent
   seules après 3,5 secondes** — plus besoin de cliquer "OK" — et sont
   maintenant affichées **sous les frises**, pas au-dessus.
+
+## v1.25 — cinq corrections/ajouts
+
+- **Fix compteur qui oscillait** : le compteur "Xs / 30s" repartait parfois
+  brièvement à "0s" avant de se corriger — la valeur affichée survit
+  maintenant aux redessins de l'écran au lieu de repartir d'un texte figé.
+- **Écran de chargement simplifié** : "Chargement, veuillez patienter."
+- **Révélation anticipée par les autres joueurs** : si tu ne joues pas ce
+  tour-ci et que tu penses que le placement est correct, tu peux appuyer sur
+  "Ça a l'air bon, révéler maintenant" pour révéler tout de suite, sans
+  attendre le délai — qui continue de s'appliquer uniquement à celui qui
+  vient de poser sa carte.
+- **Tolérance aux fautes de frappe** sur les réponses titre/artiste
+  (distance de Levenshtein, quelques lettres de différence acceptées).
+- **Fix titre/artiste qui débordait** : structure plus robuste (deux lignes
+  indépendantes, tronquées et centrées) au lieu d'un bloc multi-lignes qui
+  pouvait déborder du cadre de la carte.

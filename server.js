@@ -78,11 +78,38 @@ function nowStr() {
 function normalize(s) {
   return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
 }
+// Standard Levenshtein edit distance — used to tolerate a few typos in guesses.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      curr[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+// True if `guess` is close enough to `real` — exact containment always
+// counts, and beyond that a handful of typos are tolerated (scaled to the
+// length of the real word, with a small fixed minimum) rather than requiring
+// a letter-perfect match.
+function closeEnough(guess, real) {
+  if (!guess || !real) return false;
+  if (real.includes(guess) || guess.includes(real)) return true;
+  const maxDist = Math.max(1, Math.round(real.length * 0.22));
+  return levenshtein(guess, real) <= maxDist;
+}
 function matchGuess(gt, ga, real) {
   const nt = normalize(gt), na = normalize(ga);
   const rt = normalize(real.title), ra = normalize(real.artist.split(' ft.')[0].split(' feat.')[0]);
-  const titleOk = nt.length > 2 && (rt.includes(nt) || nt.includes(rt));
-  const artistOk = na.length > 2 && (ra.includes(na) || na.includes(ra));
+  const titleOk = nt.length > 2 && closeEnough(nt, rt);
+  const artistOk = na.length > 2 && closeEnough(na, ra);
   return titleOk && artistOk;
 }
 function timelineYears(timeline) { return timeline.map(c => c.year).sort((a, b) => a - b); }
@@ -770,11 +797,22 @@ io.on('connection', (socket) => {
     const playerId = socket.data.playerId;
     if (!room.pending || room.pending.stage !== 'placed') return;
     const active = room.players.find(p => p.id === room.pending.activePlayerId);
-    if (!(active.id === playerId || active.isBot)) return; // only the active player, or anyone for a bot's turn
-    const delayMs = (room.revealDelaySeconds || 15) * 1000;
-    const elapsed = Date.now() - (room.pending.placedAt || 0);
-    if (elapsed < delayMs) {
-      return socket.emit('error-msg', `Attends encore ${Math.ceil((delayMs - elapsed) / 1000)}s avant de pouvoir révéler — ça laisse une chance de défier.`);
+    if (!active) return;
+    const requester = room.players.find(p => p.id === playerId);
+    if (!requester && !active.isBot) return; // must be a known player (or acting on behalf of a bot)
+
+    // Only the active player revealing their OWN card is bound by the delay
+    // — that's what gives everyone else a fair window to challenge. Anyone
+    // ELSE choosing to reveal (because they're confident it's correct and
+    // don't want to wait) does so voluntarily, so it skips the timer —
+    // same for revealing on behalf of a bot's turn.
+    const isActiveRevealingOwnCard = !active.isBot && active.id === playerId;
+    if (isActiveRevealingOwnCard) {
+      const delayMs = (room.revealDelaySeconds || 15) * 1000;
+      const elapsed = Date.now() - (room.pending.placedAt || 0);
+      if (elapsed < delayMs) {
+        return socket.emit('error-msg', `Attends encore ${Math.ceil((delayMs - elapsed) / 1000)}s avant de pouvoir révéler — ça laisse une chance de défier.`);
+      }
     }
     resolveReveal(room);
   }));
