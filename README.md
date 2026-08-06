@@ -218,3 +218,16 @@ Deux causes, maintenant corrigées :
 
 Une petite bannière ("🔄 Reconnexion..." ou "🔌 Connexion perdue...")
 s'affiche pendant ces moments, pour que ce ne soit jamais silencieux.
+
+## v1.15 — kick, révélation automatique, historique des ratés, mode audio
+
+- **Exclure un joueur** : l'hôte voit un bouton 🚫 à côté de chaque joueur
+  (sauf lui-même) dans le salon d'attente, avec confirmation avant d'agir.
+  Le joueur exclu est notifié et renvoyé à l'écran d'accueil.
+- **Révélation automatique** : la carte se révèle toute seule dès que le
+  délai (réglable) s'écoule — plus besoin de cliquer sur "Révéler", même si
+  le bouton reste utilisable pour révéler plus tôt une fois le délai passé.
+- **Historique des cartes ratées** : sous la frise de chaque joueur, les 5
+  dernières chansons mal placées par ce joueur s'affichent avec leur année.
+- **Mode audio** : dans le salon, l'hôte choisit entre 🔁 en boucle (par
+  défaut) et ⏹️ une seule fois (s'arrête après les 30 secondes de l'extrait).

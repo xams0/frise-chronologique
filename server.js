@@ -275,6 +275,26 @@ async function finishGame(room, winner) {
   room.log.push({ ts: nowStr(), text: `🏆 ${winner.name} gagne la partie avec ${winner.timeline.length} cartes !` });
 }
 
+// Auto-reveal timers — kept OUTSIDE the room object (setTimeout handles
+// aren't JSON-serializable and must never end up in a broadcast payload).
+const revealTimers = {};
+function clearAutoReveal(code) {
+  if (revealTimers[code]) { clearTimeout(revealTimers[code]); delete revealTimers[code]; }
+}
+function scheduleAutoReveal(room) {
+  clearAutoReveal(room.code);
+  const delayMs = (room.revealDelaySeconds || 15) * 1000;
+  revealTimers[room.code] = setTimeout(() => {
+    delete revealTimers[room.code];
+    const r = rooms[room.code];
+    if (r && r.pending && r.pending.stage === 'placed') {
+      resolveReveal(r);
+      saveRooms();
+      broadcast(room.code);
+    }
+  }, delayMs);
+}
+
 function resolveReveal(room) {
   const pend = room.pending;
   const active = room.players.find(pl => pl.id === pend.activePlayerId);
@@ -290,6 +310,8 @@ function resolveReveal(room) {
   } else if (pend.challenge) {
     const challenger = room.players.find(pl => pl.id === pend.challenge.playerId);
     const challengeCorrect = gapCorrect(activeYears, pend.challenge.gapIndex, pend.card.year);
+    if (!room.missedCards) room.missedCards = [];
+    room.missedCards.push({ playerId: active.id, title: pend.card.title, artist: pend.card.artist, year: pend.card.year, ts: Date.now() });
     if (challengeCorrect) {
       challenger.timeline = insertSorted(challenger.timeline, pend.card);
       winner = challenger;
@@ -302,11 +324,14 @@ function resolveReveal(room) {
     }
   } else {
     room.discard.push(pend.card);
+    if (!room.missedCards) room.missedCards = [];
+    room.missedCards.push({ playerId: active.id, title: pend.card.title, artist: pend.card.artist, year: pend.card.year, ts: Date.now() });
     room.log.push({ ts: nowStr(), text: `❌ Raté — "${pend.card.title}" (${pend.card.year}) était mal placée et est défaussée.` });
     room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
   }
 
   room.pending = null;
+  clearAutoReveal(room.code);
 
   if (winner && winner.timeline.length >= CARDS_TO_WIN) {
     finishGame(room, winner);
@@ -328,6 +353,7 @@ async function botPlayTurn(room) {
   else gap = Math.floor(Math.random() * (years.length + 1));
   room.pending = { card, activePlayerId: bot.id, stage: 'placed', placement: { gapIndex: gap }, challenge: null, guessCorrect: null, guessBy: 'bot-na', placedAt: Date.now() };
   room.log.push({ ts: nowStr(), text: `🤖 Le Bot pioche et place une chanson (${card.year}) sur sa frise. À vous de décider si vous le croyez !` });
+  scheduleAutoReveal(room);
 }
 
 // ---------- express: static files + catalog REST ----------
@@ -431,6 +457,8 @@ io.on('connection', (socket) => {
       djId: playerId,
       listenMode: 'together', // 'together' = one DJ plays for the room | 'remote' = everyone hears it on their own device
       revealDelaySeconds: 15, // minimum wait before "Révéler" can be pressed, so others have time to challenge
+      audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
+      missedCards: [], // history of wrong guesses, per player, shown under their timeline
       filters: emptyFilters(),
       log: [{ ts: nowStr(), text: `${name} a créé le salon.` }],
       history: []
@@ -535,6 +563,49 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: `⏱️ Délai avant de pouvoir révéler réglé sur ${s} secondes.` });
   }));
 
+  socket.on('set-audio-mode', withRoom((room, { mode }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    if (mode !== 'loop' && mode !== 'once') return;
+    room.audioMode = mode;
+    room.log.push({ ts: nowStr(), text: mode === 'loop' ? '🔁 La musique jouera en boucle.' : '⏹️ La musique jouera une seule fois (30 secondes).' });
+  }));
+
+  socket.on('kick-player', withRoom(async (room, { playerId: targetId }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut exclure un joueur.');
+    if (targetId === room.hostId) return socket.emit('error-msg', 'L\'hôte ne peut pas s\'exclure lui-même.');
+    const idx = room.players.findIndex(p => p.id === targetId);
+    if (idx === -1) return;
+    const kicked = room.players[idx];
+    room.players.splice(idx, 1);
+
+    if (room.phase === 'playing' && room.turnOrder.length) {
+      const wasActive = room.turnOrder[room.turnIndex % room.turnOrder.length] === targetId;
+      const wasBeingChallenged = room.pending && room.pending.challenge && room.pending.challenge.playerId === targetId;
+      room.turnOrder = room.turnOrder.filter(id => id !== targetId);
+      if (wasBeingChallenged) room.pending.challenge = null;
+      if (room.turnOrder.length === 0) {
+        room.phase = 'lobby'; room.pending = null; // everyone else already left too — back to lobby rather than a broken game
+      } else {
+        if (wasActive) { clearAutoReveal(room.code); room.pending = null; }
+        room.turnIndex = room.turnIndex % room.turnOrder.length;
+      }
+    }
+    if (room.djId === targetId) room.djId = room.hostId;
+
+    room.log.push({ ts: nowStr(), text: `🚫 ${kicked.name} a été exclu(e) du salon par l'hôte.` });
+
+    const sockets = await io.in(room.code).fetchSockets();
+    for (const s of sockets) {
+      if (s.data.playerId === targetId) {
+        s.emit('kicked');
+        s.leave(room.code);
+        s.data.code = null;
+        s.data.playerId = null;
+      }
+    }
+  }));
+
   socket.on('draw-card', withRoom(async (room) => {
     const playerId = socket.data.playerId;
     const active = activePlayer(room);
@@ -583,6 +654,7 @@ io.on('connection', (socket) => {
     room.pending.stage = 'placed';
     room.pending.placedAt = Date.now();
     room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} a placé sa carte sur sa frise.` });
+    scheduleAutoReveal(room);
   }));
 
   socket.on('submit-challenge', withRoom((room, { gapIndex }) => {
@@ -627,9 +699,11 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('play-again', withRoom((room) => {
+    clearAutoReveal(room.code);
     room.phase = 'lobby';
     room.players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
     room.deck = []; room.discard = []; room.pending = null; room.lastResult = null;
+    room.missedCards = [];
     room.turnOrder = []; room.turnIndex = 0;
     room.log.push({ ts: nowStr(), text: 'Nouvelle partie dans ce salon !' });
   }));

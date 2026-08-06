@@ -346,7 +346,80 @@ async function main() {
     erin.emit('set-listen-mode', { mode: 'together' });
     const togetherRoom = await waitForRoomWhere(erin, r => r.listenMode === 'together');
     ok('set-listen-mode "together" accepted, listenMode=' + togetherRoom.listenMode);
+
+    // ---- audio mode ----
+    erin.emit('set-audio-mode', { mode: 'once' });
+    const onceRoom = await waitForRoomWhere(erin, r => r.audioMode === 'once');
+    ok('set-audio-mode "once" accepted, audioMode=' + onceRoom.audioMode);
+    erin.emit('set-audio-mode', { mode: 'loop' });
+    await waitForRoomWhere(erin, r => r.audioMode === 'loop');
+    ok('set-audio-mode "loop" accepted');
     erin.disconnect();
+
+    // ---- kick-player ----
+    const frank = io(URL, { transports: ['websocket'] });
+    const grace = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(frank, 'connect'), waitFor(grace, 'connect')]);
+    frank.emit('create-room', { name: 'Frank' });
+    const frankJoined = await waitFor(frank, 'joined');
+    grace.emit('join-room', { code: frankJoined.code, name: 'Grace' });
+    const graceJoined = await waitFor(grace, 'joined');
+
+    let graceGotKicked = false;
+    grace.once('kicked', () => { graceGotKicked = true; });
+    let graceRefusedToKick = null;
+    grace.once('error-msg', (msg) => { graceRefusedToKick = msg; });
+    grace.emit('kick-player', { playerId: frankJoined.playerId }); // non-host trying to kick -> refused
+    await new Promise(r => setTimeout(r, 400));
+    if (graceRefusedToKick) ok('non-host correctly refused when trying to kick someone: "' + graceRefusedToKick + '"');
+    else fail('expected non-host kick attempt to be refused');
+
+    frank.emit('kick-player', { playerId: graceJoined.playerId }); // host kicks Grace
+    const afterKick = await waitForRoomWhere(frank, r => r.players.length === 1);
+    await new Promise(r => setTimeout(r, 300));
+    if (afterKick.players.length === 1 && afterKick.players[0].id === frankJoined.playerId) ok('host successfully kicked the other player, 1 player remains');
+    else fail('kick did not reduce room to 1 player as expected');
+    if (graceGotKicked) ok('kicked player received a "kicked" event');
+    else fail('kicked player never received the "kicked" event');
+    frank.disconnect(); grace.disconnect();
+
+    // ---- auto-reveal (no manual "reveal" emitted — the server must resolve it by itself) ----
+    const heidi = io(URL, { transports: ['websocket'] });
+    const ivan = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(heidi, 'connect'), waitFor(ivan, 'connect')]);
+    heidi.emit('create-room', { name: 'Heidi' });
+    const heidiJoined = await waitFor(heidi, 'joined');
+    ivan.emit('join-room', { code: heidiJoined.code, name: 'Ivan' });
+    await waitFor(ivan, 'joined');
+    heidi.emit('set-reveal-delay', { seconds: 3 });
+    await waitForRoomWhere(heidi, r => r.revealDelaySeconds === 3);
+    heidi.emit('start-game');
+    const arGame = await waitForRoomWhere(heidi, r => r.phase === 'playing');
+    const arActiveId = arGame.turnOrder[arGame.turnIndex];
+    const arActive = arActiveId === heidiJoined.playerId ? heidi : ivan;
+    arActive.emit('draw-card');
+    const arDrawn = await waitForRoomWhere(arActive, r => !!r.pending);
+    const activePlayerObj = arDrawn.players.find(p => p.id === arActiveId);
+    const existingYear = activePlayerObj.timeline[0].year;
+    const newYear = arDrawn.pending.card.year;
+    const wrongGap = newYear >= existingYear ? 0 : 1; // deliberately place on the wrong side
+    arActive.emit('place-card', { gapIndex: wrongGap });
+    await waitForRoomWhere(arActive, r => r.pending && r.pending.stage === 'placed');
+    // deliberately do NOT emit 'reveal' — just wait past the (shortened) delay
+    const arResolved = await waitForRoomWhere(arActive, r => r.pending === null && r.lastResult, 8000);
+    if (arResolved.pending === null && arResolved.lastResult) ok('card auto-revealed by the server after the delay, with no manual "reveal" ever sent');
+    else fail('auto-reveal did not happen on its own');
+
+    // ---- missed-card history ----
+    if (arResolved.lastResult.kind === 'wrong' || arResolved.lastResult.kind === 'stolen') {
+      const missedEntry = (arResolved.missedCards || []).find(m => m.playerId === arActiveId && m.year === newYear);
+      if (missedEntry) ok('missed-card history recorded the wrong guess: ' + missedEntry.year + ' — ' + missedEntry.title);
+      else fail('expected a missedCards entry for the deliberately-wrong placement, found none: ' + JSON.stringify(arResolved.missedCards));
+    } else {
+      // the deliberately-"wrong" gap actually turned out to be chronologically valid (e.g. tie on year) — rare but possible
+      log('  (the deliberately-mismatched gap actually resolved as correct — equal-year edge case, not a bug; skipping the missedCards assertion this run)');
+    }
+    heidi.disconnect(); ivan.disconnect();
 
     // ---- filters (tested in a fresh room, kept in lobby phase throughout) ----
     const catRes2 = await fetch(`${URL}/api/songs`);

@@ -191,6 +191,11 @@ socket.on('connect', () => {
   render();
 });
 socket.on('disconnect', () => { state.connected = false; render(); });
+socket.on('kicked', () => {
+  clearSession();
+  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: 'Tu as été exclu·e du salon par l\'hôte.' });
+  render();
+});
 socket.on('connect_error', () => setError('Connexion au serveur perdue — vérifie que le serveur tourne et que tu es sur le même Wi-Fi.'));
 
 /* ---------- actions (thin — server owns all game logic) ---------- */
@@ -259,14 +264,16 @@ function render() {
       slot.replaceWith(preservedAudio);
       audioEl = preservedAudio;
     } else {
+      const shouldLoop = (state.room && state.room.audioMode) !== 'once';
       audioKey = wantKey;
       const a = document.createElement('audio');
       a.id = 'audio-slot';
       a.src = wantSrc;
-      a.loop = true;
+      a.loop = shouldLoop;
       // Native `loop` is unreliable on some mobile browsers for remote/short
       // clips — restarting manually on 'ended' makes the loop actually work.
-      a.addEventListener('ended', () => { a.currentTime = 0; a.play().catch(() => {}); });
+      // In "once" mode we deliberately do NOT restart, so it plays exactly once.
+      if (shouldLoop) a.addEventListener('ended', () => { a.currentTime = 0; a.play().catch(() => {}); });
       slot.replaceWith(a);
       audioEl = a;
       a.play().catch(() => { /* autoplay blocked — the manual play button covers this */ });
@@ -363,6 +370,7 @@ function renderLobby() {
   const hasBot = room.players.some(p => p.isBot);
   const listenMode = room.listenMode || 'together';
   const revealDelay = room.revealDelaySeconds || 15;
+  const audioMode = room.audioMode || 'loop';
   return `
   <div class="screen">
     ${connectionBanner()}
@@ -376,9 +384,12 @@ function renderLobby() {
     <div class="card-section" style="margin-top:18px;">
       <h3>Joueurs (${room.players.length})</h3>
       ${room.players.map(p => `
-        <div class="player-chip ${isMe(p.id) ? 'you' : ''}">
-          <div class="dot"></div>
-          <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
+        <div class="player-chip ${isMe(p.id) ? 'you' : ''}" style="justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="dot"></div>
+            <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
+          </div>
+          ${isHost && p.id !== room.hostId && !p.isBot ? `<button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="kick-player" data-pid="${p.id}">🚫</button>` : ''}
         </div>`).join('')}
       ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">🧪 Ajouter un bot pour tester seul</button>` : ''}
       ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">Retirer le bot de test</button>` : ''}
@@ -417,6 +428,16 @@ function renderLobby() {
         <div class="code-pill" style="justify-content:center;">${revealDelay}s</div>
         <button class="btn btn-ghost btn-sm" data-act="reveal-delay-plus" ${revealDelay >= 60 ? 'disabled' : ''}>+5s</button>
       </div>` : `<div class="code-pill" style="justify-content:center;">${revealDelay}s</div>`}
+    </div>
+
+    <div class="card-section">
+      <h3>Musique</h3>
+      <p class="subtitle" style="margin:0 0 10px;">L'extrait audio tourne en boucle, ou s'arrête après 30 secondes.</p>
+      ${isHost ? `
+      <div class="row">
+        <button class="btn ${audioMode === 'loop' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-audio-loop">🔁 En boucle</button>
+        <button class="btn ${audioMode === 'once' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-audio-once">⏹️ 30 secondes</button>
+      </div>` : `<div class="code-pill" style="justify-content:center;">${audioMode === 'loop' ? '🔁 En boucle' : '⏹️ 30 secondes'}</div>`}
     </div>
 
     ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
@@ -527,7 +548,7 @@ function renderTurnAction(room, pend, isActive, myself) {
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         <div class="vinyl spin" style="width:40px;height:40px;"></div>
         <button class="btn btn-ghost btn-sm" data-act="play-preview">▶️ Lecture (si le son ne démarre pas seul)</button>
-        <div class="hint">Extrait audio de 30 secondes, en boucle. Rien à voir à l'écran — seul le son compte.</div>
+        <div class="hint">Extrait audio de 30 secondes${(room.audioMode || 'loop') === 'loop' ? ', en boucle' : ', une seule fois'}. Rien à voir à l'écran — seul le son compte.</div>
       </div>`;
     } else {
       html += `<p class="subtitle" style="margin-top:10px;">🔇 Aperçu audio indisponible pour cette chanson sur Deezer — devinez à partir du titre/artiste une fois révélé, ou passez-la.</p>`;
@@ -638,6 +659,7 @@ function buildRibbonItems(sortedCards, markers) {
 function renderAllTimelines(room) {
   const pend = room.pending;
   const activeId = room.turnOrder && room.turnOrder.length ? room.turnOrder[room.turnIndex % room.turnOrder.length] : null;
+  const missed = room.missedCards || [];
   return room.players.map(p => {
     const sorted = p.timeline.slice().sort((a, b) => a.year - b.year);
     let markers = [];
@@ -648,6 +670,7 @@ function renderAllTimelines(room) {
     }
     const items = buildRibbonItems(sorted, markers);
     const isTurn = p.id === activeId;
+    const playerMissed = missed.filter(m => m.playerId === p.id).slice(-5).reverse();
     return `
     <div class="card-section compact ${isTurn ? 'turn-active' : ''}">
       <div class="timeline-owner">
@@ -661,6 +684,10 @@ function renderAllTimelines(room) {
             : `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta">${escapeHtml(it.label)}</div></div>`
           ).join('')}
       </div>
+      ${playerMissed.length ? `
+      <div class="missed-history">
+        ${playerMissed.map(m => `<div class="missed-line">❌ <b>${m.year}</b> — ${escapeHtml(m.title)}</div>`).join('')}
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -902,12 +929,15 @@ function attachHandlers() {
       else if (act === 'remove-song') removeSong(elm.getAttribute('data-title'), elm.getAttribute('data-artist'));
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
+      else if (act === 'kick-player') { if (confirm('Exclure ce joueur du salon ?')) socket.emit('kick-player', { playerId: elm.getAttribute('data-pid') }); }
       else if (act === 'open-dj') { state.showDjPicker = true; render(); }
       else if (act === 'close-dj') { state.showDjPicker = false; render(); }
       else if (act === 'set-listen-together') socket.emit('set-listen-mode', { mode: 'together' });
       else if (act === 'set-listen-remote') socket.emit('set-listen-mode', { mode: 'remote' });
       else if (act === 'reveal-delay-minus') socket.emit('set-reveal-delay', { seconds: Math.max(5, (state.room.revealDelaySeconds || 15) - 5) });
       else if (act === 'reveal-delay-plus') socket.emit('set-reveal-delay', { seconds: Math.min(60, (state.room.revealDelaySeconds || 15) + 5) });
+      else if (act === 'set-audio-loop') socket.emit('set-audio-mode', { mode: 'loop' });
+      else if (act === 'set-audio-once') socket.emit('set-audio-mode', { mode: 'once' });
       else if (act === 'show-filters') { state.showFilters = true; render(); }
       else if (act === 'close-filters') { state.showFilters = false; state.artistSearch = ''; render(); }
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });

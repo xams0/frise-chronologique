@@ -143,5 +143,8 @@
   .footer-note a{color:var(--teal);}
 
   .empty{text-align:center;color:var(--text-dim);font-size:13px;padding:20px 10px;}
+  .missed-history{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:3px;}
+  .missed-line{font-size:11px;color:var(--text-dim);}
+  .missed-line b{color:var(--red);}
 
   .version-badge{position:fixed;bottom:6px;right:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);opacity:0.5;z-index:100;pointer-events:none;}
