@@ -296,3 +296,21 @@ modifiable : c'est juste une valeur par défaut, pas un verrouillage.
   espaces vides de l'accueil.
 - Le badge de version discret en bas à droite de chaque écran est retiré —
   seule la bulle sous le titre "Chronolozik" sur l'accueil subsiste.
+
+## v1.22 — écran d'accueil des règles, corrections de scintillement et de scroll
+
+- **Écran de règles** premium, affiché **une seule fois** (mémorisé dans le
+  stockage local) avant l'accueil, expliquant le jeu en 4 étapes illustrées.
+- **Fix clignotement** : la bannière de résultat et le message "titre/artiste
+  trouvé" rejouaient leur animation à chaque redessin de l'écran (plusieurs
+  fois par seconde pendant le compte à rebours de révélation) au lieu de
+  jouer une fois — corrigé en ne déclenchant l'animation qu'au premier
+  affichage de chaque résultat.
+- **Fix scroll bloqué** : la restriction de défilement (ajoutée plus tôt pour
+  empêcher la page de bouger horizontalement) empêchait aussi de faire
+  défiler les frises trop longues — les frises ont maintenant leur propre
+  autorisation de scroll horizontal.
+- **Frises sur plusieurs lignes** : les cartes d'une frise s'enroulent
+  maintenant sur plusieurs lignes au lieu de s'étaler sur une seule bande à
+  faire défiler — beaucoup moins besoin de scroller, y compris dans la
+  fenêtre de placement/défi.

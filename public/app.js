@@ -8,6 +8,7 @@
 const CARDS_TO_WIN = 10;
 const SESSION_KEY = 'chronolozik_session';
 const LAST_NAME_KEY = 'chronolozik_last_name';
+const WELCOME_KEY = 'chronolozik_seen_welcome';
 const socket = io({ reconnection: true, reconnectionDelay: 500, reconnectionDelayMax: 3000 });
 let hasConnectedOnce = false;
 
@@ -38,9 +39,17 @@ function loadLastName() {
   try { return localStorage.getItem(LAST_NAME_KEY) || ''; } catch (e) { return ''; }
 }
 
+/* ---------- one-time welcome/rules screen ---------- */
+function hasSeenWelcome() {
+  try { return localStorage.getItem(WELCOME_KEY) === '1'; } catch (e) { return true; } // if storage is broken, don't block anyone with it
+}
+function markWelcomeSeen() {
+  try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+}
+
 /* ---------- local UI state (never synced — purely this device's screen) ---------- */
 const state = {
-  screen: 'loading',        // loading | home | lobby | game
+  screen: hasSeenWelcome() ? 'loading' : 'welcome', // welcome | loading | home | lobby | game
   mode: 'create',            // create | join
   nameInput: loadLastName(), codeInput: '', error: '', busy: false,
   playerId: null, playerName: null, code: null, room: null,
@@ -273,7 +282,8 @@ function render() {
   if (audioEl) { preservedAudio = audioEl; preservedAudio.remove(); }
 
   let html;
-  if (state.screen === 'loading') html = renderLoading();
+  if (state.screen === 'welcome') html = renderWelcome();
+  else if (state.screen === 'loading') html = renderLoading();
   else if (state.screen === 'home') html = renderHome();
   else if (state.screen === 'lobby') html = renderLobby();
   else html = renderGame();
@@ -334,6 +344,34 @@ function render() {
   }
 
   attachHandlers();
+}
+
+function renderWelcome() {
+  const rules = [
+    { icon: '🎧', title: 'Écoutez', text: "Un extrait de 30 secondes joue — pas de titre, pas d'artiste, juste le son." },
+    { icon: '📅', title: 'Placez', text: 'Devinez si la chanson est avant, après, ou entre celles déjà sur votre frise.' },
+    { icon: '⏱️', title: 'Défiez', text: "Les autres ont un délai pour parier qu'ils devinent mieux — et voler la carte." },
+    { icon: '🏆', title: 'Gagnez', text: `Le premier à ${CARDS_TO_WIN} chansons bien placées remporte la partie.` }
+  ];
+  return `
+  <div class="screen center">
+    ${renderBgPremium()}
+    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
+    <p class="subtitle" style="margin-top:10px;">Le jeu qui teste ta mémoire musicale, entre amis.</p>
+
+    <div class="stack" style="margin-top:28px;text-align:left;">
+      ${rules.map(r => `
+        <div class="card-section compact" style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:26px;flex-shrink:0;">${r.icon}</div>
+          <div>
+            <div style="font-weight:700;font-size:15px;">${escapeHtml(r.title)}</div>
+            <div class="subtitle" style="margin-top:2px;font-size:13px;">${escapeHtml(r.text)}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:26px;" data-act="welcome-continue">C'est parti 🚀</button>
+  </div>`;
 }
 
 function renderLoading() {
@@ -676,7 +714,11 @@ function renderTurnAction(room, pend, isActive, myself) {
       <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre + artiste (+1 🪙)</button>`;
     }
     if (guessDone && pend.guessBy !== 'bot-na') {
-      html += `<div class="guess-ok ${pend.guessCorrect ? 'flash-correct' : 'flash-wrong'}">${pend.guessCorrect ? '✔ Titre et artiste trouvés — jeton gagné.' : '✘ Pas trouvé cette fois.'}</div>`;
+      const guessKey = pend.placedAt + '-' + pend.guessBy;
+      const isFirstGuessRender = lastAnimatedGuessKey !== guessKey;
+      if (isFirstGuessRender) lastAnimatedGuessKey = guessKey;
+      const guessFlashCls = isFirstGuessRender ? (pend.guessCorrect ? 'flash-correct' : 'flash-wrong') : '';
+      html += `<div class="guess-ok ${guessFlashCls}">${pend.guessCorrect ? '✔ Titre et artiste trouvés — jeton gagné.' : '✘ Pas trouvé cette fois.'}</div>`;
     }
   }
 
@@ -730,13 +772,19 @@ function renderPendingParticipants(room, pend) {
   return html;
 }
 
+let lastAnimatedResultTs = null; // prevents the reveal-outcome banner from replaying its flash animation on every unrelated re-render
+let lastAnimatedGuessKey = null; // same idea for the title/artist guess feedback
+
 function renderResultBanner(r) {
-  const cls = r.kind === 'wrong' ? 'flash-wrong' : 'flash-correct';
+  const tintCls = r.kind === 'wrong' ? 'result-tint-wrong' : 'result-tint-correct';
+  const isFirstRender = lastAnimatedResultTs !== r.ts;
+  if (isFirstRender) lastAnimatedResultTs = r.ts;
+  const flashCls = isFirstRender ? (r.kind === 'wrong' ? 'flash-wrong' : 'flash-correct') : '';
   let text;
   if (r.kind === 'wrong') text = `❌ "${escapeHtml(r.title)}" (${r.year}) — mal placée, défaussée.`;
   else if (r.kind === 'stolen') text = `🎯 "${escapeHtml(r.title)}" (${r.year}) — ${escapeHtml(r.activeName)} s'est trompé, ${escapeHtml(r.extraName)} récupère la carte !`;
   else text = `✅ "${escapeHtml(r.title)}" (${r.year}) — bien placée par ${escapeHtml(r.activeName)} !`;
-  return `<div class="result-banner ${cls}">
+  return `<div class="result-banner ${tintCls} ${flashCls}">
     ${r.cover ? `<img src="${escapeHtml(r.cover)}" alt="" style="width:44px;height:44px;border-radius:8px;flex-shrink:0;object-fit:cover;"/>` : ''}
     <div style="flex:1;">${text}</div>
     <button class="btn btn-ghost btn-sm" data-act="dismiss-result" data-ts="${r.ts}">OK</button>
@@ -1010,7 +1058,13 @@ function attachHandlers() {
     elm.addEventListener('click', (e) => {
       const act = elm.getAttribute('data-act');
       state.error = '';
-      if (act === 'mode-create') { state.mode = 'create'; render(); }
+      if (act === 'welcome-continue') {
+        markWelcomeSeen();
+        if (state.ready && state.ready.ready) { proceedPastReadyGate(); }
+        else { state.screen = 'loading'; } // the still-running background poll picks this up within ~1s
+        render();
+      }
+      else if (act === 'mode-create') { state.mode = 'create'; render(); }
       else if (act === 'mode-join') { state.mode = 'join'; render(); if (state.publicRooms === null) loadPublicRooms(); }
       else if (act === 'visibility-private') { state.roomVisibility = 'private'; render(); }
       else if (act === 'visibility-public') { state.roomVisibility = 'public'; render(); }
@@ -1107,23 +1161,34 @@ async function loadPublicRooms() {
   render();
 }
 
+function proceedPastReadyGate() {
+  const saved = loadSession();
+  if (saved && saved.code && saved.name) {
+    // We have a session from before this page load (a previous tab that got
+    // fully discarded by the phone counts as a reload from our side) — try
+    // to silently resume it instead of dropping the user on the home screen.
+    state.code = saved.code; state.playerName = saved.name; state.reconnecting = true;
+    state.screen = 'home'; // fallback shown briefly if the resume attempt fails
+    socket.emit('join-room', { code: saved.code, name: saved.name });
+  } else {
+    state.screen = 'home';
+  }
+}
+
 async function pollReady() {
   try {
     const res = await fetch('/api/ready');
     state.ready = await res.json();
   } catch (e) { state.ready = null; }
   if (state.ready && state.ready.ready) {
-    const saved = loadSession();
-    if (saved && saved.code && saved.name) {
-      // We have a session from before this page load (a previous tab that
-      // got fully discarded by the phone counts as a reload from our side) —
-      // try to silently resume it instead of dropping the user on the home screen.
-      state.code = saved.code; state.playerName = saved.name; state.reconnecting = true;
-      state.screen = 'home'; // fallback shown briefly if the resume attempt fails
-      socket.emit('join-room', { code: saved.code, name: saved.name });
-    } else {
-      state.screen = 'home';
+    if (state.screen === 'welcome') {
+      // Readiness finished before the user clicked through the one-time
+      // welcome screen — don't jump ahead of them. The "C'est parti" button
+      // re-checks state.ready itself once they do.
+      render();
+      return;
     }
+    proceedPastReadyGate();
     render();
     return;
   }
