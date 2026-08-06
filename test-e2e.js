@@ -356,6 +356,47 @@ async function main() {
     ok('set-audio-mode "loop" accepted');
     erin.disconnect();
 
+    // ---- public/private rooms ----
+    const before = await (await fetch(`${URL}/api/public-rooms`)).json();
+    const judy = io(URL, { transports: ['websocket'] });
+    await waitFor(judy, 'connect');
+    judy.emit('create-room', { name: 'Judy', visibility: 'public' });
+    const judyJoined = await waitFor(judy, 'joined');
+    if (judyJoined.room.visibility === 'public') ok('room created with visibility="public"');
+    else fail('expected visibility "public", got ' + judyJoined.room.visibility);
+
+    const afterPublic = await (await fetch(`${URL}/api/public-rooms`)).json();
+    const listedEntry = afterPublic.find(r => r.code === judyJoined.code);
+    if (listedEntry && listedEntry.hostName === 'Judy' && listedEntry.playerCount === 1) {
+      ok(`public room correctly listed via GET /api/public-rooms (${afterPublic.length} public room(s) total, was ${before.length})`);
+    } else fail('public room not found in /api/public-rooms listing: ' + JSON.stringify(afterPublic));
+
+    const kevin = io(URL, { transports: ['websocket'] });
+    await waitFor(kevin, 'connect');
+    kevin.emit('create-room', { name: 'Kevin' }); // no visibility specified -> must default to private
+    const kevinJoined = await waitFor(kevin, 'joined');
+    if (kevinJoined.room.visibility === 'private') ok('room defaults to visibility="private" when not specified');
+    else fail('expected default visibility "private", got ' + kevinJoined.room.visibility);
+    const afterPrivate = await (await fetch(`${URL}/api/public-rooms`)).json();
+    if (!afterPrivate.some(r => r.code === kevinJoined.code)) ok('private room correctly excluded from /api/public-rooms');
+    else fail('private room should not appear in the public listing');
+
+    // non-host cannot flip visibility; host can
+    const laura = io(URL, { transports: ['websocket'] });
+    await waitFor(laura, 'connect');
+    laura.emit('join-room', { code: judyJoined.code, name: 'Laura' });
+    await waitFor(laura, 'joined');
+    let lauraRefused = null;
+    laura.once('error-msg', (msg) => { lauraRefused = msg; });
+    laura.emit('set-visibility', { visibility: 'private' });
+    await new Promise(r => setTimeout(r, 400));
+    if (lauraRefused) ok('non-host correctly refused when trying to change room visibility');
+    else fail('expected non-host set-visibility attempt to be refused');
+    judy.emit('set-visibility', { visibility: 'private' });
+    const judyPrivate = await waitForRoomWhere(judy, r => r.visibility === 'private');
+    ok('host successfully switched the room to private, visibility=' + judyPrivate.visibility);
+    judy.disconnect(); kevin.disconnect(); laura.disconnect();
+
     // ---- kick-player ----
     const frank = io(URL, { transports: ['websocket'] });
     const grace = io(URL, { transports: ['websocket'] });

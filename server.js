@@ -363,6 +363,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/songs', (req, res) => res.json(catalog));
 app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
 app.get('/api/ready', (req, res) => res.json(readyState));
+app.get('/api/public-rooms', (req, res) => {
+  const list = Object.values(rooms)
+    .filter(r => r.visibility === 'public' && r.phase === 'lobby')
+    .map(r => ({
+      code: r.code,
+      playerCount: r.players.length,
+      hostName: (r.players.find(p => p.id === r.hostId) || {}).name || '?'
+    }));
+  res.json(list);
+});
 app.get('/api/brackets', (req, res) => res.json(BRACKETS));
 
 app.post('/api/songs', async (req, res) => {
@@ -441,7 +451,7 @@ app.get('/api/songs/health', async (req, res) => {
 // ---------- socket.io: real-time game events ----------
 io.on('connection', (socket) => {
 
-  socket.on('create-room', ({ name }) => {
+  socket.on('create-room', ({ name, visibility }) => {
     if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
     name = (name || '').trim().slice(0, 20);
     if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
@@ -450,6 +460,7 @@ io.on('connection', (socket) => {
     const playerId = genId();
     const room = {
       code, phase: 'lobby',
+      visibility: visibility === 'public' ? 'public' : 'private',
       hostId: playerId, // the creator — only they can start the game or change settings
       players: [{ id: playerId, name, tokens: START_TOKENS, timeline: [] }],
       turnOrder: [], turnIndex: 0,
@@ -569,6 +580,14 @@ io.on('connection', (socket) => {
     if (mode !== 'loop' && mode !== 'once') return;
     room.audioMode = mode;
     room.log.push({ ts: nowStr(), text: mode === 'loop' ? '🔁 La musique jouera en boucle.' : '⏹️ La musique jouera une seule fois (30 secondes).' });
+  }));
+
+  socket.on('set-visibility', withRoom((room, { visibility }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    if (visibility !== 'public' && visibility !== 'private') return;
+    room.visibility = visibility;
+    room.log.push({ ts: nowStr(), text: visibility === 'public' ? '🌐 Le salon est maintenant public (visible dans la liste).' : '🔒 Le salon est maintenant privé (uniquement par code).' });
   }));
 
   socket.on('kick-player', withRoom(async (room, { playerId: targetId }) => {

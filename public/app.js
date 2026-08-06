@@ -41,7 +41,8 @@ const state = {
   brackets: null, showFilters: false, artistSearch: '',
   healthReport: null, healthChecking: false,
   ready: null,
-  connected: true, reconnecting: false
+  connected: true, reconnecting: false,
+  version: null, roomVisibility: 'private', publicRooms: null
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -203,7 +204,7 @@ function createRoom() {
   const name = state.nameInput.trim();
   if (!name) return setError('Entre ton prénom.');
   state.busy = true; render();
-  socket.emit('create-room', { name });
+  socket.emit('create-room', { name, visibility: state.roomVisibility });
 }
 function joinRoom() {
   const name = state.nameInput.trim();
@@ -334,9 +335,11 @@ function connectionBanner() {
 
 function renderHome() {
   return `
-  <div class="screen center">
+  <div class="screen center home-screen">
+    <div class="bg-premium"><div class="bg-blob blob1"></div><div class="bg-blob blob2"></div><div class="bg-blob blob3"></div></div>
     ${connectionBanner()}
-    <div class="brand"><div class="vinyl"></div><h1 class="title-xl">Chronolozik</h1></div>
+    <div class="brand"><div class="vinyl"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
+    ${state.version ? `<div class="version-bubble">v${escapeHtml(state.version)}</div>` : ''}
 
     <div class="tabs" style="margin-top:26px;max-width:280px;">
       <button class="tab ${state.mode === 'create' ? 'active' : ''}" data-act="mode-create">Créer un salon</button>
@@ -348,6 +351,17 @@ function renderHome() {
         <label>Ton prénom</label>
         <input id="inp-name" type="text" placeholder="Ex. Léa" value="${escapeHtml(state.nameInput)}" maxlength="20"/>
       </div>
+
+      ${state.mode === 'create' ? `
+      <div class="field">
+        <label>Visibilité du salon</label>
+        <div class="row">
+          <button type="button" class="btn ${state.roomVisibility === 'private' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="visibility-private">🔒 Privé</button>
+          <button type="button" class="btn ${state.roomVisibility === 'public' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="visibility-public">🌐 Public</button>
+        </div>
+        <p class="subtitle" style="margin:8px 0 0;">${state.roomVisibility === 'public' ? 'Visible par tout le monde dans la liste des salons publics.' : 'Rejoignable seulement avec le code.'}</p>
+      </div>` : ``}
+
       ${state.mode === 'join' ? `
       <div class="field">
         <label>Code du salon</label>
@@ -358,6 +372,29 @@ function renderHome() {
         ${state.busy ? '…' : (state.mode === 'create' ? 'Créer le salon' : 'Rejoindre')}
       </button>
     </div>
+
+    ${state.mode === 'join' ? renderPublicRoomsList() : ''}
+  </div>`;
+}
+
+function renderPublicRoomsList() {
+  const rooms = state.publicRooms;
+  return `
+  <div class="card-section" style="margin-top:18px;text-align:left;">
+    <div class="timeline-owner" style="margin-bottom:8px;">
+      <span>🌐 Salons publics</span>
+      <button class="btn btn-ghost btn-sm" style="width:auto;padding:4px 10px;" data-act="refresh-public-rooms">↻</button>
+    </div>
+    ${rooms === null ? `<div class="empty">Chargement…</div>` :
+      rooms.length === 0 ? `<div class="empty">Aucun salon public ouvert pour l'instant.</div>` :
+      rooms.map(r => `
+        <div class="player-chip" style="justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="dot"></div>
+            <div class="name">${escapeHtml(r.code)} — ${escapeHtml(r.hostName)} <span class="mono" style="color:var(--text-dim);font-size:11px;">(${r.playerCount} joueur${r.playerCount > 1 ? 's' : ''})</span></div>
+          </div>
+          <button class="btn btn-gold btn-sm" style="width:auto;flex-shrink:0;" data-act="join-public-room" data-code="${escapeHtml(r.code)}">Rejoindre</button>
+        </div>`).join('')}
   </div>`;
 }
 
@@ -910,7 +947,17 @@ function attachHandlers() {
       const act = elm.getAttribute('data-act');
       state.error = '';
       if (act === 'mode-create') { state.mode = 'create'; render(); }
-      else if (act === 'mode-join') { state.mode = 'join'; render(); }
+      else if (act === 'mode-join') { state.mode = 'join'; render(); if (state.publicRooms === null) loadPublicRooms(); }
+      else if (act === 'visibility-private') { state.roomVisibility = 'private'; render(); }
+      else if (act === 'visibility-public') { state.roomVisibility = 'public'; render(); }
+      else if (act === 'refresh-public-rooms') loadPublicRooms();
+      else if (act === 'join-public-room') {
+        const name = state.nameInput.trim();
+        if (!name) { setError('Entre ton prénom d\'abord.'); return; }
+        state.codeInput = elm.getAttribute('data-code');
+        state.busy = true; render();
+        socket.emit('join-room', { code: state.codeInput, name });
+      }
       else if (act === 'create-room') createRoom();
       else if (act === 'join-room') joinRoom();
       else if (act === 'leave') leaveToHome();
@@ -973,11 +1020,21 @@ async function loadVersion() {
   try {
     const res = await fetch('/api/version');
     const data = await res.json();
+    state.version = data.version;
     const badge = document.createElement('div');
     badge.className = 'version-badge';
     badge.textContent = 'v' + data.version;
     document.body.appendChild(badge);
+    render();
   } catch (e) { /* not critical */ }
+}
+
+async function loadPublicRooms() {
+  try {
+    const res = await fetch('/api/public-rooms');
+    state.publicRooms = await res.json();
+  } catch (e) { state.publicRooms = []; }
+  render();
 }
 
 async function pollReady() {

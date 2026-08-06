@@ -231,3 +231,16 @@ s'affiche pendant ces moments, pour que ce ne soit jamais silencieux.
   dernières chansons mal placées par ce joueur s'affichent avec leur année.
 - **Mode audio** : dans le salon, l'hôte choisit entre 🔁 en boucle (par
   défaut) et ⏹️ une seule fois (s'arrête après les 30 secondes de l'extrait).
+
+## v1.16 — habillage premium + salons publics
+
+- **Version affichée** sous le nom de l'app, en petite bulle, sur l'écran
+  d'accueil (en plus du badge discret en bas à droite de toutes les pages).
+- **Fond animé noir/bleu** sur l'écran d'accueil (dégradés flous en
+  mouvement lent), et le titre **Chronolozik** a un léger effet de brillance
+  qui balaie le texte.
+- **Salons publics ou privés** : à la création, choisis 🔒 Privé (comme
+  avant, uniquement par code) ou 🌐 Public. Les salons publics apparaissent
+  dans une liste sur l'écran "Rejoindre", avec le nom de l'hôte et le nombre
+  de joueurs, et un bouton pour rejoindre directement sans taper le code.
+  L'hôte peut aussi changer la visibilité depuis le salon d'attente.

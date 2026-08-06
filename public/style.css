@@ -49,6 +49,27 @@
   .title-xl{font-size:34px;font-weight:800;letter-spacing:-0.02em;}
   .subtitle{color:var(--text-dim);font-size:15px;margin-top:8px;line-height:1.5;}
 
+  /* ---- home screen: premium animated background + shining title ---- */
+  .home-screen{position:relative;z-index:0;}
+  .bg-premium{position:fixed;inset:0;overflow:hidden;z-index:-1;background:#04060b;}
+  .bg-blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:0.55;}
+  .blob1{width:340px;height:340px;background:radial-gradient(circle,#2563eb,transparent 70%);top:-80px;left:-80px;animation:float1 17s ease-in-out infinite alternate;}
+  .blob2{width:300px;height:300px;background:radial-gradient(circle,#1d4ed8,transparent 70%);bottom:-60px;right:-60px;animation:float2 21s ease-in-out infinite alternate;}
+  .blob3{width:260px;height:260px;background:radial-gradient(circle,#3b82f6,transparent 70%);top:45%;left:50%;animation:float3 25s ease-in-out infinite alternate;}
+  @keyframes float1{0%{transform:translate(0,0) scale(1);}100%{transform:translate(70px,90px) scale(1.2);}}
+  @keyframes float2{0%{transform:translate(0,0) scale(1);}100%{transform:translate(-80px,-60px) scale(1.15);}}
+  @keyframes float3{0%{transform:translate(-50%,-50%) scale(1);}100%{transform:translate(-38%,-62%) scale(1.25);}}
+
+  .title-shine{
+    background:linear-gradient(100deg, var(--text) 35%, #bfe0ff 50%, var(--text) 65%);
+    background-size:250% 100%;
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:titleShine 4.5s ease-in-out infinite;
+  }
+  @keyframes titleShine{0%{background-position:220% 0;}55%{background-position:-120% 0;}100%{background-position:-120% 0;}}
+
+  .version-bubble{display:inline-block;margin-top:10px;padding:4px 12px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);color:var(--text-dim);font-family:'IBM Plex Mono',monospace;font-size:11px;}
+
   .stack{display:flex;flex-direction:column;gap:12px;width:100%;margin-top:28px;}
   .field label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;}
   .field input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--text);font-size:17px;outline:none;}
