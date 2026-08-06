@@ -1,6 +1,6 @@
 {
-  "name": "frise-musicale",
-  "version": "1.13.0",
+  "name": "chronolozik",
+  "version": "1.14.0",
   "private": true,
   "description": "Jeu multijoueur de devinette musicale sur frise chronologique — serveur Node/Express/Socket.io",
   "main": "server.js",

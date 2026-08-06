@@ -1,4 +1,4 @@
-# Frise Musicale — serveur Node
+# Chronolozik — serveur Node
 
 Jeu multijoueur de devinette musicale (façon "pose la chanson sur la bonne
 année"), avec un vrai serveur Node/Express/Socket.io. Tourne en local sur ton
@@ -89,7 +89,7 @@ chansons correspondant aux filtres actifs s'affiche en direct.
    GitHub/un Gist).
 4. Dans iSH :
    ```
-   cd frise-musicale-node
+   cd frise-chronologique
    npm install
    npm start
    ```
@@ -148,7 +148,7 @@ bibliothèque de chansons.
 ## Structure du projet
 
 ```
-frise-musicale-node/
+frise-chronologique/ (dépôt GitHub xams0/frise-chronologique)
   server.js       -> logique de jeu (autoritaire), API REST, Socket.io
   songs.json       -> bibliothèque de chansons (titre/artiste/année/YouTube)
   rooms.json       -> état des salons (créé automatiquement au 1er lancement)
@@ -192,3 +192,29 @@ bouton **Révéler** devient cliquable — une barre de progression se remplit
 dans le bouton en attendant. Ça laisse toujours le temps aux autres de
 défier avant que la carte ne soit révélée. Le délai est aussi vérifié côté
 serveur, pas seulement affiché côté client.
+
+## Renommage : Chronolozik (depuis la v1.14)
+
+Le jeu s'appelle maintenant **Chronolozik**. Le dépôt GitHub reste
+`xams0/frise-chronologique` (renommer le dépôt casserait le lien de
+déploiement Render) — seul le nom affiché dans l'app a changé.
+
+## Pourquoi je me déconnectais en changeant d'appli sur mon téléphone
+
+Deux causes, maintenant corrigées :
+
+1. Quand le téléphone met la page en arrière-plan, iOS coupe souvent la
+   connexion WebSocket pour économiser la batterie. Le navigateur la
+   rétablit à la réouverture, mais **le serveur voit ça comme une toute
+   nouvelle connexion**, sans salon associé — donc plus aucune action ne
+   partait, sans message d'erreur visible. Le client détecte maintenant une
+   reconnexion et rejoint automatiquement le même salon avec le même nom.
+2. Si le téléphone est resté en arrière-plan longtemps, iOS peut carrément
+   **décharger la page de la mémoire** — au retour, c'est un rechargement
+   complet, tout l'état JS est perdu. Le salon et le prénom sont maintenant
+   sauvegardés dans le stockage local du téléphone, donc l'app retente de
+   rejoindre automatiquement au rechargement, sans que tu aies besoin de
+   retaper quoi que ce soit.
+
+Une petite bannière ("🔄 Reconnexion..." ou "🔌 Connexion perdue...")
+s'affiche pendant ces moments, pour que ce ne soit jamais silencieux.

@@ -664,7 +664,7 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Frise Musicale v${APP_VERSION} — server running:`);
+  console.log(`Chronolozik v${APP_VERSION} — server running:`);
   console.log(`  - sur cet appareil : http://localhost:${PORT}`);
   console.log(`  - depuis le même Wi-Fi : http://<IP de ce téléphone>:${PORT}`);
   verifyAndPrepareCatalog();

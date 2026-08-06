@@ -1,24 +1,38 @@
 /* =========================================================
-   FRISE MUSICALE — client
+   CHRONOLOZIK — client
    Toute la logique de jeu vit sur le serveur (server.js).
    Ce fichier ne fait que : envoyer des actions au serveur,
    et redessiner l'écran quand l'état du salon change.
    ========================================================= */
 
 const CARDS_TO_WIN = 10;
-const socket = io();
+const SESSION_KEY = 'chronolozik_session';
+const socket = io({ reconnection: true, reconnectionDelay: 500, reconnectionDelayMax: 3000 });
+let hasConnectedOnce = false;
 
 /* ---------- audio preview player (survives re-renders without restarting) ---------- */
 let audioEl = null;
 let audioKey = null; // uniquely identifies which pending card is currently loaded
 let revealTicker = null; // interval id for animating the reveal-button countdown
 
+/* ---------- session persistence (survives the phone fully discarding the page
+   while backgrounded — a common mobile Safari behavior, not just a network blip) ---------- */
+function saveSession(code, name) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ code, name })); } catch (e) {}
+}
+function loadSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; }
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+
 /* ---------- local UI state (never synced — purely this device's screen) ---------- */
 const state = {
   screen: 'loading',        // loading | home | lobby | game
   mode: 'create',            // create | join
   nameInput: '', codeInput: '', error: '', busy: false,
-  playerId: null, code: null, room: null,
+  playerId: null, playerName: null, code: null, room: null,
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
@@ -26,7 +40,8 @@ const state = {
   seenResultAt: 0, ytMuted: true,
   brackets: null, showFilters: false, artistSearch: '',
   healthReport: null, healthChecking: false,
-  ready: null
+  ready: null,
+  connected: true, reconnecting: false
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -122,7 +137,7 @@ function exportCatalog() {
   const blob = new Blob([JSON.stringify(state.catalog, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'frise-musicale-chansons.json';
+  a.href = url; a.download = 'chronolozik-chansons.json';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
@@ -144,9 +159,11 @@ async function importCatalog() {
 
 /* ---------- socket events ---------- */
 socket.on('joined', ({ playerId, code, room }) => {
-  state.playerId = playerId; state.code = code; state.room = room;
+  const name = room.players.find(p => p.id === playerId)?.name || state.nameInput.trim();
+  state.playerId = playerId; state.playerName = name; state.code = code; state.room = room;
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
-  state.error = ''; state.busy = false;
+  state.error = ''; state.busy = false; state.reconnecting = false;
+  saveSession(code, name);
   render();
 });
 socket.on('room', (room) => {
@@ -154,7 +171,26 @@ socket.on('room', (room) => {
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
   render();
 });
-socket.on('error-msg', (msg) => setError(msg));
+socket.on('error-msg', (msg) => {
+  // If we were trying to silently resume a session that no longer exists
+  // server-side, don't strand the user on a dead screen — send them home.
+  if (state.reconnecting) { clearSession(); Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, reconnecting: false }); }
+  setError(msg);
+});
+
+socket.on('connect', () => {
+  state.connected = true;
+  if (hasConnectedOnce && state.code && state.playerName) {
+    // The transport dropped and came back (e.g. the phone was backgrounded) —
+    // the server sees this as a brand new connection with no room attached,
+    // so we have to explicitly rejoin to pick the game back up.
+    state.reconnecting = true;
+    socket.emit('join-room', { code: state.code, name: state.playerName });
+  }
+  hasConnectedOnce = true;
+  render();
+});
+socket.on('disconnect', () => { state.connected = false; render(); });
 socket.on('connect_error', () => setError('Connexion au serveur perdue — vérifie que le serveur tourne et que tu es sur le même Wi-Fi.'));
 
 /* ---------- actions (thin — server owns all game logic) ---------- */
@@ -173,7 +209,8 @@ function joinRoom() {
   socket.emit('join-room', { code, name });
 }
 function leaveToHome() {
-  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, error: '', nameInput: '', codeInput: '' });
+  clearSession();
+  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, error: '', nameInput: '', codeInput: '' });
   render();
 }
 function startGame() { socket.emit('start-game'); }
@@ -267,7 +304,7 @@ function renderLoading() {
   const percent = total ? Math.round((checked / total) * 100) : 0;
   return `
   <div class="screen center">
-    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl">Frise Musicale</h1></div>
+    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl">Chronolozik</h1></div>
     <p class="subtitle" style="margin-top:10px;">Vérification de la bibliothèque musicale sur Deezer avant d'ouvrir le salon…</p>
 
     <div style="width:100%;max-width:280px;margin-top:28px;">
@@ -282,10 +319,17 @@ function renderLoading() {
   </div>`;
 }
 
+function connectionBanner() {
+  if (state.reconnecting) return `<div class="result-banner" style="background:rgba(63,217,196,0.12);border-color:var(--teal);"><div>🔄 Reconnexion à ton salon…</div></div>`;
+  if (!state.connected) return `<div class="result-banner flash-wrong"><div>🔌 Connexion perdue — nouvelle tentative…</div></div>`;
+  return '';
+}
+
 function renderHome() {
   return `
   <div class="screen center">
-    <div class="brand"><div class="vinyl"></div><h1 class="title-xl">Frise Musicale</h1></div>
+    ${connectionBanner()}
+    <div class="brand"><div class="vinyl"></div><h1 class="title-xl">Chronolozik</h1></div>
 
     <div class="tabs" style="margin-top:26px;max-width:280px;">
       <button class="tab ${state.mode === 'create' ? 'active' : ''}" data-act="mode-create">Créer un salon</button>
@@ -321,6 +365,7 @@ function renderLobby() {
   const revealDelay = room.revealDelaySeconds || 15;
   return `
   <div class="screen">
+    ${connectionBanner()}
     <div class="topbar">
       <div class="code-pill">${room.code} <button data-act="copy-code">copier</button></div>
       <button class="iconbtn" data-act="leave">✕</button>
@@ -417,6 +462,7 @@ function renderGame() {
 
   return `
   <div class="screen game-screen">
+    ${connectionBanner()}
     <div class="topbar">
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="code-pill">${room.code}</div>
@@ -910,7 +956,17 @@ async function pollReady() {
     state.ready = await res.json();
   } catch (e) { state.ready = null; }
   if (state.ready && state.ready.ready) {
-    state.screen = 'home';
+    const saved = loadSession();
+    if (saved && saved.code && saved.name) {
+      // We have a session from before this page load (a previous tab that
+      // got fully discarded by the phone counts as a reload from our side) —
+      // try to silently resume it instead of dropping the user on the home screen.
+      state.code = saved.code; state.playerName = saved.name; state.reconnecting = true;
+      state.screen = 'home'; // fallback shown briefly if the resume attempt fails
+      socket.emit('join-room', { code: saved.code, name: saved.name });
+    } else {
+      state.screen = 'home';
+    }
     render();
     return;
   }

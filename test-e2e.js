@@ -278,6 +278,25 @@ async function main() {
       ok('reveal resolved after the delay elapsed: pending cleared, lastResult=' + roomAfterReveal.lastResult.kind);
     } else fail('reveal did not resolve correctly: ' + JSON.stringify(roomAfterReveal.pending));
 
+    // ---- this is the actual bug being fixed: a player's transport drops
+    // mid-game (phone backgrounded) and comes back — the client is expected
+    // to re-emit join-room with the same name, and the server must resume
+    // the SAME player (same id, same timeline/tokens), not create a new one,
+    // even though the room is now in 'playing' phase, not 'lobby'. ----
+    const activeName = activeSocket === alice ? 'Alice' : 'Bob';
+    const activePlayerIdBefore = activeId;
+    activeSocket.disconnect();
+    await new Promise(r => setTimeout(r, 300));
+    const revived = io(URL, { transports: ['websocket'] });
+    await waitFor(revived, 'connect');
+    revived.emit('join-room', { code, name: activeName });
+    const revivedJoin = await waitFor(revived, 'joined');
+    const revivedPlayer = revivedJoin.room.players.find(p => p.id === revivedJoin.playerId);
+    if (revivedJoin.playerId === activePlayerIdBefore && revivedJoin.room.phase === 'playing' && revivedPlayer && revivedPlayer.timeline.length >= 1) {
+      ok('mid-game reconnect resumes the SAME player (same id, timeline intact) instead of creating a new one');
+    } else fail('mid-game reconnect did not resume correctly: playerId=' + revivedJoin.playerId + ' expected=' + activePlayerIdBefore + ' phase=' + revivedJoin.room.phase);
+    revived.disconnect();
+
     // ---- bot flow ----
     const carol = io(URL, { transports: ['websocket'] });
     await waitFor(carol, 'connect');
