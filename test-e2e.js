@@ -422,6 +422,16 @@ async function main() {
     const togetherRoom = await waitForRoomWhere(erin, r => r.listenMode === 'together');
     ok('set-listen-mode "together" accepted, listenMode=' + togetherRoom.listenMode);
 
+    // ---- ready state ----
+    if (togetherRoom.players[0].ready === false) ok('player defaults to ready=false in the lobby');
+    else fail('expected default ready=false, got ' + togetherRoom.players[0].ready);
+    erin.emit('set-ready', { ready: true });
+    const readyRoom = await waitForRoomWhere(erin, r => r.players[0].ready === true);
+    ok('set-ready(true) accepted, ready=' + readyRoom.players[0].ready);
+    erin.emit('set-ready', { ready: false });
+    await waitForRoomWhere(erin, r => r.players[0].ready === false);
+    ok('set-ready(false) accepted');
+
     // ---- audio mode ----
     erin.emit('set-audio-mode', { mode: 'once' });
     const onceRoom = await waitForRoomWhere(erin, r => r.audioMode === 'once');

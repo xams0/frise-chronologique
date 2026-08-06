@@ -445,3 +445,12 @@ de fonctionner sans intervention, y compris en mode "chacun chez soi".
 
 (Petit bonus : un test de bout en bout qui pouvait échouer au hasard selon
 la chanson tirée a été rendu déterministe.)
+
+## v1.33 — bouton "Prêt" dans le salon
+
+Chaque joueur a maintenant un bouton **"✅ Je suis prêt·e"** dans le salon
+d'attente. Ce tap explicite sert de déblocage audio fiable (bien plus
+qu'une simple frappe au clavier), et le bouton "Lancer la partie" de l'hôte
+affiche le nombre de joueurs prêts (ex. "3/4 prêts"). L'hôte garde le
+contrôle final — il peut lancer la partie même si tout le monde n'a pas
+encore confirmé, mais voit clairement qui est prêt.

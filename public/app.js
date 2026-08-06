@@ -581,6 +581,7 @@ function renderLobby() {
   const isHost = room.hostId === state.playerId;
   const djId = getDjId(room);
   const hasBot = room.players.some(p => p.isBot);
+  const myself = room.players.find(p => p.id === state.playerId);
   const listenMode = room.listenMode || 'together';
   const revealDelay = room.revealDelaySeconds || 15;
   const audioMode = room.audioMode || 'loop';
@@ -601,13 +602,14 @@ function renderLobby() {
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="dot"></div>
-            <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
+            <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''} ${p.isBot || p.ready ? '✅' : '⏳'}</div>
           </div>
           ${isHost && p.id !== room.hostId && !p.isBot ? `<button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="kick-player" data-pid="${p.id}">🚫</button>` : ''}
         </div>`).join('')}
       ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">🧪 Ajouter un bot pour tester seul</button>` : ''}
       ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">Retirer le bot de test</button>` : ''}
       ${!isHost ? `<p class="subtitle" style="margin:8px 0 0;">👑 ${escapeHtml(room.players.find(p => p.id === room.hostId)?.name || '?')} est l'hôte — seul·e à pouvoir changer les réglages et lancer la partie.</p>` : ''}
+      <button class="btn ${myself && myself.ready ? 'btn-ghost' : 'btn-gold'} btn-sm" style="margin-top:10px;width:100%;" data-act="toggle-ready">${myself && myself.ready ? '⏳ Se marquer non prêt·e' : '✅ Je suis prêt·e (active le son)'}</button>
     </div>
 
     <div class="card-section">
@@ -677,7 +679,7 @@ function renderLobby() {
 
     ${isHost ? `
     <button class="btn btn-primary" data-act="start-game" ${room.players.length < 2 ? 'disabled' : ''}>
-      ${room.players.length < 2 ? "En attente d'un 2e joueur…" : 'Lancer la partie'}
+      ${room.players.length < 2 ? "En attente d'un 2e joueur…" : `Lancer la partie (${room.players.filter(p => p.isBot || p.ready).length}/${room.players.length} prêts)`}
     </button>` : `
     <button class="btn btn-primary" disabled>En attente que l'hôte lance la partie…</button>`}
     <div class="row" style="margin-top:10px;">
@@ -1185,6 +1187,11 @@ function attachHandlers() {
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
       else if (act === 'kick-player') { if (confirm('Exclure ce joueur du salon ?')) socket.emit('kick-player', { playerId: elm.getAttribute('data-pid') }); }
+      else if (act === 'toggle-ready') {
+        unlockAudioOnce(); // an explicit "I'm ready" tap is exactly the kind of deliberate gesture that reliably unlocks audio
+        const myself = state.room && state.room.players.find(p => p.id === state.playerId);
+        socket.emit('set-ready', { ready: !(myself && myself.ready) });
+      }
       else if (act === 'set-max-players') {
         const raw = elm.getAttribute('data-max');
         socket.emit('set-max-players', { max: raw === '' ? null : parseInt(raw, 10) });

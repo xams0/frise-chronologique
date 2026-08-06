@@ -547,7 +547,7 @@ io.on('connection', (socket) => {
       code, phase: 'lobby',
       visibility: visibility === 'public' ? 'public' : 'private',
       hostId: playerId, // the creator — only they can start the game or change settings
-      players: [{ id: playerId, name, tokens: START_TOKENS, timeline: [] }],
+      players: [{ id: playerId, name, tokens: START_TOKENS, timeline: [], ready: false }],
       turnOrder: [], turnIndex: 0,
       deck: [], discard: [], pending: null, lastResult: null,
       djId: playerId,
@@ -591,7 +591,7 @@ io.on('connection', (socket) => {
       return socket.emit('error-msg', `Ce salon est complet (maximum ${room.maxPlayers} joueurs).`);
     }
     const playerId = genId();
-    room.players.push({ id: playerId, name, tokens: START_TOKENS, timeline: [] });
+    room.players.push({ id: playerId, name, tokens: START_TOKENS, timeline: [], ready: false });
     room.log.push({ ts: nowStr(), text: `${name} a rejoint le salon.` });
     saveRooms();
     socket.join(code);
@@ -621,7 +621,7 @@ io.on('connection', (socket) => {
       return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).`);
     }
     let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
-    const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
+    const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
     players.forEach(p => { p.timeline = [deck.pop()]; });
     room.players = players;
     room.deck = deck;
@@ -632,6 +632,13 @@ io.on('connection', (socket) => {
     room.lastResult = null;
     room.phase = 'playing';
     room.log.push({ ts: nowStr(), text: `La partie commence (${pool.length} chansons disponibles avec les filtres actifs) — chaque joueur a reçu une chanson de départ !` });
+  }));
+
+  socket.on('set-ready', withRoom((room, { ready }) => {
+    if (room.phase !== 'lobby') return;
+    const p = me(room, socket.data.playerId);
+    if (!p) return;
+    p.ready = !!ready;
   }));
 
   socket.on('set-filters', withRoom((room, { filters }) => {
@@ -828,7 +835,7 @@ io.on('connection', (socket) => {
   socket.on('play-again', withRoom((room) => {
     clearAutoReveal(room.code);
     room.phase = 'lobby';
-    room.players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [] }));
+    room.players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
     room.deck = []; room.discard = []; room.pending = null; room.lastResult = null;
     room.missedCards = [];
     room.turnOrder = []; room.turnIndex = 0;
