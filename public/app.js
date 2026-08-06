@@ -7,6 +7,7 @@
 
 const CARDS_TO_WIN = 10;
 const SESSION_KEY = 'chronolozik_session';
+const LAST_NAME_KEY = 'chronolozik_last_name';
 const socket = io({ reconnection: true, reconnectionDelay: 500, reconnectionDelayMax: 3000 });
 let hasConnectedOnce = false;
 
@@ -27,11 +28,20 @@ function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
 }
 
+/* ---------- remembered name — a pure convenience default, always editable,
+   kept separate from the room session above so it survives leaving a room ---------- */
+function saveLastName(name) {
+  try { if (name) localStorage.setItem(LAST_NAME_KEY, name); } catch (e) {}
+}
+function loadLastName() {
+  try { return localStorage.getItem(LAST_NAME_KEY) || ''; } catch (e) { return ''; }
+}
+
 /* ---------- local UI state (never synced — purely this device's screen) ---------- */
 const state = {
   screen: 'loading',        // loading | home | lobby | game
   mode: 'create',            // create | join
-  nameInput: '', codeInput: '', error: '', busy: false,
+  nameInput: loadLastName(), codeInput: '', error: '', busy: false,
   playerId: null, playerName: null, code: null, room: null,
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
@@ -165,6 +175,7 @@ socket.on('joined', ({ playerId, code, room }) => {
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
   state.error = ''; state.busy = false; state.reconnecting = false;
   saveSession(code, name);
+  saveLastName(name);
   render();
 });
 socket.on('room', (room) => {
@@ -227,7 +238,7 @@ function joinRoom() {
 function leaveToHome() {
   if (state.code) socket.emit('leave-room');
   clearSession();
-  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, error: '', nameInput: '', codeInput: '' });
+  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, error: '', nameInput: loadLastName(), codeInput: '' });
   render();
 }
 function startGame() { socket.emit('start-game'); }

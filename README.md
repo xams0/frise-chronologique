@@ -265,3 +265,10 @@ joueurs déjà présents.
   le client détecte maintenant lui-même s'il a disparu de la liste des
   joueurs (peu importe la cause exacte) et se déconnecte proprement — un
   filet de sécurité qui ne dépend plus d'un seul mécanisme.
+
+## v1.19 — le prénom est mémorisé
+
+Le champ "Ton prénom" se pré-remplit maintenant avec le dernier prénom
+utilisé sur cet appareil (stocké dans le stockage local du navigateur, pas
+un vrai cookie HTTP — plus simple et suffisant ici). Il reste 100%
+modifiable : c'est juste une valeur par défaut, pas un verrouillage.
