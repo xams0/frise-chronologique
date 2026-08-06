@@ -870,7 +870,15 @@ io.on('connection', (socket) => {
   socket.on('submit-challenge', withRoom((room, { gapIndex }) => {
     const playerId = socket.data.playerId;
     const p = me(room, playerId);
-    if (!p || !room.pending || room.pending.stage !== 'placed' || room.pending.challenge) return;
+    if (!p || !room.pending || room.pending.stage !== 'placed') return;
+    if (room.pending.challenge) {
+      // Two players can tap "Défier" almost simultaneously — only the first
+      // to actually reach the server wins the challenge slot. Without this,
+      // the second player's attempt was silently dropped with no feedback
+      // at all, leaving them thinking nothing happened.
+      const first = room.players.find(pl => pl.id === room.pending.challenge.playerId);
+      return socket.emit('error-msg', `Trop tard — ${first ? first.name : 'quelqu\'un'} a défié en premier.`);
+    }
     if (room.pending.activePlayerId === playerId || p.tokens < 1) return;
     if (room.pending.placement && gapIndex === room.pending.placement.gapIndex) {
       return socket.emit('error-msg', 'Choisis un autre emplacement que celui déjà posé.');

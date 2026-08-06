@@ -553,3 +553,18 @@ sur un appareil réel serait idéal, que je ne peux pas faire moi-même).
   maintenant le vrai nom du joueur qui a défié.
 - **Ajout** : le joueur actif voit maintenant lui aussi qui l'a défié
   ("🚨 [pseudo] a défié [pseudo] !"), ce qu'il ne voyait jamais avant.
+
+## v1.41 — fix de la course entre deux "Défier" simultanés
+
+Trouvé le vrai trou : quand deux joueurs appuyaient sur "Défier" presque en
+même temps, le second (arrivé quelques millisecondes trop tard côté
+serveur) était rejeté **en silence** — aucun message, rien. Et même quand
+le serveur envoyait un message d'erreur, l'écran de partie ne l'affichait
+nulle part.
+
+Corrigé des deux côtés :
+- Le serveur envoie maintenant un message explicite : *"Trop tard — [pseudo]
+  a défié en premier."*
+- L'écran de partie affiche maintenant les messages d'erreur (il ne le
+  faisait qu'à l'accueil et dans le salon avant), et ils disparaissent
+  seuls après 4 secondes.

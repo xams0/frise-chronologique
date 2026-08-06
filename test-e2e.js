@@ -688,14 +688,21 @@ async function main() {
       ok('first challenger (of 2 eligible) successfully registered the challenge');
     } else fail('expected the first challenger to be registered');
 
-    // a second, different player tries to also challenge the SAME pending card — must be a no-op
-    // (withRoom always broadcasts after a handler runs, even a no-op one, so
-    // we can just capture the very next broadcast this player receives)
+    // a second, different player tries to also challenge the SAME pending card — must get
+    // an explicit "too late" message, not silence (this used to be a silent no-op)
+    let secondAttemptError = null;
+    secondChallenger.once('error-msg', (msg) => { secondAttemptError = msg; });
     let roomAfterSecondAttempt = null;
     secondChallenger.once('room', (r) => { roomAfterSecondAttempt = r; });
     secondChallenger.emit('submit-challenge', { gapIndex: placedRoom.pending.placement.gapIndex === 0 ? 1 : 0 });
     await new Promise(r => setTimeout(r, 500));
 
+    const firstChallengerName = placedRoom.players.find(p => p.id === nonActiveIds[0]).name;
+    if (secondAttemptError && secondAttemptError.includes(firstChallengerName)) {
+      ok(`second (too-late) challenger correctly received an explicit error naming the winner: "${secondAttemptError}"`);
+    } else {
+      fail('expected an explicit "too late, X challenged first" error for the second challenger, got: ' + JSON.stringify(secondAttemptError));
+    }
     if (roomAfterSecondAttempt && roomAfterSecondAttempt.pending.challenge.playerId === nonActiveIds[0]) {
       ok('second challenger correctly could NOT overwrite the existing challenge (still belongs to the first challenger)');
     } else {

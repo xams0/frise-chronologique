@@ -98,7 +98,14 @@ const state = {
   cardDetail: null
 };
 
-function setError(msg) { state.error = msg; state.busy = false; render(); }
+let errorDismissTimer = null;
+function setError(msg) {
+  state.error = msg; state.busy = false; render();
+  // Transient errors that happen mid-game (like a challenge race lost by a
+  // few milliseconds) shouldn't sit on screen forever — auto-clear it.
+  if (errorDismissTimer) clearTimeout(errorDismissTimer);
+  errorDismissTimer = setTimeout(() => { state.error = ''; render(); }, 4000);
+}
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -820,6 +827,7 @@ function renderGame() {
   <div class="screen game-screen">
     ${renderBgPremium()}
     ${connectionBanner()}
+    ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
     <div class="topbar">
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="code-pill">${room.code}</div>
