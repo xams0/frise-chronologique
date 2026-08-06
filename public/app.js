@@ -645,6 +645,7 @@ function renderLobby() {
       <div class="recap-chip">${audioMode === 'loop' ? '🔁' : '⏹️'} ${audioMode === 'loop' ? 'Boucle' : '30s'}</div>
       <div class="recap-chip">⏱️ ${room.revealDelaySeconds || 15}s</div>
       <div class="recap-chip">⏳ ${room.turnDecisionSeconds || 60}s</div>
+      <div class="recap-chip">${room.freeCardEnabled ? '🛒' : '🚫'} Achat direct</div>
     </div>
     <button class="btn btn-ghost" style="margin-top:10px;" data-act="open-options">⚙️ Options de la partie</button>
 
@@ -722,7 +723,15 @@ function renderOptionsModal(room) {
       <div class="row" style="margin-top:8px;">
         <button class="btn ${visibility === 'private' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-visibility-private">🔒 Privé</button>
         <button class="btn ${visibility === 'public' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-visibility-public">🌐 Public</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${visibility === 'public' ? '🌐 Public' : '🔒 Privé'}</div>`}`;
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${visibility === 'public' ? '🌐 Public' : '🔒 Privé'}</div>`}
+
+      <h3 style="margin-top:18px;">Achat direct de carte</h3>
+      <p class="subtitle" style="margin:0 0 8px;">Échanger 3 jetons pour poser une carte directement sur sa frise, sans l'écouter ni la deviner.</p>
+      ${isHost ? `
+      <div class="row" style="margin-top:8px;">
+        <button class="btn ${!room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-off">🚫 Désactivé</button>
+        <button class="btn ${room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-on">🛒 Activé</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.freeCardEnabled ? '🛒 Activé' : '🚫 Désactivé'}</div>`}`;
   } else if (tab === 'ecoute') {
     body = `
       <h3>Où êtes-vous ?</h3>
@@ -855,7 +864,7 @@ function renderTurnAction(room, pend, isActive, myself) {
     if (!isActive) {
       return `<p class="subtitle" style="margin-top:10px;">En attente que ${escapeHtml(active.name)} pioche une chanson…</p>`;
     }
-    const canFree = myself.tokens >= 3 && (room.deck.length > 0 || room.discard.length > 0);
+    const canFree = room.freeCardEnabled && myself.tokens >= 3 && (room.deck.length > 0 || room.discard.length > 0);
     return `
       <div class="stack" style="margin-top:14px;">
         <button class="btn btn-primary" data-act="draw-card">🎵 Piocher et écouter</button>
@@ -1360,6 +1369,8 @@ function attachHandlers() {
       else if (act === 'start-tokens-plus') socket.emit('set-start-tokens', { count: Math.min(10, (state.room.startTokens != null ? state.room.startTokens : 2) + 1) });
       else if (act === 'set-visibility-private') socket.emit('set-visibility', { visibility: 'private' });
       else if (act === 'set-visibility-public') socket.emit('set-visibility', { visibility: 'public' });
+      else if (act === 'set-free-card-off') socket.emit('set-free-card-enabled', { enabled: false });
+      else if (act === 'set-free-card-on') socket.emit('set-free-card-enabled', { enabled: true });
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
       else if (act === 'reset-filters') resetFilters();
       else if (act === 'pick-dj') setDj(elm.getAttribute('data-pid'));

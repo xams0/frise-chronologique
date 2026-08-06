@@ -607,6 +607,7 @@ io.on('connection', (socket) => {
       turnDecisionSeconds: 60, // time the active player has to place (or pass) a drawn card before it auto-passes
       cardsToWin: CARDS_TO_WIN, // configurable win condition
       startTokens: START_TOKENS, // configurable starting token count
+      freeCardEnabled: false, // "spend 3 tokens to place a card without listening" — off by default
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
       maxPlayers: null, // null = no limit
@@ -776,6 +777,13 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: `🪙 Jetons de départ réglés sur ${n}.` });
   }));
 
+  socket.on('set-free-card-enabled', withRoom((room, { enabled }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    room.freeCardEnabled = !!enabled;
+    room.log.push({ ts: nowStr(), text: room.freeCardEnabled ? '🛒 Achat direct de carte (3 jetons) activé.' : '🛒 Achat direct de carte (3 jetons) désactivé.' });
+  }));
+
   socket.on('leave-room', withRoom(async (room) => {
     const targetId = socket.data.playerId;
     const left = removePlayerFromRoom(room, targetId);
@@ -835,6 +843,7 @@ io.on('connection', (socket) => {
     const p = me(room, playerId);
     const active = activePlayer(room);
     if (!p || !active || active.id !== playerId || room.pending || p.tokens < 3) return;
+    if (!room.freeCardEnabled) return socket.emit('error-msg', 'L\'achat direct de carte n\'est pas activé pour cette partie.');
     if (room.deck.length === 0) {
       if (room.discard.length === 0) return socket.emit('error-msg', 'Plus de chansons disponibles !');
       room.deck = shuffle(room.discard); room.discard = [];

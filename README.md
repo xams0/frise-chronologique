@@ -527,3 +527,15 @@ sur un appareil réel serait idéal, que je ne peux pas faire moi-même).
   bouton **"Prêt(e)"** (renommé), et une **rangée de pastilles-résumé**
   (🏆10 🪙2 👥∞ 🔒Privé 🎉Ensemble 🔁Boucle ⏱️15s ⏳60s) pour voir l'essentiel
   d'un coup d'œil sans ouvrir le menu.
+
+## v1.39 — achat direct de carte devient une option (désactivée par défaut)
+
+- **Échanger 3 jetons contre une carte posée directement** (sans l'écouter)
+  est maintenant une option dans "⚙️ Options de la partie" → onglet 🎮
+  Partie, **désactivée par défaut**. L'hôte peut l'activer.
+- Sur le second point : après relecture complète du code client et serveur,
+  aucune restriction liée au mode d'écoute ("Tous ensemble" vs "Chacun chez
+  soi") n'a été trouvée — testé et confirmé de bout en bout que la
+  fonctionnalité fonctionne identiquement dans les deux modes une fois
+  activée. Si le souci persiste après ce déploiement, dis-le avec plus de
+  détails (quel mode, à quel moment précis) pour qu'on creuse ensemble.

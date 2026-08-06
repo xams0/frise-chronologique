@@ -593,6 +593,68 @@ async function main() {
 
     mallory.disconnect(); nathan.disconnect(); nathanAgain.disconnect(); oscar.disconnect();
 
+    // ---- free-card (buy-without-listening): off by default, host-gated, works in BOTH listen modes ----
+    async function testFreeCard(listenModeToUse, label) {
+      const hostS = io(URL, { transports: ['websocket'] });
+      const otherS = io(URL, { transports: ['websocket'] });
+      await Promise.all([waitFor(hostS, 'connect'), waitFor(otherS, 'connect')]);
+      hostS.emit('create-room', { name: 'FCHost' });
+      const hostJoined = await waitFor(hostS, 'joined');
+      if (hostJoined.room.freeCardEnabled === false) ok(`[${label}] room defaults to freeCardEnabled=false`);
+      else fail(`[${label}] expected default freeCardEnabled=false, got ` + hostJoined.room.freeCardEnabled);
+      otherS.emit('join-room', { code: hostJoined.code, name: 'FCOther' });
+      await waitFor(otherS, 'joined');
+
+      let refusedMsg = null;
+      otherS.once('error-msg', (msg) => { refusedMsg = msg; });
+      otherS.emit('set-free-card-enabled', { enabled: true });
+      await new Promise(r => setTimeout(r, 400));
+      if (refusedMsg) ok(`[${label}] non-host correctly refused when trying to enable free-card`);
+      else fail(`[${label}] expected non-host set-free-card-enabled attempt to be refused`);
+
+      hostS.emit('set-listen-mode', { mode: listenModeToUse });
+      await waitForRoomWhere(hostS, r => r.listenMode === listenModeToUse);
+      hostS.emit('set-start-tokens', { count: 3 });
+      await waitForRoomWhere(hostS, r => r.startTokens === 3);
+      hostS.emit('set-reveal-delay', { seconds: 3 });
+      await waitForRoomWhere(hostS, r => r.revealDelaySeconds === 3);
+
+      // still off — must be refused even with enough tokens once the game starts
+      hostS.emit('start-game');
+      const gameOff = await waitForRoomWhere(hostS, r => r.phase === 'playing');
+      const activeIdOff = gameOff.turnOrder[gameOff.turnIndex];
+      const activeSocketOff = activeIdOff === hostJoined.playerId ? hostS : otherS;
+      let offRefused = null;
+      activeSocketOff.once('error-msg', (msg) => { offRefused = msg; });
+      activeSocketOff.emit('free-card');
+      await new Promise(r => setTimeout(r, 400));
+      if (offRefused) ok(`[${label}] free-card correctly refused while the option is disabled`);
+      else fail(`[${label}] expected free-card to be refused while disabled`);
+
+      // enable it and start a fresh game to test it actually works
+      hostS.emit('play-again');
+      await waitForRoomWhere(hostS, r => r.phase === 'lobby');
+      hostS.emit('set-free-card-enabled', { enabled: true });
+      const enabledRoom = await waitForRoomWhere(hostS, r => r.freeCardEnabled === true);
+      ok(`[${label}] host successfully enabled free-card`);
+      hostS.emit('start-game');
+      const gameOn = await waitForRoomWhere(hostS, r => r.phase === 'playing');
+      const activeIdOn = gameOn.turnOrder[gameOn.turnIndex];
+      const activeSocketOn = activeIdOn === hostJoined.playerId ? hostS : otherS;
+      const beforeLen = gameOn.players.find(p => p.id === activeIdOn).timeline.length;
+      activeSocketOn.emit('free-card');
+      const afterFree = await waitForRoomWhere(activeSocketOn, r => r.players.find(p => p.id === activeIdOn).timeline.length > beforeLen, 5000);
+      const activePlayerAfter = afterFree.players.find(p => p.id === activeIdOn);
+      if (activePlayerAfter.timeline.length === beforeLen + 1 && activePlayerAfter.tokens === 0) {
+        ok(`[${label}] free-card worked once enabled: timeline grew, 3 tokens spent`);
+      } else {
+        fail(`[${label}] free-card did not behave as expected: ` + JSON.stringify({ timeline: activePlayerAfter.timeline.length, tokens: activePlayerAfter.tokens }));
+      }
+      hostS.disconnect(); otherS.disconnect();
+    }
+    await testFreeCard('together', 'tous ensemble');
+    await testFreeCard('remote', 'chacun chez soi');
+
     // ---- leave-room: game ends when too few players remain, host reassigned if needed ----
     const paul = io(URL, { transports: ['websocket'] }); // host
     const quinn = io(URL, { transports: ['websocket'] });
