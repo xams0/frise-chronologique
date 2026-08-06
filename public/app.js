@@ -16,6 +16,7 @@ let hasConnectedOnce = false;
 let audioEl = null;
 let audioKey = null; // uniquely identifies which pending card is currently loaded
 let audioSecondsDisplay = 0; // last-known playback position — used as the template's starting value so a re-render never visibly resets the counter to 0
+let audioAutoplayBlocked = false; // true when the browser refused to auto-start playback — makes the manual fallback button impossible to miss
 let revealTicker = null; // interval id for animating the reveal-button countdown
 let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
 
@@ -63,7 +64,7 @@ const state = {
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
-  version: null, roomVisibility: 'private', publicRooms: null, maxPlayersInput: ''
+  version: null, roomVisibility: 'private', publicRooms: null, maxPlayersInput: '', showFinalTimelines: false
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -265,13 +266,13 @@ function openPlacementPicker() { state.activeTimelinePlayerId = state.playerId; 
 function openChallengePicker() { state.activeTimelinePlayerId = 'CHALLENGE'; state.selectedGap = null; render(); }
 function submitGuess() { socket.emit('submit-guess', { title: state.guessTitle, artist: state.guessArtist }); state.guessTitle = ''; state.guessArtist = ''; render(); }
 function reveal() { socket.emit('reveal'); }
-function playAgain() { socket.emit('play-again'); state.screen = 'lobby'; render(); }
+function playAgain() { socket.emit('play-again'); state.screen = 'lobby'; state.showFinalTimelines = false; render(); }
 function setDj(playerId) { socket.emit('set-dj', { playerId }); state.showDjPicker = false; render(); }
 function addTestBot() { socket.emit('add-bot'); }
 function removeTestBot() { socket.emit('remove-bot'); }
 function botPlayTurn() { socket.emit('bot-play'); }
 function playPreviewManually() {
-  if (audioEl) { audioEl.play().catch(() => {}); }
+  if (audioEl) { audioEl.play().then(() => { audioAutoplayBlocked = false; render(); }).catch(() => {}); }
 }
 
 function me(room) { return room.players.find(p => p.id === state.playerId); }
@@ -282,6 +283,17 @@ function getDjName(room) { const p = room.players.find(pl => pl.id === getDjId(r
 /* ============================= RENDER ============================= */
 function render() {
   const root = document.getElementById('root');
+
+  // Preserve focus + cursor/selection position across the rebuild below —
+  // periodic re-renders (the reveal countdown ticker fires every 250ms while
+  // a card is placed) would otherwise silently steal focus out of whatever
+  // input the user is actively typing into, breaking mid-guess typing.
+  let focusedId = null, selStart = null, selEnd = null;
+  const activeEl = document.activeElement;
+  if (activeEl && activeEl.id && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+    focusedId = activeEl.id;
+    try { selStart = activeEl.selectionStart; selEnd = activeEl.selectionEnd; } catch (e) {}
+  }
 
   // Preserve a live <audio> across re-renders so playback never restarts.
   let preservedAudio = null;
@@ -295,6 +307,16 @@ function render() {
   else html = renderGame();
   root.innerHTML = html;
 
+  if (focusedId) {
+    const el = document.getElementById(focusedId);
+    if (el) {
+      el.focus();
+      if (selStart !== null && el.setSelectionRange) {
+        try { el.setSelectionRange(selStart, selEnd); } catch (e) {}
+      }
+    }
+  }
+
   const slot = document.getElementById('audio-slot');
   const wantKey = slot ? slot.dataset.key : null;
   const wantSrc = slot ? slot.dataset.src : null;
@@ -307,6 +329,7 @@ function render() {
       const shouldLoop = (state.room && state.room.audioMode) !== 'once';
       audioKey = wantKey;
       audioSecondsDisplay = 0; // fresh track — reset the last-known playback position
+      audioAutoplayBlocked = false;
       const a = document.createElement('audio');
       a.id = 'audio-slot';
       a.src = wantSrc;
@@ -326,7 +349,17 @@ function render() {
       });
       slot.replaceWith(a);
       audioEl = a;
-      a.play().catch(() => { /* autoplay blocked — the manual play button covers this */ });
+      audioAutoplayBlocked = false;
+      a.play().catch(() => {
+        // Autoplay blocked by the browser (very common when this device
+        // didn't just have a direct tap — e.g. every listener in "chacun
+        // chez soi" mode except whoever just drew the card). Not a sync
+        // bug: the card and its audio DO arrive at the same time for
+        // everyone, browsers just refuse to auto-start sound without a
+        // very recent tap on THIS device. Make the fallback impossible to miss.
+        audioAutoplayBlocked = true;
+        render();
+      });
     }
   } else if (wantKey && !wantSrc) {
     // pending card exists but no preview available for it
@@ -713,7 +746,7 @@ function renderTurnAction(room, pend, isActive, myself) {
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         ${renderSoundBars()}
         <div id="audio-counter" class="mono" style="color:var(--gold);font-size:13px;">${audioSecondsDisplay}s / 30s</div>
-        <button class="btn btn-ghost btn-sm" data-act="play-preview">🔊 Appuyer si pas de son</button>
+        <button class="btn ${audioAutoplayBlocked ? 'btn-gold play-nudge' : 'btn-ghost'} btn-sm" data-act="play-preview">🔊 ${audioAutoplayBlocked ? 'Appuie ici pour le son' : 'Appuyer si pas de son'}</button>
       </div>`;
     } else {
       html += `<p class="subtitle" style="margin-top:10px;">🔇 Aperçu audio indisponible pour cette chanson sur Deezer — devinez à partir du titre/artiste une fois révélé, ou passez-la.</p>`;
@@ -867,12 +900,13 @@ function renderAllTimelines(room) {
           items.map(it => {
             if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(it.label)}</div></div></div>`;
             const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
-            return `<div class="ticket ${isWonCard ? 'ticket-won' : ''}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div></div></div>`;
+            const wonCls = isWonCard ? (lr.kind === 'stolen' ? 'ticket-stolen' : 'ticket-won') : '';
+            return `<div class="ticket ${wonCls}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div></div></div>`;
           }).join('')}
       </div>
       ${playerMissed.length ? `
       <div class="missed-history">
-        ${playerMissed.map(m => `<div class="missed-line">❌ <b>${m.year}</b> — ${escapeHtml(m.title)}</div>`).join('')}
+        ${playerMissed.map(m => `<div class="missed-line">❌ <b>${m.year}</b> — ${escapeHtml(m.title)} · ${escapeHtml(m.artist)}</div>`).join('')}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -891,6 +925,8 @@ function renderFinished() {
         <div class="player-chip"><div class="dot"></div><div class="name">${escapeHtml(p.name)}</div><div class="cards mono">${p.timeline.length} cartes</div></div>
       `).join('')}
     </div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:14px;" data-act="toggle-final-timelines">${state.showFinalTimelines ? '▲ Masquer les frises' : '📊 Revoir les frises de tout le monde'}</button>
+    ${state.showFinalTimelines ? `<div class="stack" style="margin-top:12px;text-align:left;width:100%;">${renderAllTimelines(room)}</div>` : ''}
     <button class="btn btn-primary" style="margin-top:22px;" data-act="play-again">Rejouer dans ce salon</button>
     <button class="btn btn-ghost" style="margin-top:10px;" data-act="leave">Quitter</button>
   </div>`;
@@ -1153,6 +1189,7 @@ function attachHandlers() {
       else if (act === 'submit-guess') submitGuess();
       else if (act === 'reveal') reveal();
       else if (act === 'play-again') playAgain();
+      else if (act === 'toggle-final-timelines') { state.showFinalTimelines = !state.showFinalTimelines; render(); }
       else if (act === 'select-gap') { state.selectedGap = parseInt(elm.getAttribute('data-gap'), 10); render(); }
       else if (act === 'confirm-gap') {
         if (state.selectedGap === null) return;

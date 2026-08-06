@@ -107,8 +107,11 @@ function closeEnough(guess, real) {
 function matchGuess(gt, ga, real) {
   const nt = normalize(gt), na = normalize(ga);
   const rt = normalize(real.title), ra = normalize(real.artist.split(' ft.')[0].split(' feat.')[0]);
-  const titleOk = nt.length > 2 && closeEnough(nt, rt);
-  const artistOk = na.length > 2 && closeEnough(na, ra);
+  // >= 2 rather than > 2 — some real artist names are exactly 2 characters
+  // (e.g. "U2"), which the stricter check silently made impossible to ever
+  // guess correctly, regardless of how it was typed.
+  const titleOk = nt.length >= 2 && closeEnough(nt, rt);
+  const artistOk = na.length >= 2 && closeEnough(na, ra);
   return titleOk && artistOk;
 }
 function timelineYears(timeline) { return timeline.map(c => c.year).sort((a, b) => a - b); }

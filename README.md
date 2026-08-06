@@ -405,3 +405,29 @@ chansons associées, tu peux exporter la bibliothèque (📚 Bibliothèque → �
 Exporter) et me la transmettre — je peux alors committer directement les
 identifiants Deezer déjà résolus dans `songs.json`, ce qui rendrait même le
 tout premier démarrage après un déploiement quasi instantané.
+
+## v1.31 — six correctifs/ajouts
+
+- **Fix vrai bug** : le champ de saisie titre/artiste perdait le focus
+  toutes les 250ms pendant le compte à rebours de révélation (le redessin
+  périodique détruisait et recréait le champ en pleine frappe) — c'était la
+  cause probable à la fois du "insensible à la casse" perçu et de
+  "impossible de taper après avoir placé une carte". La logique de
+  comparaison elle-même était déjà insensible à la casse (vérifié
+  directement). Le focus et la position du curseur sont maintenant
+  préservés à travers les redessins.
+- **Couleur distincte pour une carte volée** (rose) vs gagnée normalement
+  (doré) dans la frise.
+- **Artiste ajouté** à l'historique des chansons ratées (year + titre +
+  artiste, au lieu de year + titre seulement).
+- **Revoir les frises finales** : bouton sur l'écran de victoire pour
+  afficher la frise complète de chaque joueur.
+- **Audio qui ne démarre pas seul en "chacun chez soi"** : ce n'est pas un
+  souci de synchronisation (carte et son arrivent bien en même temps pour
+  tous) — c'est la politique de lecture automatique des navigateurs, qui
+  bloque plus souvent quand l'appareil n'a pas eu d'interaction tactile
+  très récente. Le bouton de secours pulse maintenant visuellement dès que
+  le navigateur bloque la lecture automatique, pour ne jamais le manquer.
+- Petit fix additionnel : les artistes à 2 caractères (ex. "U2") étaient
+  auparavant impossibles à deviner correctement à cause d'un seuil de
+  longueur trop strict.

@@ -88,6 +88,8 @@
   .btn:active{transform:scale(0.97);}
   .btn-primary{background:var(--pink);color:#fff;}
   .btn-gold{background:var(--gold);color:#241205;}
+  .play-nudge{animation:playNudge 0.9s ease-in-out infinite;}
+  @keyframes playNudge{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(242,184,75,0.5);}50%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(242,184,75,0);}}
   .btn-teal{background:var(--teal);color:#062521;}
   .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--text);}
   .btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}
@@ -158,6 +160,8 @@
   .ticket.challenge .year{color:var(--teal);}
   .ticket.ticket-won{border-color:var(--gold);border-style:solid;animation:ticketWon 0.6s ease-in-out infinite alternate;}
   @keyframes ticketWon{0%{box-shadow:0 0 0 0 rgba(242,184,75,0);background:var(--surface2);}100%{box-shadow:0 0 16px 4px rgba(242,184,75,0.6);background:rgba(242,184,75,0.18);}}
+  .ticket.ticket-stolen{border-color:var(--pink);border-style:solid;animation:ticketStolen 0.6s ease-in-out infinite alternate;}
+  @keyframes ticketStolen{0%{box-shadow:0 0 0 0 rgba(255,79,129,0);background:var(--surface2);}100%{box-shadow:0 0 16px 4px rgba(255,79,129,0.6);background:rgba(255,79,129,0.2);}}
   .slot{flex:0 0 auto;width:26px;display:flex;align-items:center;justify-content:center;}
   .slot button{width:22px;height:22px;border-radius:50%;background:var(--surface);border:1px dashed var(--line);color:var(--text-dim);font-size:14px;line-height:1;}
   .slot button.active{background:var(--pink);border-color:var(--pink);color:#fff;}
