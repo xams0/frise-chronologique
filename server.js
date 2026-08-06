@@ -560,6 +560,29 @@ app.get('/api/songs/health', async (req, res) => {
 });
 
 // ---------- socket.io: real-time game events ----------
+// Shared by the host's explicit "Lancer la partie" click AND the automatic
+// start once every player has marked themselves ready.
+function tryStartGame(room) {
+  if (room.players.length < 2) return { ok: false, error: 'Il faut au moins 2 joueurs.' };
+  const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
+  if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
+    return { ok: false, error: `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).` };
+  }
+  let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
+  const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
+  players.forEach(p => { p.timeline = [deck.pop()]; });
+  room.players = players;
+  room.deck = deck;
+  room.discard = [];
+  room.turnOrder = shuffle(players.map(p => p.id));
+  room.turnIndex = 0;
+  room.pending = null;
+  room.lastResult = null;
+  room.phase = 'playing';
+  room.log.push({ ts: nowStr(), text: `La partie commence (${pool.length} chansons disponibles avec les filtres actifs) — chaque joueur a reçu une chanson de départ !` });
+  return { ok: true };
+}
+
 io.on('connection', (socket) => {
 
   socket.on('create-room', ({ name, visibility }) => {
@@ -642,23 +665,8 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', withRoom((room) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut lancer la partie.');
-    if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
-    const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
-    if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
-      return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).`);
-    }
-    let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
-    const players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
-    players.forEach(p => { p.timeline = [deck.pop()]; });
-    room.players = players;
-    room.deck = deck;
-    room.discard = [];
-    room.turnOrder = shuffle(players.map(p => p.id));
-    room.turnIndex = 0;
-    room.pending = null;
-    room.lastResult = null;
-    room.phase = 'playing';
-    room.log.push({ ts: nowStr(), text: `La partie commence (${pool.length} chansons disponibles avec les filtres actifs) — chaque joueur a reçu une chanson de départ !` });
+    const result = tryStartGame(room);
+    if (!result.ok) socket.emit('error-msg', result.error);
   }));
 
   socket.on('set-ready', withRoom((room, { ready }) => {
@@ -666,6 +674,14 @@ io.on('connection', (socket) => {
     const p = me(room, socket.data.playerId);
     if (!p) return;
     p.ready = !!ready;
+    // Everyone's confirmed ready — start automatically, no need to wait on
+    // the host to click anything. Bots don't click ready, so they always
+    // count as ready for this check. A failure here (e.g. filters too
+    // narrow) is a silent no-op — the room just stays in the lobby, exactly
+    // as if nobody had triggered anything.
+    if (room.players.length >= 2 && room.players.every(pl => pl.isBot || pl.ready)) {
+      tryStartGame(room);
+    }
   }));
 
   socket.on('set-filters', withRoom((room, { filters }) => {

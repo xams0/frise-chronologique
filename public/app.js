@@ -312,6 +312,18 @@ function getDjId(room) { return room.djId || (room.players[0] && room.players[0]
 function getDjName(room) { const p = room.players.find(pl => pl.id === getDjId(room)); return p ? p.name : '?'; }
 
 /* ============================= RENDER ============================= */
+// Used for the periodic countdown-bar ticks — skips the render entirely
+// while the user has an input/textarea focused, so typing (title/artist
+// guesses, name fields, etc.) is never interrupted by a periodic rebuild.
+// The countdown fill bars are pure CSS (wall-clock synced), so they keep
+// animating smoothly on their own even when a tick is skipped — only the
+// numeric label/button-enabled state pauses briefly until the user blurs.
+function renderTick() {
+  const activeTag = document.activeElement && document.activeElement.tagName;
+  if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
+  render();
+}
+
 function render() {
   const root = document.getElementById('root');
 
@@ -407,7 +419,7 @@ function render() {
     const delayMs = ((state.room.revealDelaySeconds || 15) * 1000);
     const elapsed = Date.now() - pend.placedAt;
     if (elapsed < delayMs) {
-      if (!revealTicker) revealTicker = setInterval(render, 250);
+      if (!revealTicker) revealTicker = setInterval(renderTick, 250);
     } else if (revealTicker) {
       clearInterval(revealTicker); revealTicker = null;
     }
@@ -415,7 +427,7 @@ function render() {
     const delayMs = ((state.room.turnDecisionSeconds || 60) * 1000);
     const elapsed = Date.now() - pend.drawnAt;
     if (elapsed < delayMs) {
-      if (!revealTicker) revealTicker = setInterval(render, 250);
+      if (!revealTicker) revealTicker = setInterval(renderTick, 250);
     } else if (revealTicker) {
       clearInterval(revealTicker); revealTicker = null;
     }
@@ -899,6 +911,7 @@ function renderPendingParticipants(room, pend) {
   } else if (iAmActive) {
     html += renderRevealButton(room, pend, 'Révéler la carte');
   } else {
+    html += renderRevealInfoTimer(room, pend, activePl);
     if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier (1 🪙)</button>`;
     if (pend.challenge) {
       const c = room.players.find(p => p.id === pend.challenge.playerId);
@@ -908,6 +921,21 @@ function renderPendingParticipants(room, pend) {
   }
   html += '</div>';
   return html;
+}
+
+function renderRevealInfoTimer(room, pend, activePl) {
+  const delayMs = (room.revealDelaySeconds || 15) * 1000;
+  const elapsed = Date.now() - (pend.placedAt || Date.now());
+  const remaining = Math.max(0, delayMs - elapsed);
+  if (remaining <= 0) return '';
+  const secondsLeft = Math.ceil(remaining / 1000);
+  const durationS = (delayMs / 1000).toFixed(2);
+  const negDelayS = (-(elapsed / 1000)).toFixed(3);
+  return `
+  <div class="decision-timer">
+    <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
+    <span class="decision-timer-label">⏱️ ${secondsLeft}s avant que ${escapeHtml(activePl.name)} puisse révéler</span>
+  </div>`;
 }
 
 let lastAnimatedResultTs = null; // prevents the reveal-outcome banner from replaying its flash animation on every unrelated re-render

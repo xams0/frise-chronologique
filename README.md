@@ -477,3 +477,23 @@ la carte a été volée. Une croix ✕ referme la popup. Pour la toute première
 carte de chaque joueur (distribuée au lancement de la partie, avant tout
 tirage), aucune pochette n'a encore été récupérée sur Deezer — un espace
 réservé musical s'affiche à la place.
+
+## v1.36 — quatre corrections/ajouts
+
+- **Fix scroll bloqué sur Chrome mobile** : le fond animé plein écran
+  n'avait pas `pointer-events:none` — malgré un `z-index` négatif, il
+  pouvait intercepter les gestes de défilement sur certains navigateurs.
+- **Fix vraie cause de la saisie qui bug pendant le compte à rebours** : le
+  focus était déjà restauré depuis la v1.31, mais le champ de texte était
+  quand même détruit et recréé toutes les 250ms, ce qui pouvait faire
+  perdre des lettres tapées via le clavier prédictif mobile (IME). Le tick
+  périodique du chronomètre saute maintenant complètement le redessin tant
+  qu'un champ de texte est activement utilisé — les barres de progression
+  restent fluides (animation CSS pure), seul le chiffre affiché fait une
+  pause le temps de la frappe.
+- **Barre "Révéler" visible pour tout le monde** : les autres joueurs voient
+  maintenant combien de temps il reste avant que le joueur actif puisse
+  révéler, pas seulement lui.
+- **Lancement automatique** : si tous les joueurs (bots inclus, toujours
+  comptés prêts) appuient sur "Prêt", la partie démarre toute seule, sans
+  que l'hôte ait besoin de cliquer sur "Lancer la partie".

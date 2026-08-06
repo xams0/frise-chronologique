@@ -432,6 +432,27 @@ async function main() {
     await waitForRoomWhere(erin, r => r.players[0].ready === false);
     ok('set-ready(false) accepted');
 
+    // ---- auto-start once everyone is ready (no explicit start-game needed) ----
+    const fiona = io(URL, { transports: ['websocket'] });
+    const george = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(fiona, 'connect'), waitFor(george, 'connect')]);
+    fiona.emit('create-room', { name: 'Fiona' });
+    const fionaJoined = await waitFor(fiona, 'joined');
+    george.emit('join-room', { code: fionaJoined.code, name: 'George' });
+    await waitFor(george, 'joined');
+    let phaseAfterOneReady = null;
+    fiona.once('room', (r) => { phaseAfterOneReady = r.phase; });
+    fiona.emit('set-ready', { ready: true });
+    await new Promise(r => setTimeout(r, 400));
+    if (phaseAfterOneReady === 'lobby') ok('room correctly stays in lobby when only 1 of 2 players is ready');
+    else fail('expected phase to stay "lobby" with only 1/2 ready, got ' + phaseAfterOneReady);
+    george.emit('set-ready', { ready: true });
+    const autoStarted = await waitForRoomWhere(george, r => r.phase === 'playing');
+    if (autoStarted.phase === 'playing' && autoStarted.players.every(p => p.timeline.length === 1)) {
+      ok('game auto-started once both players marked ready, with no explicit start-game emitted');
+    } else fail('expected auto-start once everyone was ready: ' + JSON.stringify({ phase: autoStarted.phase }));
+    fiona.disconnect(); george.disconnect();
+
     // ---- audio mode ----
     erin.emit('set-audio-mode', { mode: 'once' });
     const onceRoom = await waitForRoomWhere(erin, r => r.audioMode === 'once');

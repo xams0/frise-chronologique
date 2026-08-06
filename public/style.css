@@ -54,7 +54,7 @@
 
   /* ---- home screen: premium animated background + shining title ---- */
   .home-screen{position:relative;z-index:0;}
-  .bg-premium{position:fixed;inset:0;overflow:hidden;z-index:-1;background:#04060b;}
+  .bg-premium{position:fixed;inset:0;overflow:hidden;z-index:-1;background:#04060b;pointer-events:none;}
   .bg-blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:0.75;}
   .blob1{width:380px;height:380px;background:radial-gradient(circle,#3b82f6,transparent 68%);top:-90px;left:-90px;animation:float1 17s ease-in-out infinite alternate;}
   .blob2{width:340px;height:340px;background:radial-gradient(circle,#2563eb,transparent 68%);bottom:-70px;right:-70px;animation:float2 21s ease-in-out infinite alternate;}
