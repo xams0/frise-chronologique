@@ -94,7 +94,8 @@ const state = {
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
-  version: null, roomVisibility: 'private', publicRooms: null, maxPlayersInput: '', showFinalTimelines: false
+  version: null, roomVisibility: 'private', publicRooms: null, maxPlayersInput: '', showFinalTimelines: false,
+  cardDetail: null
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -762,6 +763,7 @@ function renderGame() {
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
     ${state.showDjPicker ? renderDjModal(room) : ''}
+    ${state.cardDetail ? renderCardDetailModal() : ''}
   </div>`;
 }
 
@@ -970,7 +972,7 @@ function renderAllTimelines(room) {
             const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
             const wonCls = isWonCard ? (lr.kind === 'stolen' ? 'ticket-stolen' : 'ticket-won') : (it.card.stolenFrom ? 'ticket-stolen-permanent' : '');
             const stolenNote = it.card.stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(it.card.stolenFrom)}</div>` : '';
-            return `<div class="ticket ${wonCls}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div>${stolenNote}</div></div>`;
+            return `<div class="ticket ${wonCls}" data-act="show-card-detail" data-title="${escapeHtml(it.card.title)}" data-artist="${escapeHtml(it.card.artist)}" data-year="${it.card.year}" data-cover="${escapeHtml(it.card.cover || '')}" data-stolen="${escapeHtml(it.card.stolenFrom || '')}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div>${stolenNote}</div></div>`;
           }).join('')}
       </div>
       ${playerMissed.length ? `
@@ -1143,6 +1145,28 @@ function renderHealthReport() {
     </div>`;
 }
 
+let lastAnimatedCardDetailKey = null; // prevents the flip-in animation from replaying while the same card stays open across re-renders
+
+function renderCardDetailModal() {
+  const c = state.cardDetail;
+  const key = c.title + '|' + c.artist + '|' + c.year;
+  const isFirstRender = lastAnimatedCardDetailKey !== key;
+  if (isFirstRender) lastAnimatedCardDetailKey = key;
+  return `
+  <div class="modal-bg card-detail-bg" data-act="close-card-detail" style="z-index:200;">
+    <div class="card-detail-wrap" onclick="event.stopPropagation()">
+      <button class="iconbtn card-detail-close" data-act="close-card-detail">✕</button>
+      <div class="card-detail-face ${isFirstRender ? 'card-flip-in' : ''} ${c.stolenFrom ? 'stolen' : ''}">
+        ${c.cover ? `<img src="${escapeHtml(c.cover)}" alt="" class="card-detail-cover"/>` : `<div class="card-detail-cover-placeholder">🎵</div>`}
+        <div class="card-detail-year">${escapeHtml(String(c.year))}</div>
+        <div class="card-detail-title">${escapeHtml(c.title)}</div>
+        <div class="card-detail-artist">${escapeHtml(c.artist)}</div>
+        ${c.stolenFrom ? `<div class="card-detail-stolen">Volée à ${escapeHtml(c.stolenFrom)}</div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderRulesModal() {
   return `
   <div class="modal-bg" data-act="close-rules">
@@ -1224,6 +1248,17 @@ function attachHandlers() {
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
       else if (act === 'kick-player') { if (confirm('Exclure ce joueur du salon ?')) socket.emit('kick-player', { playerId: elm.getAttribute('data-pid') }); }
+      else if (act === 'show-card-detail') {
+        state.cardDetail = {
+          title: elm.getAttribute('data-title'),
+          artist: elm.getAttribute('data-artist'),
+          year: elm.getAttribute('data-year'),
+          cover: elm.getAttribute('data-cover') || null,
+          stolenFrom: elm.getAttribute('data-stolen') || null
+        };
+        render();
+      }
+      else if (act === 'close-card-detail') { state.cardDetail = null; render(); }
       else if (act === 'toggle-ready') {
         unlockAudioOnce(); // an explicit "I'm ready" tap is exactly the kind of deliberate gesture that reliably unlocks audio
         const myself = state.room && state.room.players.find(p => p.id === state.playerId);

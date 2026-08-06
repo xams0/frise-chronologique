@@ -152,7 +152,7 @@
   /* timeline ribbon */
   .timeline-owner{font-size:12px;color:var(--text-dim);margin-bottom:6px;display:flex;justify-content:space-between;}
   .ribbon{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;overflow-x:auto;padding:4px 2px 8px;touch-action:pan-x pan-y;}
-  .ticket{flex:0 0 auto;width:64px;min-height:74px;background:var(--surface2);border:1.5px dashed var(--line);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 3px;text-align:center;overflow:hidden;box-sizing:border-box;}
+  .ticket{flex:0 0 auto;width:64px;min-height:74px;background:var(--surface2);border:1.5px dashed var(--line);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 3px;text-align:center;overflow:hidden;box-sizing:border-box;cursor:pointer;}
   .ticket.ticket-stolen-permanent,.ticket.ticket-stolen{min-height:88px;}
   .ticket .year{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:17px;color:var(--gold);}
   .ticket .meta{margin-top:4px;width:100%;max-width:100%;min-width:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;}
@@ -185,6 +185,21 @@
   .modal h2{margin-bottom:12px;}
   .rules p{font-size:14px;color:var(--text-dim);line-height:1.6;margin:0 0 10px;}
   .rules b{color:var(--text);}
+
+  /* card detail popup — tap any placed card to see it large, with a flip-in */
+  .modal-bg.card-detail-bg{align-items:center;justify-content:center;padding:20px;box-sizing:border-box;}
+  .card-detail-wrap{position:relative;perspective:1000px;width:min(300px, 100%);}
+  .card-detail-close{position:absolute;top:-46px;right:0;background:rgba(255,255,255,0.08);}
+  .card-detail-face{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:30px 22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.55);}
+  .card-detail-face.stolen{border-color:var(--pink);}
+  .card-detail-face.card-flip-in{animation:cardFlipIn 0.5s cubic-bezier(0.34,1.56,0.64,1);}
+  @keyframes cardFlipIn{from{transform:rotateY(90deg);opacity:0;}to{transform:rotateY(0deg);opacity:1;}}
+  .card-detail-cover{width:160px;height:160px;border-radius:16px;object-fit:cover;margin:0 auto 18px;display:block;box-shadow:0 8px 24px rgba(0,0,0,0.4);}
+  .card-detail-cover-placeholder{width:160px;height:160px;border-radius:16px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;font-size:52px;background:var(--surface2);}
+  .card-detail-year{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:42px;color:var(--gold);}
+  .card-detail-title{font-size:19px;font-weight:700;margin-top:10px;}
+  .card-detail-artist{font-size:14px;color:var(--text-dim);margin-top:4px;}
+  .card-detail-stolen{margin-top:14px;padding-top:14px;border-top:1px dashed rgba(255,79,129,0.4);color:var(--pink);font-weight:700;font-size:13px;}
 
   .footer-note{font-size:11.5px;color:var(--text-dim);text-align:center;margin-top:18px;line-height:1.5;}
   .footer-note a{color:var(--teal);}
