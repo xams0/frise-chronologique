@@ -314,3 +314,14 @@ modifiable : c'est juste une valeur par défaut, pas un verrouillage.
   maintenant sur plusieurs lignes au lieu de s'étaler sur une seule bande à
   faire défiler — beaucoup moins besoin de scroller, y compris dans la
   fenêtre de placement/défi.
+
+## v1.23 — vrai logo partout
+
+Le logo (note de musique + onde sonore, dégradé bleu/rose) remplace l'icône
+CSS générique sur l'accueil, l'écran de règles, l'écran de chargement et
+l'écran de victoire. Il sert aussi de :
+- **Favicon** (onglet du navigateur)
+- **Icône iOS** quand on ajoute le site à l'écran d'accueil ("Sur l'écran
+  d'accueil" dans Safari) — fond bleu marine assorti au thème, comme une
+  vraie app
+- **Icône Android/PWA** via `manifest.json` (192px et 512px)

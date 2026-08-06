@@ -356,7 +356,7 @@ function renderWelcome() {
   return `
   <div class="screen center">
     ${renderBgPremium()}
-    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
+    <div class="brand"><img src="/logo.png" class="brand-logo spin" alt="Chronolozik"/><h1 class="title-xl title-shine">Chronolozik</h1></div>
     <p class="subtitle" style="margin-top:10px;">Le jeu qui teste ta mémoire musicale, entre amis.</p>
 
     <div class="stack" style="margin-top:28px;text-align:left;">
@@ -382,7 +382,7 @@ function renderLoading() {
   return `
   <div class="screen center">
     ${renderBgPremium()}
-    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
+    <div class="brand"><img src="/logo.png" class="brand-logo spin" alt="Chronolozik"/><h1 class="title-xl title-shine">Chronolozik</h1></div>
     <p class="subtitle" style="margin-top:10px;">Vérification de la bibliothèque musicale sur Deezer avant d'ouvrir le salon…</p>
 
     <div style="width:100%;max-width:280px;margin-top:28px;">
@@ -422,7 +422,7 @@ function renderHome() {
   <div class="screen center home-screen">
     ${renderBgPremium()}
     ${connectionBanner()}
-    <div class="brand"><div class="vinyl"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
+    <div class="brand"><img src="/logo.png" class="brand-logo" alt="Chronolozik"/><h1 class="title-xl title-shine">Chronolozik</h1></div>
     ${state.version ? `<div class="version-bubble">v${escapeHtml(state.version)}</div>` : ''}
 
     <div class="tabs" style="margin-top:26px;max-width:280px;">
@@ -844,7 +844,7 @@ function renderFinished() {
   return `
   <div class="screen center">
     ${renderBgPremium()}
-    <div class="brand"><div class="vinyl"></div></div>
+    <div class="brand"><img src="/logo.png" class="brand-logo" alt="Chronolozik"/></div>
     <h1 class="title-xl">🏆 ${escapeHtml(last.winnerName)} gagne !</h1>
     <div class="stack" style="margin-top:18px;">
       ${room.players.slice().sort((a, b) => b.timeline.length - a.timeline.length).map(p => `

@@ -2,23 +2,17 @@
   {
     "title": "In the Good Old Summertime",
     "artist": "Blanche Ring",
-    "year": 1902,
-    "genre": null,
-    "country": null
+    "year": 1902
   },
   {
     "title": "Give My Regards to Broadway",
     "artist": "George M. Cohan",
-    "year": 1904,
-    "genre": null,
-    "country": null
+    "year": 1904
   },
   {
     "title": "Meet Me in St. Louis, Louis",
     "artist": "Billy Murray",
-    "year": 1904,
-    "genre": null,
-    "country": null
+    "year": 1904
   },
   {
     "title": "Take Me Out to the Ballgame",
@@ -30,9 +24,7 @@
   {
     "title": "By the Light of the Silvery Moon",
     "artist": "Ada Jones & Billy Murray",
-    "year": 1909,
-    "genre": null,
-    "country": null
+    "year": 1909
   },
   {
     "title": "Alexander's Ragtime Band",
@@ -51,9 +43,7 @@
   {
     "title": "Ballin' the Jack",
     "artist": "Prince's Band",
-    "year": 1913,
-    "genre": null,
-    "country": null
+    "year": 1913
   },
   {
     "title": "St. Louis Blues",
@@ -100,37 +90,27 @@
   {
     "title": "Charleston",
     "artist": "James P. Johnson",
-    "year": 1923,
-    "genre": null,
-    "country": null
+    "year": 1923
   },
   {
     "title": "Rhapsody in Blue",
     "artist": "George Gershwin",
-    "year": 1924,
-    "genre": null,
-    "country": null
+    "year": 1924
   },
   {
     "title": "Ol' Man River",
     "artist": "Paul Robeson",
-    "year": 1927,
-    "genre": null,
-    "country": null
+    "year": 1927
   },
   {
     "title": "Stardust",
     "artist": "Hoagy Carmichael",
-    "year": 1927,
-    "genre": null,
-    "country": null
+    "year": 1927
   },
   {
     "title": "Blue Skies",
     "artist": "Ben Selvin",
-    "year": 1927,
-    "genre": null,
-    "country": null
+    "year": 1927
   },
   {
     "title": "Mack the Knife (Die Moritat)",
@@ -142,9 +122,7 @@
   {
     "title": "Makin' Whoopee",
     "artist": "Eddie Cantor",
-    "year": 1928,
-    "genre": null,
-    "country": null
+    "year": 1928
   },
   {
     "title": "Ain't Misbehavin'",
@@ -156,9 +134,7 @@
   {
     "title": "Happy Days Are Here Again",
     "artist": "Ben Selvin",
-    "year": 1929,
-    "genre": null,
-    "country": null
+    "year": 1929
   },
   {
     "title": "J'ai Deux Amours",
@@ -170,9 +146,7 @@
   {
     "title": "Georgia on My Mind",
     "artist": "Hoagy Carmichael",
-    "year": 1930,
-    "genre": null,
-    "country": null
+    "year": 1930
   },
   {
     "title": "Minnie the Moocher",
@@ -198,9 +172,7 @@
   {
     "title": "You're the Top",
     "artist": "Cole Porter",
-    "year": 1934,
-    "genre": null,
-    "country": null
+    "year": 1934
   },
   {
     "title": "Cheek to Cheek",
@@ -226,9 +198,7 @@
   {
     "title": "The Way You Look Tonight",
     "artist": "Fred Astaire",
-    "year": 1936,
-    "genre": null,
-    "country": null
+    "year": 1936
   },
   {
     "title": "Bei Mir Bist Du Schön",
@@ -268,9 +238,7 @@
   {
     "title": "Chattanooga Choo Choo",
     "artist": "Glenn Miller",
-    "year": 1941,
-    "genre": null,
-    "country": null
+    "year": 1941
   },
   {
     "title": "White Christmas",
@@ -282,23 +250,17 @@
   {
     "title": "Don't Sit Under the Apple Tree",
     "artist": "The Andrews Sisters",
-    "year": 1942,
-    "genre": null,
-    "country": null
+    "year": 1942
   },
   {
     "title": "I'll Be Seeing You",
     "artist": "Bing Crosby",
-    "year": 1944,
-    "genre": null,
-    "country": null
+    "year": 1944
   },
   {
     "title": "Ac-Cent-Tchu-Ate the Positive",
     "artist": "Johnny Mercer",
-    "year": 1944,
-    "genre": null,
-    "country": null
+    "year": 1944
   },
   {
     "title": "Sentimental Journey",
@@ -331,16 +293,12 @@
   {
     "title": "Buttons and Bows",
     "artist": "Dinah Shore",
-    "year": 1948,
-    "genre": null,
-    "country": null
+    "year": 1948
   },
   {
     "title": "Some Enchanted Evening",
     "artist": "Ezio Pinza",
-    "year": 1949,
-    "genre": null,
-    "country": null
+    "year": 1949
   },
   {
     "title": "Mona Lisa",
@@ -366,16 +324,12 @@
   {
     "title": "Unforgettable",
     "artist": "Nat King Cole",
-    "year": 1951,
-    "genre": null,
-    "country": null
+    "year": 1951
   },
   {
     "title": "Cry",
     "artist": "Johnnie Ray",
-    "year": 1951,
-    "genre": null,
-    "country": null
+    "year": 1951
   },
   {
     "title": "Singin' in the Rain",
@@ -394,9 +348,7 @@
   {
     "title": "Shake, Rattle and Roll",
     "artist": "Big Joe Turner",
-    "year": 1954,
-    "genre": null,
-    "country": null
+    "year": 1954
   },
   {
     "title": "Sixteen Tons",
@@ -415,16 +367,12 @@
   {
     "title": "Ain't That a Shame",
     "artist": "Fats Domino",
-    "year": 1955,
-    "genre": null,
-    "country": null
+    "year": 1955
   },
   {
     "title": "Tutti Frutti",
     "artist": "Little Richard",
-    "year": 1955,
-    "genre": null,
-    "country": null
+    "year": 1955
   },
   {
     "title": "Hound Dog",
@@ -443,16 +391,12 @@
   {
     "title": "Blueberry Hill",
     "artist": "Fats Domino",
-    "year": 1956,
-    "genre": null,
-    "country": null
+    "year": 1956
   },
   {
     "title": "Love Me Tender",
     "artist": "Elvis Presley",
-    "year": 1956,
-    "genre": null,
-    "country": null
+    "year": 1956
   },
   {
     "title": "Jailhouse Rock",
@@ -485,16 +429,12 @@
   {
     "title": "All Shook Up",
     "artist": "Elvis Presley",
-    "year": 1957,
-    "genre": null,
-    "country": null
+    "year": 1957
   },
   {
     "title": "Wake Up Little Susie",
     "artist": "The Everly Brothers",
-    "year": 1957,
-    "genre": null,
-    "country": null
+    "year": 1957
   },
   {
     "title": "Volare",
@@ -520,16 +460,12 @@
   {
     "title": "Bird Dog",
     "artist": "The Everly Brothers",
-    "year": 1958,
-    "genre": null,
-    "country": null
+    "year": 1958
   },
   {
     "title": "Come Fly with Me",
     "artist": "Frank Sinatra",
-    "year": 1958,
-    "genre": null,
-    "country": null
+    "year": 1958
   },
   {
     "title": "What'd I Say",
@@ -555,16 +491,12 @@
   {
     "title": "Mr. Blue",
     "artist": "The Fleetwoods",
-    "year": 1959,
-    "genre": null,
-    "country": null
+    "year": 1959
   },
   {
     "title": "The Twist",
     "artist": "Chubby Checker",
-    "year": 1960,
-    "genre": null,
-    "country": null
+    "year": 1960
   },
   {
     "title": "Le Moribond",
@@ -576,9 +508,7 @@
   {
     "title": "Runaway",
     "artist": "Del Shannon",
-    "year": 1961,
-    "genre": null,
-    "country": null
+    "year": 1961
   },
   {
     "title": "I Want to Hold Your Hand",
@@ -590,16 +520,12 @@
   {
     "title": "Blowin' in the Wind",
     "artist": "Bob Dylan",
-    "year": 1963,
-    "genre": null,
-    "country": null
+    "year": 1963
   },
   {
     "title": "Da Doo Ron Ron",
     "artist": "The Crystals",
-    "year": 1963,
-    "genre": null,
-    "country": null
+    "year": 1963
   },
   {
     "title": "Fly Me to the Moon",
@@ -618,23 +544,17 @@
   {
     "title": "The Times They Are a-Changin'",
     "artist": "Bob Dylan",
-    "year": 1964,
-    "genre": null,
-    "country": null
+    "year": 1964
   },
   {
     "title": "You've Lost That Lovin' Feelin'",
     "artist": "The Righteous Brothers",
-    "year": 1964,
-    "genre": null,
-    "country": null
+    "year": 1964
   },
   {
     "title": "The Sound of Silence",
     "artist": "Simon & Garfunkel",
-    "year": 1964,
-    "genre": null,
-    "country": null
+    "year": 1964
   },
   {
     "title": "Satisfaction",
@@ -660,9 +580,7 @@
   {
     "title": "My Generation",
     "artist": "The Who",
-    "year": 1965,
-    "genre": null,
-    "country": null
+    "year": 1965
   },
   {
     "title": "Good Vibrations",
@@ -674,16 +592,12 @@
   {
     "title": "Paint It Black",
     "artist": "The Rolling Stones",
-    "year": 1966,
-    "genre": null,
-    "country": null
+    "year": 1966
   },
   {
     "title": "Strangers in the Night",
     "artist": "Frank Sinatra",
-    "year": 1966,
-    "genre": null,
-    "country": null
+    "year": 1966
   },
   {
     "title": "Respect",
@@ -716,16 +630,12 @@
   {
     "title": "Ruby Tuesday",
     "artist": "The Rolling Stones",
-    "year": 1967,
-    "genre": null,
-    "country": null
+    "year": 1967
   },
   {
     "title": "All You Need Is Love",
     "artist": "The Beatles",
-    "year": 1967,
-    "genre": null,
-    "country": null
+    "year": 1967
   },
   {
     "title": "Hey Jude",
@@ -744,16 +654,12 @@
   {
     "title": "Piece of My Heart",
     "artist": "Janis Joplin",
-    "year": 1968,
-    "genre": null,
-    "country": null
+    "year": 1968
   },
   {
     "title": "Comment te dire adieu",
     "artist": "Françoise Hardy",
-    "year": 1968,
-    "genre": null,
-    "country": null
+    "year": 1968
   },
   {
     "title": "Je t'aime... moi non plus",
@@ -765,16 +671,12 @@
   {
     "title": "Aquarius / Let the Sunshine In",
     "artist": "The 5th Dimension",
-    "year": 1969,
-    "genre": null,
-    "country": null
+    "year": 1969
   },
   {
     "title": "Suspicious Minds",
     "artist": "Elvis Presley",
-    "year": 1969,
-    "genre": null,
-    "country": null
+    "year": 1969
   },
   {
     "title": "Bridge Over Troubled Water",
@@ -800,16 +702,12 @@
   {
     "title": "Let It Be",
     "artist": "The Beatles",
-    "year": 1970,
-    "genre": null,
-    "country": null
+    "year": 1970
   },
   {
     "title": "Layla",
     "artist": "Derek and the Dominos",
-    "year": 1970,
-    "genre": null,
-    "country": null
+    "year": 1970
   },
   {
     "title": "Imagine",
@@ -828,16 +726,12 @@
   {
     "title": "What's Going On",
     "artist": "Marvin Gaye",
-    "year": 1971,
-    "genre": null,
-    "country": null
+    "year": 1971
   },
   {
     "title": "American Pie",
     "artist": "Don McLean",
-    "year": 1971,
-    "genre": null,
-    "country": null
+    "year": 1971
   },
   {
     "title": "Superstition",
@@ -849,16 +743,12 @@
   {
     "title": "Rocket Man",
     "artist": "Elton John",
-    "year": 1972,
-    "genre": null,
-    "country": null
+    "year": 1972
   },
   {
     "title": "Free Bird",
     "artist": "Lynyrd Skynyrd",
-    "year": 1973,
-    "genre": null,
-    "country": null
+    "year": 1973
   },
   {
     "title": "Bohemian Rhapsody",
@@ -884,16 +774,12 @@
   {
     "title": "Kashmir",
     "artist": "Led Zeppelin",
-    "year": 1975,
-    "genre": null,
-    "country": null
+    "year": 1975
   },
   {
     "title": "Le Téléphone Pleure",
     "artist": "Claude François",
-    "year": 1975,
-    "genre": null,
-    "country": null
+    "year": 1975
   },
   {
     "title": "Dancing Queen",
@@ -926,9 +812,7 @@
   {
     "title": "Go Your Own Way",
     "artist": "Fleetwood Mac",
-    "year": 1977,
-    "genre": null,
-    "country": null
+    "year": 1977
   },
   {
     "title": "Le Freak",
@@ -954,30 +838,22 @@
   {
     "title": "Y.M.C.A.",
     "artist": "Village People",
-    "year": 1978,
-    "genre": null,
-    "country": null
+    "year": 1978
   },
   {
     "title": "Heart of Glass",
     "artist": "Blondie",
-    "year": 1978,
-    "genre": null,
-    "country": null
+    "year": 1978
   },
   {
     "title": "My Sharona",
     "artist": "The Knack",
-    "year": 1979,
-    "genre": null,
-    "country": null
+    "year": 1979
   },
   {
     "title": "Don't Stop Believin'",
     "artist": "Journey",
-    "year": 1981,
-    "genre": null,
-    "country": null
+    "year": 1981
   },
   {
     "title": "Africa",
@@ -996,16 +872,12 @@
   {
     "title": "Eye of the Tiger",
     "artist": "Survivor",
-    "year": 1982,
-    "genre": null,
-    "country": null
+    "year": 1982
   },
   {
     "title": "It's Raining Men",
     "artist": "The Weather Girls",
-    "year": 1982,
-    "genre": null,
-    "country": null
+    "year": 1982
   },
   {
     "title": "Billie Jean",
@@ -1031,37 +903,27 @@
   {
     "title": "Beat It",
     "artist": "Michael Jackson",
-    "year": 1983,
-    "genre": null,
-    "country": null
+    "year": 1983
   },
   {
     "title": "Karma Chameleon",
     "artist": "Culture Club",
-    "year": 1983,
-    "genre": null,
-    "country": null
+    "year": 1983
   },
   {
     "title": "Total Eclipse of the Heart",
     "artist": "Bonnie Tyler",
-    "year": 1983,
-    "genre": null,
-    "country": null
+    "year": 1983
   },
   {
     "title": "Owner of a Lonely Heart",
     "artist": "Yes",
-    "year": 1983,
-    "genre": null,
-    "country": null
+    "year": 1983
   },
   {
     "title": "Sweet Dreams (Are Made of This)",
     "artist": "Eurythmics",
-    "year": 1983,
-    "genre": null,
-    "country": null
+    "year": 1983
   },
   {
     "title": "Like a Virgin",
@@ -1073,9 +935,7 @@
   {
     "title": "Time After Time",
     "artist": "Cyndi Lauper",
-    "year": 1984,
-    "genre": null,
-    "country": null
+    "year": 1984
   },
   {
     "title": "Take On Me",
@@ -1094,16 +954,12 @@
   {
     "title": "Money for Nothing",
     "artist": "Dire Straits",
-    "year": 1985,
-    "genre": null,
-    "country": null
+    "year": 1985
   },
   {
     "title": "We Built This City",
     "artist": "Starship",
-    "year": 1985,
-    "genre": null,
-    "country": null
+    "year": 1985
   },
   {
     "title": "Livin' on a Prayer",
@@ -1122,23 +978,17 @@
   {
     "title": "Papa Don't Preach",
     "artist": "Madonna",
-    "year": 1986,
-    "genre": null,
-    "country": null
+    "year": 1986
   },
   {
     "title": "Walk Like an Egyptian",
     "artist": "The Bangles",
-    "year": 1986,
-    "genre": null,
-    "country": null
+    "year": 1986
   },
   {
     "title": "True Colors",
     "artist": "Cyndi Lauper",
-    "year": 1986,
-    "genre": null,
-    "country": null
+    "year": 1986
   },
   {
     "title": "Never Gonna Give You Up",
@@ -1171,9 +1021,7 @@
   {
     "title": "Faith",
     "artist": "George Michael",
-    "year": 1987,
-    "genre": null,
-    "country": null
+    "year": 1987
   },
   {
     "title": "Wind of Change",
@@ -1192,23 +1040,17 @@
   {
     "title": "Groove Is in the Heart",
     "artist": "Deee-Lite",
-    "year": 1990,
-    "genre": null,
-    "country": null
+    "year": 1990
   },
   {
     "title": "Ice Ice Baby",
     "artist": "Vanilla Ice",
-    "year": 1990,
-    "genre": null,
-    "country": null
+    "year": 1990
   },
   {
     "title": "U Can't Touch This",
     "artist": "MC Hammer",
-    "year": 1990,
-    "genre": null,
-    "country": null
+    "year": 1990
   },
   {
     "title": "Smells Like Teen Spirit",
@@ -1241,9 +1083,7 @@
   {
     "title": "Désenchantée",
     "artist": "Mylène Farmer",
-    "year": 1991,
-    "genre": null,
-    "country": null
+    "year": 1991
   },
   {
     "title": "Baby Got Back",
@@ -1269,9 +1109,7 @@
   {
     "title": "Under the Bridge",
     "artist": "Red Hot Chili Peppers",
-    "year": 1992,
-    "genre": null,
-    "country": null
+    "year": 1992
   },
   {
     "title": "What Is Love",
@@ -1297,16 +1135,12 @@
   {
     "title": "Black Hole Sun",
     "artist": "Soundgarden",
-    "year": 1994,
-    "genre": null,
-    "country": null
+    "year": 1994
   },
   {
     "title": "Basket Case",
     "artist": "Green Day",
-    "year": 1994,
-    "genre": null,
-    "country": null
+    "year": 1994
   },
   {
     "title": "Wonderwall",
@@ -1332,9 +1166,7 @@
   {
     "title": "Pour que tu m'aimes encore",
     "artist": "Céline Dion",
-    "year": 1995,
-    "genre": null,
-    "country": null
+    "year": 1995
   },
   {
     "title": "Wannabe",
@@ -1346,30 +1178,22 @@
   {
     "title": "Return of the Mack",
     "artist": "Mark Morrison",
-    "year": 1996,
-    "genre": null,
-    "country": null
+    "year": 1996
   },
   {
     "title": "Macarena",
     "artist": "Los del Río",
-    "year": 1996,
-    "genre": null,
-    "country": null
+    "year": 1996
   },
   {
     "title": "1979",
     "artist": "Smashing Pumpkins",
-    "year": 1996,
-    "genre": null,
-    "country": null
+    "year": 1996
   },
   {
     "title": "Aïcha",
     "artist": "Khaled",
-    "year": 1996,
-    "genre": null,
-    "country": null
+    "year": 1996
   },
   {
     "title": "Everybody (Backstreet's Back)",
@@ -1402,23 +1226,17 @@
   {
     "title": "Barbie Girl",
     "artist": "Aqua",
-    "year": 1997,
-    "genre": null,
-    "country": null
+    "year": 1997
   },
   {
     "title": "Tubthumping",
     "artist": "Chumbawamba",
-    "year": 1997,
-    "genre": null,
-    "country": null
+    "year": 1997
   },
   {
     "title": "Song 2",
     "artist": "Blur",
-    "year": 1997,
-    "genre": null,
-    "country": null
+    "year": 1997
   },
   {
     "title": "...Baby One More Time",
@@ -1437,16 +1255,12 @@
   {
     "title": "Doo Wop (That Thing)",
     "artist": "Lauryn Hill",
-    "year": 1998,
-    "genre": null,
-    "country": null
+    "year": 1998
   },
   {
     "title": "Freak on a Leash",
     "artist": "Korn",
-    "year": 1998,
-    "genre": null,
-    "country": null
+    "year": 1998
   },
   {
     "title": "All Star",
@@ -1472,30 +1286,22 @@
   {
     "title": "Larger Than Life",
     "artist": "Backstreet Boys",
-    "year": 1999,
-    "genre": null,
-    "country": null
+    "year": 1999
   },
   {
     "title": "Genie in a Bottle",
     "artist": "Christina Aguilera",
-    "year": 1999,
-    "genre": null,
-    "country": null
+    "year": 1999
   },
   {
     "title": "In the End",
     "artist": "Linkin Park",
-    "year": 2000,
-    "genre": null,
-    "country": null
+    "year": 2000
   },
   {
     "title": "Beautiful Day",
     "artist": "U2",
-    "year": 2000,
-    "genre": null,
-    "country": null
+    "year": 2000
   },
   {
     "title": "Lose Yourself",
@@ -1507,16 +1313,12 @@
   {
     "title": "Clocks",
     "artist": "Coldplay",
-    "year": 2002,
-    "genre": null,
-    "country": null
+    "year": 2002
   },
   {
     "title": "Complicated",
     "artist": "Avril Lavigne",
-    "year": 2002,
-    "genre": null,
-    "country": null
+    "year": 2002
   },
   {
     "title": "Crazy In Love",
@@ -1542,23 +1344,17 @@
   {
     "title": "Toxic",
     "artist": "Britney Spears",
-    "year": 2003,
-    "genre": null,
-    "country": null
+    "year": 2003
   },
   {
     "title": "Mr. Brightside",
     "artist": "The Killers",
-    "year": 2003,
-    "genre": null,
-    "country": null
+    "year": 2003
   },
   {
     "title": "Seven Nation Army",
     "artist": "The White Stripes",
-    "year": 2003,
-    "genre": null,
-    "country": null
+    "year": 2003
   },
   {
     "title": "Since U Been Gone",
@@ -1570,9 +1366,7 @@
   {
     "title": "Yeah!",
     "artist": "Usher",
-    "year": 2004,
-    "genre": null,
-    "country": null
+    "year": 2004
   },
   {
     "title": "Hips Don't Lie",
@@ -1591,9 +1385,7 @@
   {
     "title": "Crazy",
     "artist": "Gnarls Barkley",
-    "year": 2006,
-    "genre": null,
-    "country": null
+    "year": 2006
   },
   {
     "title": "Umbrella",
@@ -1654,30 +1446,22 @@
   {
     "title": "Grenade",
     "artist": "Bruno Mars",
-    "year": 2010,
-    "genre": null,
-    "country": null
+    "year": 2010
   },
   {
     "title": "Just the Way You Are",
     "artist": "Bruno Mars",
-    "year": 2010,
-    "genre": null,
-    "country": null
+    "year": 2010
   },
   {
     "title": "Forget You",
     "artist": "CeeLo Green",
-    "year": 2010,
-    "genre": null,
-    "country": null
+    "year": 2010
   },
   {
     "title": "Je veux",
     "artist": "Zaz",
-    "year": 2010,
-    "genre": null,
-    "country": null
+    "year": 2010
   },
   {
     "title": "Party Rock Anthem",
@@ -1717,9 +1501,7 @@
   {
     "title": "Call Me Maybe",
     "artist": "Carly Rae Jepsen",
-    "year": 2012,
-    "genre": null,
-    "country": null
+    "year": 2012
   },
   {
     "title": "Get Lucky",
@@ -1766,23 +1548,17 @@
   {
     "title": "All of Me",
     "artist": "John Legend",
-    "year": 2013,
-    "genre": null,
-    "country": null
+    "year": 2013
   },
   {
     "title": "Wrecking Ball",
     "artist": "Miley Cyrus",
-    "year": 2013,
-    "genre": null,
-    "country": null
+    "year": 2013
   },
   {
     "title": "Roar",
     "artist": "Katy Perry",
-    "year": 2013,
-    "genre": null,
-    "country": null
+    "year": 2013
   },
   {
     "title": "Uptown Funk",
@@ -1801,9 +1577,7 @@
   {
     "title": "Dernière danse",
     "artist": "Indila",
-    "year": 2014,
-    "genre": null,
-    "country": null
+    "year": 2014
   },
   {
     "title": "Hello",
@@ -1822,16 +1596,12 @@
   {
     "title": "Can't Stop the Feeling!",
     "artist": "Justin Timberlake",
-    "year": 2016,
-    "genre": null,
-    "country": null
+    "year": 2016
   },
   {
     "title": "Closer",
     "artist": "The Chainsmokers",
-    "year": 2016,
-    "genre": null,
-    "country": null
+    "year": 2016
   },
   {
     "title": "Shape of You",
@@ -1850,16 +1620,12 @@
   {
     "title": "Havana",
     "artist": "Camila Cabello",
-    "year": 2017,
-    "genre": null,
-    "country": null
+    "year": 2017
   },
   {
     "title": "Perfect",
     "artist": "Ed Sheeran",
-    "year": 2017,
-    "genre": null,
-    "country": null
+    "year": 2017
   },
   {
     "title": "Sicko Mode",
@@ -1871,30 +1637,22 @@
   {
     "title": "Girls Like You",
     "artist": "Maroon 5",
-    "year": 2018,
-    "genre": null,
-    "country": null
+    "year": 2018
   },
   {
     "title": "God's Plan",
     "artist": "Drake",
-    "year": 2018,
-    "genre": null,
-    "country": null
+    "year": 2018
   },
   {
     "title": "Shallow",
     "artist": "Lady Gaga & Bradley Cooper",
-    "year": 2018,
-    "genre": null,
-    "country": null
+    "year": 2018
   },
   {
     "title": "Sunflower",
     "artist": "Post Malone & Swae Lee",
-    "year": 2018,
-    "genre": null,
-    "country": null
+    "year": 2018
   },
   {
     "title": "Blinding Lights",
@@ -1934,30 +1692,22 @@
   {
     "title": "Someone You Loved",
     "artist": "Lewis Capaldi",
-    "year": 2019,
-    "genre": null,
-    "country": null
+    "year": 2019
   },
   {
     "title": "Truth Hurts",
     "artist": "Lizzo",
-    "year": 2019,
-    "genre": null,
-    "country": null
+    "year": 2019
   },
   {
     "title": "Señorita",
     "artist": "Shawn Mendes & Camila Cabello",
-    "year": 2019,
-    "genre": null,
-    "country": null
+    "year": 2019
   },
   {
     "title": "7 rings",
     "artist": "Ariana Grande",
-    "year": 2019,
-    "genre": null,
-    "country": null
+    "year": 2019
   },
   {
     "title": "Levitating",
@@ -1976,16 +1726,12 @@
   {
     "title": "WAP",
     "artist": "Cardi B ft. Megan Thee Stallion",
-    "year": 2020,
-    "genre": null,
-    "country": null
+    "year": 2020
   },
   {
     "title": "Watermelon Sugar",
     "artist": "Harry Styles",
-    "year": 2020,
-    "genre": null,
-    "country": null
+    "year": 2020
   },
   {
     "title": "drivers license",
@@ -2025,30 +1771,22 @@
   {
     "title": "Montero (Call Me By Your Name)",
     "artist": "Lil Nas X",
-    "year": 2021,
-    "genre": null,
-    "country": null
+    "year": 2021
   },
   {
     "title": "Industry Baby",
     "artist": "Lil Nas X & Jack Harlow",
-    "year": 2021,
-    "genre": null,
-    "country": null
+    "year": 2021
   },
   {
     "title": "Bad Habits",
     "artist": "Ed Sheeran",
-    "year": 2021,
-    "genre": null,
-    "country": null
+    "year": 2021
   },
   {
     "title": "Enemy",
     "artist": "Imagine Dragons",
-    "year": 2021,
-    "genre": null,
-    "country": null
+    "year": 2021
   },
   {
     "title": "As It Was",
@@ -2067,37 +1805,27 @@
   {
     "title": "About Damn Time",
     "artist": "Lizzo",
-    "year": 2022,
-    "genre": null,
-    "country": null
+    "year": 2022
   },
   {
     "title": "Unholy",
     "artist": "Sam Smith & Kim Petras",
-    "year": 2022,
-    "genre": null,
-    "country": null
+    "year": 2022
   },
   {
     "title": "Kill Bill",
     "artist": "SZA",
-    "year": 2022,
-    "genre": null,
-    "country": null
+    "year": 2022
   },
   {
     "title": "Calm Down",
     "artist": "Rema & Selena Gomez",
-    "year": 2022,
-    "genre": null,
-    "country": null
+    "year": 2022
   },
   {
     "title": "Snooze",
     "artist": "SZA",
-    "year": 2022,
-    "genre": null,
-    "country": null
+    "year": 2022
   },
   {
     "title": "Flowers",
@@ -2116,16 +1844,12 @@
   {
     "title": "Paint The Town Red",
     "artist": "Doja Cat",
-    "year": 2023,
-    "genre": null,
-    "country": null
+    "year": 2023
   },
   {
     "title": "Lovin On Me",
     "artist": "Jack Harlow",
-    "year": 2023,
-    "genre": null,
-    "country": null
+    "year": 2023
   },
   {
     "title": "Espresso",
@@ -2151,15 +1875,11 @@
   {
     "title": "Beautiful Things",
     "artist": "Benson Boone",
-    "year": 2024,
-    "genre": null,
-    "country": null
+    "year": 2024
   },
   {
     "title": "Birds of a Feather",
     "artist": "Billie Eilish",
-    "year": 2024,
-    "genre": null,
-    "country": null
+    "year": 2024
   }
 ]
