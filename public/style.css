@@ -140,8 +140,8 @@
   .sound-bars span:nth-child(4){height:26px;}
   @keyframes soundBar{0%,100%{transform:scaleY(0.35);}50%{transform:scaleY(1);}}
 
-  .guess-box{display:flex;gap:8px;margin-top:12px;}
-  .guess-box input{flex:1;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;}
+  .guess-box{display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+  .guess-box input{width:100%;min-width:0;box-sizing:border-box;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;}
   .guess-ok{color:var(--teal);font-size:13px;margin-top:8px;font-weight:600;}
 
   /* timeline ribbon */

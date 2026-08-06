@@ -368,3 +368,13 @@ l'écran de victoire. Il sert aussi de :
   animation CSS fluide (calculée pour démarrer déjà au bon endroit selon le
   temps écoulé) au lieu d'une largeur recalculée par à-coups toutes les
   250ms — beaucoup plus premium.
+
+## v1.29 — vrai fix : le champ "Artiste ?" débordait de l'écran
+
+Les précédentes tentatives (v1.25/v1.27/v1.28) corrigeaient les cartes de la
+frise, mais le vrai bug (confirmé par capture d'écran) était ailleurs : les
+champs **"Titre ?" / "Artiste ?"** pour deviner la chanson étaient côte à
+côte (`flex:1` sans `min-width:0`, un piège classique de flexbox où un
+`<input>` refuse de rétrécir sous sa largeur naturelle) — "Artiste ?" sortait
+de l'écran sur mobile. Les deux champs sont maintenant **empilés
+verticalement**, chacun pleine largeur.

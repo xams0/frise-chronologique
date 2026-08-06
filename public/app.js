@@ -555,7 +555,7 @@ function renderLobby() {
         <button class="btn ${!room.maxPlayers ? 'btn-gold' : 'btn-ghost'} btn-sm" style="width:auto;flex:1;min-width:70px;" data-act="set-max-players" data-max="">Illimité</button>
       </div>
       <div class="row" style="margin-top:8px;">
-        <input id="inp-max-custom" type="number" min="2" max="20" placeholder="Personnalisé (2-20)" value="${escapeHtml(state.maxPlayersInput)}" style="background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;"/>
+        <input id="inp-max-custom" type="number" min="2" max="20" placeholder="Personnalisé (2-20)" value="${escapeHtml(state.maxPlayersInput)}" style="flex:1;min-width:0;box-sizing:border-box;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;"/>
         <button class="btn btn-ghost btn-sm" style="width:auto;" data-act="set-max-players-custom">Valider</button>
       </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.maxPlayers ? room.maxPlayers + ' joueurs max' : 'Illimité'}</div>`}
     </div>
