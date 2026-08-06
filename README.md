@@ -454,3 +454,16 @@ qu'une simple frappe au clavier), et le bouton "Lancer la partie" de l'hôte
 affiche le nombre de joueurs prêts (ex. "3/4 prêts"). L'hôte garde le
 contrôle final — il peut lancer la partie même si tout le monde n'a pas
 encore confirmé, mais voit clairement qui est prêt.
+
+## v1.34 — carte volée permanente + timer de décision
+
+- **Carte volée** : reste marquée en **rose** pendant tout le reste de la
+  partie (plus seulement quelques secondes), avec une mention **"Volée à
+  [pseudo]"** affichée en bas de la carte, dans la frise et dans la fenêtre
+  de placement/défi.
+- **Temps pour répondre à une carte** : nouveau réglage (60s par défaut,
+  15 à 180s, réglable par l'hôte dans le salon). Si le joueur actif ne place
+  pas (et ne passe pas) sa carte à temps, elle est automatiquement
+  défaussée et le tour passe au joueur suivant — avec une barre de
+  progression du même style que celle du bouton Révéler, visible par tous
+  pendant la phase d'écoute.

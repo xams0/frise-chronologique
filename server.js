@@ -331,6 +331,30 @@ function scheduleAutoReveal(room) {
   }, delayMs);
 }
 
+// Same idea, but for the OTHER end of a turn: if the active player draws a
+// card and never places (or passes) it in time, the turn auto-passes to the
+// next player instead of the game just sitting there forever.
+const passTimers = {};
+function clearAutoPass(code) {
+  if (passTimers[code]) { clearTimeout(passTimers[code]); delete passTimers[code]; }
+}
+function scheduleAutoPass(room) {
+  clearAutoPass(room.code);
+  const delayMs = (room.turnDecisionSeconds || 60) * 1000;
+  passTimers[room.code] = setTimeout(() => {
+    delete passTimers[room.code];
+    const r = rooms[room.code];
+    if (r && r.pending && r.pending.stage === 'listening') {
+      const activePlayer = r.players.find(p => p.id === r.pending.activePlayerId);
+      r.discard.push(r.pending.card);
+      r.log.push({ ts: nowStr(), text: `⏱️ ${activePlayer ? activePlayer.name : '?'} n'a pas répondu à temps — la chanson est défaussée, au tour suivant.` });
+      advanceTurn(r);
+      saveRooms();
+      broadcast(room.code);
+    }
+  }, delayMs);
+}
+
 // Shared cleanup for any time a player leaves the room (voluntarily or
 // kicked): fixes up turn order/pending/DJ/host, ends an in-progress game if
 // too few players remain, and deletes the room entirely if it's now empty.
@@ -345,7 +369,7 @@ function removePlayerFromRoom(room, targetId) {
     const wasBeingChallenged = room.pending && room.pending.challenge && room.pending.challenge.playerId === targetId;
     room.turnOrder = room.turnOrder.filter(id => id !== targetId);
     if (wasBeingChallenged) room.pending.challenge = null;
-    if (wasActive) { clearAutoReveal(room.code); room.pending = null; }
+    if (wasActive) { clearAutoReveal(room.code); clearAutoPass(room.code); room.pending = null; }
     if (room.turnOrder.length) room.turnIndex = room.turnIndex % room.turnOrder.length;
   }
 
@@ -364,6 +388,7 @@ function removePlayerFromRoom(room, targetId) {
   // the specific case the host asked for: the host left alone.
   if (room.phase === 'playing' && room.players.length < 2) {
     clearAutoReveal(room.code);
+    clearAutoPass(room.code);
     room.phase = 'lobby';
     room.pending = null;
     room.deck = []; room.discard = [];
@@ -373,6 +398,7 @@ function removePlayerFromRoom(room, targetId) {
 
   if (room.players.length === 0) {
     clearAutoReveal(room.code);
+    clearAutoPass(room.code);
     delete rooms[room.code];
   }
 
@@ -397,7 +423,7 @@ function resolveReveal(room) {
     if (!room.missedCards) room.missedCards = [];
     room.missedCards.push({ playerId: active.id, title: pend.card.title, artist: pend.card.artist, year: pend.card.year, ts: Date.now() });
     if (challengeCorrect) {
-      challenger.timeline = insertSorted(challenger.timeline, pend.card);
+      challenger.timeline = insertSorted(challenger.timeline, { ...pend.card, stolenFrom: active.name });
       winner = challenger;
       room.log.push({ ts: nowStr(), text: `🎯 ${active.name} s'est trompé, mais ${challenger.name} avait raison — la carte "${pend.card.title}" (${pend.card.year}) file dans sa frise !` });
       room.lastResult = { ts: Date.now(), kind: 'stolen', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, extraName: challenger.name, cover: pend.card.cover || null };
@@ -553,6 +579,7 @@ io.on('connection', (socket) => {
       djId: playerId,
       listenMode: 'together', // 'together' = one DJ plays for the room | 'remote' = everyone hears it on their own device
       revealDelaySeconds: 15, // minimum wait before "Révéler" can be pressed, so others have time to challenge
+      turnDecisionSeconds: 60, // time the active player has to place (or pass) a drawn card before it auto-passes
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
       maxPlayers: null, // null = no limit
@@ -671,6 +698,15 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: `⏱️ Délai avant de pouvoir révéler réglé sur ${s} secondes.` });
   }));
 
+  socket.on('set-turn-decision-seconds', withRoom((room, { seconds }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    const s = parseInt(seconds, 10);
+    if (!Number.isFinite(s) || s < 15 || s > 180) return socket.emit('error-msg', 'Le temps de décision doit être entre 15 et 180 secondes.');
+    room.turnDecisionSeconds = s;
+    room.log.push({ ts: nowStr(), text: `⏱️ Temps pour répondre à une carte réglé sur ${s} secondes.` });
+  }));
+
   socket.on('set-audio-mode', withRoom((room, { mode }) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
     if (room.phase !== 'lobby') return;
@@ -735,8 +771,9 @@ io.on('connection', (socket) => {
     if (!active || active.id !== playerId || room.pending) return;
     const card = await drawPlayableCard(room);
     if (!card) return socket.emit('error-msg', 'Plus de chansons avec un aperçu audio jouable dans la pioche !');
-    room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null };
+    room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null, drawnAt: Date.now() };
     room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} pioche une chanson.` });
+    scheduleAutoPass(room);
   }));
 
   socket.on('skip-card', withRoom(async (room) => {
@@ -747,9 +784,11 @@ io.on('connection', (socket) => {
     room.discard.push(room.pending.card);
     room.log.push({ ts: nowStr(), text: `${p.name} dépense 1 jeton pour passer la chanson.` });
     room.pending = null;
+    clearAutoPass(room.code);
     const card = await drawPlayableCard(room);
     if (card) {
-      room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null };
+      room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null, drawnAt: Date.now() };
+      scheduleAutoPass(room);
     }
   }));
 
@@ -777,6 +816,7 @@ io.on('connection', (socket) => {
     room.pending.stage = 'placed';
     room.pending.placedAt = Date.now();
     room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} a placé sa carte sur sa frise.` });
+    clearAutoPass(room.code);
     scheduleAutoReveal(room);
   }));
 
@@ -834,6 +874,7 @@ io.on('connection', (socket) => {
 
   socket.on('play-again', withRoom((room) => {
     clearAutoReveal(room.code);
+    clearAutoPass(room.code);
     room.phase = 'lobby';
     room.players = room.players.map(p => ({ ...p, tokens: START_TOKENS, timeline: [], ready: false }));
     room.deck = []; room.discard = []; room.pending = null; room.lastResult = null;

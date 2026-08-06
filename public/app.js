@@ -398,13 +398,21 @@ function render() {
     audioEl = null; audioKey = null;
   }
 
-  // Keep the "Révéler" countdown bar animating smoothly by re-rendering a
-  // few times a second while a card is placed and still within its delay —
-  // and stop as soon as it's not needed, so this never runs idle forever.
+  // Keep the countdown bars (Révéler + décision de tour) animating smoothly
+  // by re-rendering a few times a second while relevant — and stop as soon
+  // as it's not needed, so this never runs idle forever.
   const pend = state.room && state.room.pending;
   if (pend && pend.stage === 'placed' && pend.placedAt) {
     const delayMs = ((state.room.revealDelaySeconds || 15) * 1000);
     const elapsed = Date.now() - pend.placedAt;
+    if (elapsed < delayMs) {
+      if (!revealTicker) revealTicker = setInterval(render, 250);
+    } else if (revealTicker) {
+      clearInterval(revealTicker); revealTicker = null;
+    }
+  } else if (pend && pend.stage === 'listening' && pend.drawnAt) {
+    const delayMs = ((state.room.turnDecisionSeconds || 60) * 1000);
+    const elapsed = Date.now() - pend.drawnAt;
     if (elapsed < delayMs) {
       if (!revealTicker) revealTicker = setInterval(render, 250);
     } else if (revealTicker) {
@@ -584,6 +592,7 @@ function renderLobby() {
   const myself = room.players.find(p => p.id === state.playerId);
   const listenMode = room.listenMode || 'together';
   const revealDelay = room.revealDelaySeconds || 15;
+  const turnDecisionSeconds = room.turnDecisionSeconds || 60;
   const audioMode = room.audioMode || 'loop';
   return `
   <div class="screen">
@@ -657,6 +666,17 @@ function renderLobby() {
         <div class="code-pill" style="justify-content:center;">${revealDelay}s</div>
         <button class="btn btn-ghost btn-sm" data-act="reveal-delay-plus" ${revealDelay >= 60 ? 'disabled' : ''}>+5s</button>
       </div>` : `<div class="code-pill" style="justify-content:center;">${revealDelay}s</div>`}
+    </div>
+
+    <div class="card-section">
+      <h3>Temps pour répondre à une carte</h3>
+      <p class="subtitle" style="margin:0 0 10px;">Passé ce délai après la pioche, la chanson est défaussée et le tour passe automatiquement.</p>
+      ${isHost ? `
+      <div class="row" style="align-items:center;">
+        <button class="btn btn-ghost btn-sm" data-act="turn-decision-minus" ${turnDecisionSeconds <= 15 ? 'disabled' : ''}>−15s</button>
+        <div class="code-pill" style="justify-content:center;">${turnDecisionSeconds}s</div>
+        <button class="btn btn-ghost btn-sm" data-act="turn-decision-plus" ${turnDecisionSeconds >= 180 ? 'disabled' : ''}>+15s</button>
+      </div>` : `<div class="code-pill" style="justify-content:center;">${turnDecisionSeconds}s</div>`}
     </div>
 
     <div class="card-section">
@@ -786,6 +806,7 @@ function renderTurnAction(room, pend, isActive, myself) {
   }
 
   if (pend.stage === 'listening') {
+    html += renderDecisionTimer(room, pend, active, isActivePlayerTurn);
     if (isActivePlayerTurn) {
       html += `
       <div class="row" style="margin-top:12px;">
@@ -825,6 +846,21 @@ function renderTurnAction(room, pend, isActive, myself) {
   }
 
   return html;
+}
+
+function renderDecisionTimer(room, pend, active, isActivePlayerTurn) {
+  const delayMs = (room.turnDecisionSeconds || 60) * 1000;
+  const elapsed = Date.now() - (pend.drawnAt || Date.now());
+  const remaining = Math.max(0, delayMs - elapsed);
+  const secondsLeft = Math.ceil(remaining / 1000);
+  const durationS = (delayMs / 1000).toFixed(2);
+  const negDelayS = (-(elapsed / 1000)).toFixed(3);
+  const label = isActivePlayerTurn ? `⏱️ ${secondsLeft}s pour répondre` : `⏱️ ${secondsLeft}s restantes pour ${escapeHtml(active.name)}`;
+  return `
+  <div class="decision-timer">
+    <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
+    <span class="decision-timer-label">${label}</span>
+  </div>`;
 }
 
 function renderRevealButton(room, pend, label) {
@@ -932,8 +968,9 @@ function renderAllTimelines(room) {
           items.map(it => {
             if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(it.label)}</div></div></div>`;
             const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
-            const wonCls = isWonCard ? (lr.kind === 'stolen' ? 'ticket-stolen' : 'ticket-won') : '';
-            return `<div class="ticket ${wonCls}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div></div></div>`;
+            const wonCls = isWonCard ? (lr.kind === 'stolen' ? 'ticket-stolen' : 'ticket-won') : (it.card.stolenFrom ? 'ticket-stolen-permanent' : '');
+            const stolenNote = it.card.stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(it.card.stolenFrom)}</div>` : '';
+            return `<div class="ticket ${wonCls}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div>${stolenNote}</div></div>`;
           }).join('')}
       </div>
       ${playerMissed.length ? `
@@ -977,7 +1014,7 @@ function renderPlacementModal(room) {
     const selected = state.selectedGap === i;
     if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">Ici</div></div></div>`;
     else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''}>+</button></div>`;
-    if (i < sorted.length) slots += `<div class="ticket"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div></div></div>`;
+    if (i < sorted.length) slots += `<div class="ticket ${sorted[i].stolenFrom ? 'ticket-stolen-permanent' : ''}"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div>${sorted[i].stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(sorted[i].stolenFrom)}</div>` : ''}</div></div>`;
   }
 
   return `
@@ -1208,6 +1245,8 @@ function attachHandlers() {
       else if (act === 'set-listen-remote') socket.emit('set-listen-mode', { mode: 'remote' });
       else if (act === 'reveal-delay-minus') socket.emit('set-reveal-delay', { seconds: Math.max(5, (state.room.revealDelaySeconds || 15) - 5) });
       else if (act === 'reveal-delay-plus') socket.emit('set-reveal-delay', { seconds: Math.min(60, (state.room.revealDelaySeconds || 15) + 5) });
+      else if (act === 'turn-decision-minus') socket.emit('set-turn-decision-seconds', { seconds: Math.max(15, (state.room.turnDecisionSeconds || 60) - 15) });
+      else if (act === 'turn-decision-plus') socket.emit('set-turn-decision-seconds', { seconds: Math.min(180, (state.room.turnDecisionSeconds || 60) + 15) });
       else if (act === 'set-audio-loop') socket.emit('set-audio-mode', { mode: 'loop' });
       else if (act === 'set-audio-once') socket.emit('set-audio-mode', { mode: 'once' });
       else if (act === 'show-filters') { state.showFilters = true; render(); }

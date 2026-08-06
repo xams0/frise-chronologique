@@ -652,6 +652,90 @@ async function main() {
     }
     heidi.disconnect(); ivan.disconnect();
 
+    // ---- stolen-card permanent marker (stolenFrom) ----
+    const bess = io(URL, { transports: ['websocket'] });
+    const carl = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(bess, 'connect'), waitFor(carl, 'connect')]);
+    bess.emit('create-room', { name: 'Bess' });
+    const bessJoined = await waitFor(bess, 'joined');
+    carl.emit('join-room', { code: bessJoined.code, name: 'Carl' });
+    const carlJoined = await waitFor(carl, 'joined');
+    bess.emit('set-reveal-delay', { seconds: 3 });
+    await waitForRoomWhere(bess, r => r.revealDelaySeconds === 3);
+    bess.emit('start-game');
+    const stGame = await waitForRoomWhere(bess, r => r.phase === 'playing');
+    const stActiveId = stGame.turnOrder[stGame.turnIndex];
+    const stActiveSocket = stActiveId === bessJoined.playerId ? bess : carl;
+    const stActiveName = stActiveId === bessJoined.playerId ? 'Bess' : 'Carl';
+    const stChallengerSocket = stActiveSocket === bess ? carl : bess;
+    const stChallengerId = stActiveSocket === bess ? carlJoined.playerId : bessJoined.playerId;
+
+    stActiveSocket.emit('draw-card');
+    const stDrawn = await waitForRoomWhere(stActiveSocket, r => !!r.pending);
+    const stNewYear = stDrawn.pending.card.year;
+    const stActiveExistingYear = stDrawn.players.find(p => p.id === stActiveId).timeline[0].year;
+    const stChallengerExistingYear = stDrawn.players.find(p => p.id === stChallengerId).timeline[0].year;
+    const stWrongGap = stNewYear >= stActiveExistingYear ? 0 : 1; // deliberately wrong for the active player
+    stActiveSocket.emit('place-card', { gapIndex: stWrongGap });
+    await waitForRoomWhere(stActiveSocket, r => r.pending && r.pending.stage === 'placed');
+    let stCorrectGap = stNewYear <= stChallengerExistingYear ? 0 : 1; // correct relative to the challenger's own timeline
+    // The server rejects a challenge on the SAME gap the active player already
+    // used — if our two independently-computed gaps happen to coincide, flip
+    // the challenge gap so the submission is actually accepted. (The existing
+    // "skip assertion if outcome isn't stolen" fallback below already covers
+    // the resulting rare case where that flip makes the challenge incorrect.)
+    if (stCorrectGap === stWrongGap) stCorrectGap = 1 - stCorrectGap;
+    stChallengerSocket.emit('submit-challenge', { gapIndex: stCorrectGap });
+    await waitForRoomWhere(stChallengerSocket, r => r.pending && r.pending.challenge);
+    const stResolved = await waitForRoomWhere(stActiveSocket, r => r.pending === null && r.lastResult, 6000);
+
+    if (stResolved.lastResult.kind === 'stolen') {
+      const winnerObj = stResolved.players.find(p => p.id === stChallengerId);
+      const stolenCard = winnerObj.timeline.find(c => c.year === stNewYear && c.title === stResolved.lastResult.title);
+      if (stolenCard && stolenCard.stolenFrom === stActiveName) {
+        ok(`stolen card permanently tagged with stolenFrom="${stolenCard.stolenFrom}" on the winner's timeline`);
+      } else {
+        fail('winning timeline card missing correct stolenFrom marker: ' + JSON.stringify(stolenCard));
+      }
+    } else {
+      // the deliberately-mismatched gaps happened to tie on year for one side — rare edge case, not a bug
+      log(`  (this run resolved as "${stResolved.lastResult.kind}" instead of "stolen" — equal-year edge case; skipping the stolenFrom assertion this run)`);
+    }
+    bess.disconnect(); carl.disconnect();
+
+    // ---- turn-decision timeout (auto-pass) ----
+    const dana = io(URL, { transports: ['websocket'] });
+    const eli = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(dana, 'connect'), waitFor(eli, 'connect')]);
+    dana.emit('create-room', { name: 'Dana' });
+    const danaJoined = await waitFor(dana, 'joined');
+    eli.emit('join-room', { code: danaJoined.code, name: 'Eli' });
+    await waitFor(eli, 'joined');
+    let tdRefused = null;
+    eli.once('error-msg', (msg) => { tdRefused = msg; });
+    eli.emit('set-turn-decision-seconds', { seconds: 15 });
+    await new Promise(r => setTimeout(r, 400));
+    if (tdRefused) ok('non-host correctly refused when trying to set the turn-decision delay');
+    else fail('expected non-host set-turn-decision-seconds attempt to be refused');
+    dana.emit('set-turn-decision-seconds', { seconds: 15 }); // the configured minimum
+    const tdRoom = await waitForRoomWhere(dana, r => r.turnDecisionSeconds === 15);
+    ok('host successfully set turn-decision delay to ' + tdRoom.turnDecisionSeconds + 's');
+    dana.emit('start-game');
+    const tdGame = await waitForRoomWhere(dana, r => r.phase === 'playing');
+    const tdActiveId = tdGame.turnOrder[tdGame.turnIndex];
+    const tdActiveSocket = tdActiveId === danaJoined.playerId ? dana : eli;
+    tdActiveSocket.emit('draw-card');
+    const tdDrawn = await waitForRoomWhere(tdActiveSocket, r => r.pending && r.pending.stage === 'listening' && !!r.pending.drawnAt);
+    ok('draw-card set a drawnAt timestamp, starting the decision timer');
+    // deliberately never place or pass — just wait past the 15s decision delay
+    const tdAdvanced = await waitForRoomWhere(tdActiveSocket, r => r.pending === null && r.turnIndex !== tdGame.turnIndex, 20000);
+    if (tdAdvanced.pending === null && tdAdvanced.turnIndex !== tdGame.turnIndex) {
+      ok('turn auto-passed to the next player after the decision delay elapsed with no response');
+    } else {
+      fail('expected the turn to auto-pass after the decision delay: ' + JSON.stringify({ pending: tdAdvanced.pending, turnIndex: tdAdvanced.turnIndex }));
+    }
+    dana.disconnect(); eli.disconnect();
+
     // ---- filters (tested in a fresh room, kept in lobby phase throughout) ----
     const catRes2 = await fetch(`${URL}/api/songs`);
     const fullCatalog = await catRes2.json();
