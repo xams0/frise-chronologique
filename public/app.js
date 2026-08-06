@@ -15,6 +15,7 @@ let hasConnectedOnce = false;
 let audioEl = null;
 let audioKey = null; // uniquely identifies which pending card is currently loaded
 let revealTicker = null; // interval id for animating the reveal-button countdown
+let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
 
 /* ---------- session persistence (survives the phone fully discarding the page
    while backgrounded — a common mobile Safari behavior, not just a network blip) ---------- */
@@ -324,6 +325,14 @@ function render() {
     clearInterval(revealTicker); revealTicker = null;
   }
 
+  // Auto-refresh the public rooms list every ~2.5s, but only while it's
+  // actually being looked at — no point polling in the background.
+  if (state.screen === 'home' && state.mode === 'join') {
+    if (!publicRoomsTicker) publicRoomsTicker = setInterval(loadPublicRooms, 2500);
+  } else if (publicRoomsTicker) {
+    clearInterval(publicRoomsTicker); publicRoomsTicker = null;
+  }
+
   attachHandlers();
 }
 
@@ -334,7 +343,8 @@ function renderLoading() {
   const percent = total ? Math.round((checked / total) * 100) : 0;
   return `
   <div class="screen center">
-    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl">Chronolozik</h1></div>
+    ${renderBgPremium()}
+    <div class="brand"><div class="vinyl spin"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
     <p class="subtitle" style="margin-top:10px;">Vérification de la bibliothèque musicale sur Deezer avant d'ouvrir le salon…</p>
 
     <div style="width:100%;max-width:280px;margin-top:28px;">
@@ -349,6 +359,20 @@ function renderLoading() {
   </div>`;
 }
 
+// The blob animations loop over tens of seconds, but the game screen can
+// re-render several times a second (reveal countdown, etc.) — recreating the
+// divs on every render would restart each animation from 0%, looking like a
+// stutter. Using a negative animation-delay computed from wall-clock time
+// makes a freshly-created element pick up exactly where the animation
+// "should" be at this instant, so re-renders are invisible.
+function renderBgPremium() {
+  const t = Date.now();
+  const d1 = -((t % 17000) / 1000);
+  const d2 = -((t % 21000) / 1000);
+  const d3 = -((t % 25000) / 1000);
+  return `<div class="bg-premium"><div class="bg-blob blob1" style="animation-delay:${d1}s;"></div><div class="bg-blob blob2" style="animation-delay:${d2}s;"></div><div class="bg-blob blob3" style="animation-delay:${d3}s;"></div></div>`;
+}
+
 function connectionBanner() {
   if (state.reconnecting) return `<div class="result-banner" style="background:rgba(63,217,196,0.12);border-color:var(--teal);"><div>🔄 Reconnexion à ton salon…</div></div>`;
   if (!state.connected) return `<div class="result-banner flash-wrong"><div>🔌 Connexion perdue — nouvelle tentative…</div></div>`;
@@ -358,7 +382,7 @@ function connectionBanner() {
 function renderHome() {
   return `
   <div class="screen center home-screen">
-    <div class="bg-premium"><div class="bg-blob blob1"></div><div class="bg-blob blob2"></div><div class="bg-blob blob3"></div></div>
+    ${renderBgPremium()}
     ${connectionBanner()}
     <div class="brand"><div class="vinyl"></div><h1 class="title-xl title-shine">Chronolozik</h1></div>
     ${state.version ? `<div class="version-bubble">v${escapeHtml(state.version)}</div>` : ''}
@@ -432,6 +456,7 @@ function renderLobby() {
   const audioMode = room.audioMode || 'loop';
   return `
   <div class="screen">
+    ${renderBgPremium()}
     ${connectionBanner()}
     <div class="topbar">
       <div class="code-pill">${room.code} <button data-act="copy-code">copier</button></div>
@@ -555,6 +580,7 @@ function renderGame() {
 
   return `
   <div class="screen game-screen">
+    ${renderBgPremium()}
     ${connectionBanner()}
     <div class="topbar">
       <div style="display:flex;gap:8px;align-items:center;">
@@ -769,6 +795,7 @@ function renderFinished() {
   const last = room.history[0];
   return `
   <div class="screen center">
+    ${renderBgPremium()}
     <div class="brand"><div class="vinyl"></div></div>
     <h1 class="title-xl">🏆 ${escapeHtml(last.winnerName)} gagne !</h1>
     <div class="stack" style="margin-top:18px;">

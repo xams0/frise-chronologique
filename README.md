@@ -272,3 +272,16 @@ Le champ "Ton prénom" se pré-remplit maintenant avec le dernier prénom
 utilisé sur cet appareil (stocké dans le stockage local du navigateur, pas
 un vrai cookie HTTP — plus simple et suffisant ici). Il reste 100%
 modifiable : c'est juste une valeur par défaut, pas un verrouillage.
+
+## v1.20 — habillage premium partout + salons publics quasi temps réel
+
+- Le **fond animé noir/bleu** et le **titre brillant** sont maintenant sur
+  toutes les pages : accueil, écran de chargement, salon d'attente, partie
+  et écran de victoire — pas seulement l'accueil.
+- L'animation de fond est synchronisée sur l'horloge (délai négatif calculé
+  à chaque rendu) pour ne jamais "sauter"/redémarrer, même sur l'écran de
+  partie qui se redessine plusieurs fois par seconde pendant le compte à
+  rebours de révélation.
+- La liste des **salons publics** se rafraîchit automatiquement toutes les
+  2,5 secondes tant qu'elle est affichée (onglet "Rejoindre" de l'accueil) —
+  quasi temps réel, sans avoir à appuyer sur ↻.
