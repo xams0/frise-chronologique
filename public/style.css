@@ -2,12 +2,12 @@
   @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
   :root{
-    --bg:#120F1A;
-    --surface:#1C1728;
-    --surface2:#241D35;
-    --line:#362C4D;
+    --bg:#070B14;
+    --surface:#131C2E;
+    --surface2:#1B2740;
+    --line:#2A3B5C;
     --text:#F3ECE3;
-    --text-dim:#A99BC7;
+    --text-dim:#8FA3C7;
     --pink:#FF4F81;
     --pink-dim:#7A3350;
     --gold:#F2B84B;
@@ -52,10 +52,10 @@
   /* ---- home screen: premium animated background + shining title ---- */
   .home-screen{position:relative;z-index:0;}
   .bg-premium{position:fixed;inset:0;overflow:hidden;z-index:-1;background:#04060b;}
-  .bg-blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:0.55;}
-  .blob1{width:340px;height:340px;background:radial-gradient(circle,#2563eb,transparent 70%);top:-80px;left:-80px;animation:float1 17s ease-in-out infinite alternate;}
-  .blob2{width:300px;height:300px;background:radial-gradient(circle,#1d4ed8,transparent 70%);bottom:-60px;right:-60px;animation:float2 21s ease-in-out infinite alternate;}
-  .blob3{width:260px;height:260px;background:radial-gradient(circle,#3b82f6,transparent 70%);top:45%;left:50%;animation:float3 25s ease-in-out infinite alternate;}
+  .bg-blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:0.75;}
+  .blob1{width:380px;height:380px;background:radial-gradient(circle,#3b82f6,transparent 68%);top:-90px;left:-90px;animation:float1 17s ease-in-out infinite alternate;}
+  .blob2{width:340px;height:340px;background:radial-gradient(circle,#2563eb,transparent 68%);bottom:-70px;right:-70px;animation:float2 21s ease-in-out infinite alternate;}
+  .blob3{width:320px;height:320px;background:radial-gradient(circle,#60a5fa,transparent 68%);top:45%;left:50%;animation:float3 25s ease-in-out infinite alternate;}
   @keyframes float1{0%{transform:translate(0,0) scale(1);}100%{transform:translate(70px,90px) scale(1.2);}}
   @keyframes float2{0%{transform:translate(0,0) scale(1);}100%{transform:translate(-80px,-60px) scale(1.15);}}
   @keyframes float3{0%{transform:translate(-50%,-50%) scale(1);}100%{transform:translate(-38%,-62%) scale(1.25);}}
@@ -168,4 +168,3 @@
   .missed-line{font-size:11px;color:var(--text-dim);}
   .missed-line b{color:var(--red);}
 
-  .version-badge{position:fixed;bottom:6px;right:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);opacity:0.5;z-index:100;pointer-events:none;}

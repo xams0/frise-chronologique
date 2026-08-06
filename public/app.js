@@ -1095,10 +1095,6 @@ async function loadVersion() {
     const res = await fetch('/api/version');
     const data = await res.json();
     state.version = data.version;
-    const badge = document.createElement('div');
-    badge.className = 'version-badge';
-    badge.textContent = 'v' + data.version;
-    document.body.appendChild(badge);
     render();
   } catch (e) { /* not critical */ }
 }

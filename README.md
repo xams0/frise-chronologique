@@ -285,3 +285,14 @@ modifiable : c'est juste une valeur par défaut, pas un verrouillage.
 - La liste des **salons publics** se rafraîchit automatiquement toutes les
   2,5 secondes tant qu'elle est affichée (onglet "Rejoindre" de l'accueil) —
   quasi temps réel, sans avoir à appuyer sur ↻.
+
+## v1.21 — vraie palette bleutée + badge de version retiré
+
+- La vraie cause du "toujours noir" : la palette de base (`--bg`, `--surface`)
+  était en fait **violette**, pas bleue — sur le salon et la partie, les
+  panneaux opaques recouvrent presque tout l'écran et cachaient les halos
+  animés. Corrigé à la racine : les couleurs de fond de toute l'app sont
+  maintenant du bleu marine foncé, visible partout, pas seulement dans les
+  espaces vides de l'accueil.
+- Le badge de version discret en bas à droite de chaque écran est retiré —
+  seule la bulle sous le titre "Chronolozik" sur l'accueil subsiste.
