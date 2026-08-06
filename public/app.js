@@ -42,7 +42,7 @@ const state = {
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
-  version: null, roomVisibility: 'private', publicRooms: null
+  version: null, roomVisibility: 'private', publicRooms: null, maxPlayersInput: ''
 };
 
 function setError(msg) { state.error = msg; state.busy = false; render(); }
@@ -391,7 +391,7 @@ function renderPublicRoomsList() {
         <div class="player-chip" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="dot"></div>
-            <div class="name">${escapeHtml(r.code)} — ${escapeHtml(r.hostName)} <span class="mono" style="color:var(--text-dim);font-size:11px;">(${r.playerCount} joueur${r.playerCount > 1 ? 's' : ''})</span></div>
+            <div class="name">${escapeHtml(r.code)} — ${escapeHtml(r.hostName)} <span class="mono" style="color:var(--text-dim);font-size:11px;">(${r.playerCount}${r.maxPlayers ? '/' + r.maxPlayers : ''} joueur${r.playerCount > 1 ? 's' : ''})</span></div>
           </div>
           <button class="btn btn-gold btn-sm" style="width:auto;flex-shrink:0;" data-act="join-public-room" data-code="${escapeHtml(r.code)}">Rejoindre</button>
         </div>`).join('')}
@@ -419,7 +419,7 @@ function renderLobby() {
     <p class="subtitle" style="margin-top:0;">Partage le code <b class="mono" style="color:var(--gold)">${room.code}</b> avec tes amis, sur le même Wi-Fi.</p>
 
     <div class="card-section" style="margin-top:18px;">
-      <h3>Joueurs (${room.players.length})</h3>
+      <h3>Joueurs (${room.players.length}${room.maxPlayers ? ' / ' + room.maxPlayers : ''})</h3>
       ${room.players.map(p => `
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
@@ -431,6 +431,19 @@ function renderLobby() {
       ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">🧪 Ajouter un bot pour tester seul</button>` : ''}
       ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">Retirer le bot de test</button>` : ''}
       ${!isHost ? `<p class="subtitle" style="margin:8px 0 0;">👑 ${escapeHtml(room.players.find(p => p.id === room.hostId)?.name || '?')} est l'hôte — seul·e à pouvoir changer les réglages et lancer la partie.</p>` : ''}
+    </div>
+
+    <div class="card-section">
+      <h3>Nombre de joueurs maximum</h3>
+      ${isHost ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+        ${[2, 3, 4, 5, 6].map(n => `<button class="btn ${room.maxPlayers === n ? 'btn-gold' : 'btn-ghost'} btn-sm" style="width:auto;flex:1;min-width:44px;" data-act="set-max-players" data-max="${n}">${n}</button>`).join('')}
+        <button class="btn ${!room.maxPlayers ? 'btn-gold' : 'btn-ghost'} btn-sm" style="width:auto;flex:1;min-width:70px;" data-act="set-max-players" data-max="">Illimité</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <input id="inp-max-custom" type="number" min="2" max="20" placeholder="Personnalisé (2-20)" value="${escapeHtml(state.maxPlayersInput)}" style="background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;"/>
+        <button class="btn btn-ghost btn-sm" style="width:auto;" data-act="set-max-players-custom">Valider</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.maxPlayers ? room.maxPlayers + ' joueurs max' : 'Illimité'}</div>`}
     </div>
 
     <div class="card-section">
@@ -941,6 +954,8 @@ function attachHandlers() {
   bindNested('lib-year', 'newSong', 'year');
   const artistSearchEl = document.getElementById('inp-artist-search');
   if (artistSearchEl) artistSearchEl.oninput = e => { state.artistSearch = e.target.value; render(); };
+  const maxCustomEl = document.getElementById('inp-max-custom');
+  if (maxCustomEl) maxCustomEl.oninput = e => { state.maxPlayersInput = e.target.value; };
 
   root.querySelectorAll('[data-act]').forEach(elm => {
     elm.addEventListener('click', (e) => {
@@ -977,6 +992,16 @@ function attachHandlers() {
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
       else if (act === 'kick-player') { if (confirm('Exclure ce joueur du salon ?')) socket.emit('kick-player', { playerId: elm.getAttribute('data-pid') }); }
+      else if (act === 'set-max-players') {
+        const raw = elm.getAttribute('data-max');
+        socket.emit('set-max-players', { max: raw === '' ? null : parseInt(raw, 10) });
+      }
+      else if (act === 'set-max-players-custom') {
+        const v = document.getElementById('inp-max-custom');
+        const n = v ? parseInt(v.value, 10) : NaN;
+        if (!Number.isFinite(n)) { setError('Entre un nombre entre 2 et 20.'); return; }
+        socket.emit('set-max-players', { max: n });
+      }
       else if (act === 'open-dj') { state.showDjPicker = true; render(); }
       else if (act === 'close-dj') { state.showDjPicker = false; render(); }
       else if (act === 'set-listen-together') socket.emit('set-listen-mode', { mode: 'together' });

@@ -244,3 +244,12 @@ s'affiche pendant ces moments, pour que ce ne soit jamais silencieux.
   dans une liste sur l'écran "Rejoindre", avec le nom de l'hôte et le nombre
   de joueurs, et un bouton pour rejoindre directement sans taper le code.
   L'hôte peut aussi changer la visibilité depuis le salon d'attente.
+
+## v1.17 — nombre de joueurs maximum
+
+Dans le salon d'attente, l'hôte peut limiter le nombre de joueurs : boutons
+rapides 2/3/4/5/6, ou une valeur personnalisée (2 à 20) via le champ dédié.
+"Illimité" retire la limite. Un joueur déjà présent peut toujours reprendre
+sa place même si le salon est "complet" — la limite ne bloque que les
+nouvelles arrivées. Impossible de fixer un maximum inférieur au nombre de
+joueurs déjà présents.

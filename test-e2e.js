@@ -397,6 +397,61 @@ async function main() {
     ok('host successfully switched the room to private, visibility=' + judyPrivate.visibility);
     judy.disconnect(); kevin.disconnect(); laura.disconnect();
 
+    // ---- max players ----
+    const mallory = io(URL, { transports: ['websocket'] });
+    const nathan = io(URL, { transports: ['websocket'] });
+    const oscar = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(mallory, 'connect'), waitFor(nathan, 'connect'), waitFor(oscar, 'connect')]);
+    mallory.emit('create-room', { name: 'Mallory' });
+    const malloryJoined = await waitFor(mallory, 'joined');
+    if (malloryJoined.room.maxPlayers === null) ok('room has no player limit by default');
+    else fail('expected default maxPlayers null, got ' + malloryJoined.room.maxPlayers);
+
+    let nonHostMaxRefused = null;
+    nathan.emit('join-room', { code: malloryJoined.code, name: 'Nathan' });
+    await waitFor(nathan, 'joined');
+    nathan.once('error-msg', (msg) => { nonHostMaxRefused = msg; });
+    nathan.emit('set-max-players', { max: 2 });
+    await new Promise(r => setTimeout(r, 400));
+    if (nonHostMaxRefused) ok('non-host correctly refused when trying to set max players');
+    else fail('expected non-host set-max-players attempt to be refused');
+
+    mallory.emit('set-max-players', { max: 2 });
+    const cappedRoom = await waitForRoomWhere(mallory, r => r.maxPlayers === 2);
+    ok('host successfully capped the room at ' + cappedRoom.maxPlayers + ' players (currently ' + cappedRoom.players.length + ')');
+
+    let oscarRefused = null;
+    oscar.once('error-msg', (msg) => { oscarRefused = msg; });
+    oscar.emit('join-room', { code: malloryJoined.code, name: 'Oscar' });
+    await new Promise(r => setTimeout(r, 500));
+    if (oscarRefused) ok('3rd player correctly refused from a room capped at 2: "' + oscarRefused + '"');
+    else fail('a 3rd player should have been refused from a 2-player-max room');
+
+    // an existing player (Nathan) must still be able to resume even though the room is "full"
+    let nathanResumeOk = false;
+    const nathanAgain = io(URL, { transports: ['websocket'] });
+    await waitFor(nathanAgain, 'connect');
+    nathanAgain.emit('join-room', { code: malloryJoined.code, name: 'Nathan' });
+    const nathanResumed = await waitFor(nathanAgain, 'joined');
+    nathanResumeOk = nathanResumed.room.players.length === 2;
+    if (nathanResumeOk) ok('existing player can still resume in a "full" capped room (cap only blocks new joins)');
+    else fail('existing player resume should not be blocked by the player cap');
+
+    // host cannot set a cap lower than the current player count
+    let cantShrinkMsg = null;
+    mallory.once('error-msg', (msg) => { cantShrinkMsg = msg; });
+    mallory.emit('set-max-players', { max: 1 });
+    await new Promise(r => setTimeout(r, 400));
+    if (cantShrinkMsg) ok('host correctly refused from setting a max below the current player count: "' + cantShrinkMsg + '"');
+    else fail('setting maxPlayers below current player count should have been refused');
+
+    // and unsetting the limit works
+    mallory.emit('set-max-players', { max: null });
+    const uncappedRoom = await waitForRoomWhere(mallory, r => r.maxPlayers === null);
+    ok('host successfully removed the player limit again, maxPlayers=' + uncappedRoom.maxPlayers);
+
+    mallory.disconnect(); nathan.disconnect(); nathanAgain.disconnect(); oscar.disconnect();
+
     // ---- kick-player ----
     const frank = io(URL, { transports: ['websocket'] });
     const grace = io(URL, { transports: ['websocket'] });

@@ -365,10 +365,11 @@ app.get('/api/version', (req, res) => res.json({ version: APP_VERSION }));
 app.get('/api/ready', (req, res) => res.json(readyState));
 app.get('/api/public-rooms', (req, res) => {
   const list = Object.values(rooms)
-    .filter(r => r.visibility === 'public' && r.phase === 'lobby')
+    .filter(r => r.visibility === 'public' && r.phase === 'lobby' && !(r.maxPlayers && r.players.length >= r.maxPlayers))
     .map(r => ({
       code: r.code,
       playerCount: r.players.length,
+      maxPlayers: r.maxPlayers || null,
       hostName: (r.players.find(p => p.id === r.hostId) || {}).name || '?'
     }));
   res.json(list);
@@ -470,6 +471,7 @@ io.on('connection', (socket) => {
       revealDelaySeconds: 15, // minimum wait before "Révéler" can be pressed, so others have time to challenge
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
+      maxPlayers: null, // null = no limit
       filters: emptyFilters(),
       log: [{ ts: nowStr(), text: `${name} a créé le salon.` }],
       history: []
@@ -491,9 +493,9 @@ io.on('connection', (socket) => {
     if (!room) return socket.emit('error-msg', 'Aucun salon avec ce code.');
     if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
     const existing = room.players.find(p => p.name.trim().toLowerCase() === name.toLowerCase());
-    socket.join(code);
-    socket.data.code = code;
     if (existing) {
+      socket.join(code);
+      socket.data.code = code;
       socket.data.playerId = existing.id;
       socket.emit('joined', { playerId: existing.id, code, room });
       return;
@@ -501,10 +503,15 @@ io.on('connection', (socket) => {
     if (room.phase !== 'lobby') {
       return socket.emit('error-msg', 'La partie a déjà commencé. Ressaisis exactement le prénom utilisé pour reprendre ta place.');
     }
+    if (room.maxPlayers && room.players.length >= room.maxPlayers) {
+      return socket.emit('error-msg', `Ce salon est complet (maximum ${room.maxPlayers} joueurs).`);
+    }
     const playerId = genId();
     room.players.push({ id: playerId, name, tokens: START_TOKENS, timeline: [] });
     room.log.push({ ts: nowStr(), text: `${name} a rejoint le salon.` });
     saveRooms();
+    socket.join(code);
+    socket.data.code = code;
     socket.data.playerId = playerId;
     socket.emit('joined', { playerId, code, room });
     broadcast(code);
@@ -588,6 +595,21 @@ io.on('connection', (socket) => {
     if (visibility !== 'public' && visibility !== 'private') return;
     room.visibility = visibility;
     room.log.push({ ts: nowStr(), text: visibility === 'public' ? '🌐 Le salon est maintenant public (visible dans la liste).' : '🔒 Le salon est maintenant privé (uniquement par code).' });
+  }));
+
+  socket.on('set-max-players', withRoom((room, { max }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    if (max === null) {
+      room.maxPlayers = null;
+      room.log.push({ ts: nowStr(), text: '👥 Plus de limite de joueurs.' });
+      return;
+    }
+    const m = parseInt(max, 10);
+    if (!Number.isFinite(m) || m < 2 || m > 20) return socket.emit('error-msg', 'Le nombre maximum doit être entre 2 et 20.');
+    if (m < room.players.length) return socket.emit('error-msg', `Il y a déjà ${room.players.length} joueurs dans le salon — choisis un maximum plus grand.`);
+    room.maxPlayers = m;
+    room.log.push({ ts: nowStr(), text: `👥 Nombre de joueurs maximum réglé sur ${m}.` });
   }));
 
   socket.on('kick-player', withRoom(async (room, { playerId: targetId }) => {
