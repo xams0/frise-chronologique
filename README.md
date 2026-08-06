@@ -568,3 +568,35 @@ Corrigé des deux côtés :
 - L'écran de partie affiche maintenant les messages d'erreur (il ne le
   faisait qu'à l'accueil et dans le salon avant), et ils disparaissent
   seuls après 4 secondes.
+
+## v2.0 — 🎉 catalogue élargi à 712 chansons
+
+Ajout de **403 nouvelles chansons** (309 → 712), dédupliquées contre le
+catalogue existant, avec une bonne répartition sur toutes les décennies :
+
+| Période | Chansons |
+|---|---|
+| 1900s | 8 |
+| 1910s | 16 |
+| 1920s | 19 |
+| 1930s | 25 |
+| 1940s | 23 |
+| 1950s | 50 |
+| 1960s | 79 |
+| 1970s | 88 |
+| 1980s | 86 |
+| 1990s | 94 |
+| 2000s | 65 |
+| 2010s | 98 |
+| 2020s | 61 |
+
+Nouveauté notable : plus de diversité musicale — chanson française
+(Piaf, Brel, Aznavour, Stromae, Angèle...), musique latine, K-pop, afrobeats,
+reggae, metal, punk, et davantage de country, en plus des classiques pop/rock
+déjà présents.
+
+Comme toujours, le démarrage du serveur doit associer chaque nouvelle
+chanson à Deezer avant d'ouvrir le salon — avec 712 titres au lieu de 309,
+le tout premier démarrage après ce déploiement prendra plus de temps que
+d'habitude (les démarrages suivants restent rapides tant que le disque
+persiste, voir la note v1.30 plus haut).
