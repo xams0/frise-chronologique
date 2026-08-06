@@ -82,7 +82,8 @@
   .btn{border-radius:14px;padding:15px 20px;font-size:16px;font-weight:700;width:100%;transition:transform .1s;display:inline-block;text-decoration:none;text-align:center;box-sizing:border-box;}
   .reveal-btn{position:relative;overflow:hidden;}
   .btn.reveal-btn:disabled{opacity:1;}
-  .reveal-fill{position:absolute;top:0;left:0;bottom:0;background:rgba(255,255,255,0.28);transition:width 0.25s linear;z-index:1;}
+  .reveal-fill{position:absolute;top:0;left:0;bottom:0;background:linear-gradient(90deg, rgba(255,255,255,0.18), rgba(255,255,255,0.5));z-index:1;}
+  @keyframes revealFill{from{width:0%;}to{width:100%;}}
   .reveal-label{position:relative;z-index:2;}
   .btn:active{transform:scale(0.97);}
   .btn-primary{background:var(--pink);color:#fff;}
@@ -133,10 +134,10 @@
 
   .sound-bars{display:flex;align-items:flex-end;gap:4px;height:28px;}
   .sound-bars span{width:5px;background:linear-gradient(180deg,var(--teal),var(--pink));border-radius:3px;animation:soundBar 1s ease-in-out infinite;}
-  .sound-bars span:nth-child(1){animation-delay:0s;height:10px;}
-  .sound-bars span:nth-child(2){animation-delay:0.15s;height:22px;}
-  .sound-bars span:nth-child(3){animation-delay:0.3s;height:14px;}
-  .sound-bars span:nth-child(4){animation-delay:0.45s;height:26px;}
+  .sound-bars span:nth-child(1){height:10px;}
+  .sound-bars span:nth-child(2){height:22px;}
+  .sound-bars span:nth-child(3){height:14px;}
+  .sound-bars span:nth-child(4){height:26px;}
   @keyframes soundBar{0%,100%{transform:scaleY(0.35);}50%{transform:scaleY(1);}}
 
   .guess-box{display:flex;gap:8px;margin-top:12px;}

@@ -212,7 +212,7 @@ async function main() {
     const expectBlocked = (socket) => new Promise((resolve) => { socket.once('error-msg', () => { bobBlocked++; resolve(); }); });
     await Promise.all([expectBlocked(bob), (async () => { bob.emit('start-game'); })()]);
     await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-listen-mode', { mode: 'remote' }); })()]);
-    await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-filters', { filters: { brackets: [], artists: [] } }); })()]);
+    await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-filters', { filters: { brackets: [] } }); })()]);
     await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-dj', { playerId: bobJoined.playerId }); })()]);
     await Promise.all([expectBlocked(bob), (async () => { bob.emit('set-reveal-delay', { seconds: 5 }); })()]);
     if (bobBlocked === 5) ok('non-host correctly refused on all 5 admin actions (start-game, listen-mode, filters, dj, reveal-delay)');
@@ -653,13 +653,15 @@ async function main() {
 
     const narrowBracket = brackets.find(b => b.label === '1900-1919');
     const expectedCount = fullCatalog.filter(s => s.year >= narrowBracket.from && s.year <= narrowBracket.to).length;
-    dave.emit('set-filters', { filters: { brackets: [narrowBracket], artists: [] } });
+    dave.emit('set-filters', { filters: { brackets: [narrowBracket] } });
     await waitForRoomWhere(dave, r => r.filters.brackets.length === 1);
     ok(`set-filters accepted (1900-1919 bracket, ${expectedCount} matching songs in catalog)`);
 
     // A filter guaranteed to match zero songs must always be rejected, regardless of catalog size.
-    dave.emit('set-filters', { filters: { brackets: [], artists: ['Some Totally Unknown Artist XYZ'] } });
-    await waitForRoomWhere(dave, r => r.filters.artists.length === 1);
+    // (Every real bracket has songs now that the catalog spans 1900-2026, so
+    // this uses an out-of-range synthetic bracket to force a genuine zero-match pool.)
+    dave.emit('set-filters', { filters: { brackets: [{ from: 1000, to: 1005, label: 'synthetic-empty' }] } });
+    await waitForRoomWhere(dave, r => r.filters.brackets.length === 1 && r.filters.brackets[0].from === 1000);
     let zeroMatchErrorSeen = false;
     dave.once('error-msg', () => { zeroMatchErrorSeen = true; });
     dave.emit('start-game');
@@ -669,8 +671,8 @@ async function main() {
 
     // Reset filters back to "everything" — this room never successfully started a
     // game above, so it is still in lobby phase and set-filters will take effect.
-    dave.emit('set-filters', { filters: { brackets: [], artists: [] } });
-    await waitForRoomWhere(dave, r => r.filters.brackets.length === 0 && r.filters.artists.length === 0);
+    dave.emit('set-filters', { filters: { brackets: [] } });
+    await waitForRoomWhere(dave, r => r.filters.brackets.length === 0);
     dave.emit('start-game');
     const filteredGameStarted = await waitForRoomWhere(dave, r => r.phase === 'playing');
     if (filteredGameStarted.phase === 'playing') ok('start-game succeeds once filters are reset to "all songs"');

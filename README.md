@@ -354,3 +354,17 @@ l'écran de victoire. Il sert aussi de :
 - **Fix titre/artiste qui débordait** : structure plus robuste (deux lignes
   indépendantes, tronquées et centrées) au lieu d'un bloc multi-lignes qui
   pouvait déborder du cadre de la carte.
+
+## v1.26 — filtres simplifiés, animations réparées
+
+- **Filtres réduits aux périodes uniquement** — le filtre par artiste est
+  retiré des options de partie.
+- **Fix égaliseur audio** : même cause que les précédents bugs
+  d'animation — les barres 3 et 4 avaient un délai trop long pour survivre
+  aux redessins fréquents de l'écran et ne démarraient jamais. Corrigé avec
+  la même technique de délai négatif synchronisé sur l'horloge que le fond
+  animé.
+- **Barre de progression du bouton Révéler** : remplacée par une vraie
+  animation CSS fluide (calculée pour démarrer déjà au bon endroit selon le
+  temps écoulé) au lieu d'une largeur recalculée par à-coups toutes les
+  250ms — beaucoup plus premium.

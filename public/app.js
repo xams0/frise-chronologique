@@ -59,7 +59,7 @@ const state = {
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showFilters: false, artistSearch: '',
+  brackets: null, showFilters: false,
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
@@ -92,7 +92,6 @@ function songMatchesFilters(song, filters) {
     const inBracket = filters.brackets.some(b => song.year >= b.from && song.year <= b.to);
     if (!inBracket) return false;
   }
-  if (filters.artists && filters.artists.length && !filters.artists.includes(song.artist)) return false;
   return true;
 }
 function matchCount(room) {
@@ -109,15 +108,11 @@ function toggleInArray(arr, value) {
   return next;
 }
 function toggleBracket(room, bracket) {
-  const f = room.filters || { brackets: [], artists: [] };
+  const f = room.filters || { brackets: [] };
   setFilters(room, { ...f, brackets: toggleInArray(f.brackets, bracket) });
 }
-function toggleArtist(room, artist) {
-  const f = room.filters || { brackets: [], artists: [] };
-  setFilters(room, { ...f, artists: toggleInArray(f.artists, artist) });
-}
 function resetFilters() {
-  socket.emit('set-filters', { filters: { brackets: [], artists: [] } });
+  socket.emit('set-filters', { filters: { brackets: [] } });
 }
 async function addSongToCatalog() {
   const body = { title: state.newSong.title.trim(), artist: state.newSong.artist.trim(), year: state.newSong.year };
@@ -432,6 +427,19 @@ function renderBgPremium() {
   return `<div class="bg-premium"><div class="bg-blob blob1" style="animation-delay:${d1}s;"></div><div class="bg-blob blob2" style="animation-delay:${d2}s;"></div><div class="bg-blob blob3" style="animation-delay:${d3}s;"></div></div>`;
 }
 
+// Same fix as renderBgPremium: with plain positive animation-delay, bars 3
+// and 4 (0.3s/0.45s delay) never get to start if the DOM gets rebuilt more
+// often than that — they're removed and recreated before their delay even
+// elapses, so they just sit static. Wall-clock-synced negative delays make
+// every bar mid-animation immediately, regardless of render frequency.
+function renderSoundBars() {
+  const t = Date.now();
+  const dur = 1000; // matches @keyframes soundBar 1s
+  const offsets = [0, 150, 300, 450];
+  const spans = offsets.map(off => `<span style="animation-delay:${-(((t + off) % dur) / 1000)}s;"></span>`).join('');
+  return `<div class="sound-bars">${spans}</div>`;
+}
+
 function connectionBanner() {
   if (state.reconnecting) return `<div class="result-banner" style="background:rgba(63,217,196,0.12);border-color:var(--teal);"><div>🔄 Reconnexion à ton salon…</div></div>`;
   if (!state.connected) return `<div class="result-banner flash-wrong"><div>🔌 Connexion perdue — nouvelle tentative…</div></div>`;
@@ -601,7 +609,7 @@ function renderLobby() {
     <div class="card-section">
       <h3>Options de partie</h3>
       <p class="subtitle" style="margin:0 0 10px;">${matchCount(room) === null ? '…' : matchCount(room)} chanson${matchCount(room) === 1 ? '' : 's'} disponible${matchCount(room) === 1 ? '' : 's'} avec les filtres actuels.</p>
-      ${isHost ? `<button class="btn btn-ghost btn-sm" data-act="show-filters">⚙️ Choisir périodes / artistes</button>` : ''}
+      ${isHost ? `<button class="btn btn-ghost btn-sm" data-act="show-filters">⚙️ Choisir les périodes</button>` : ''}
     </div>
 
     ${isHost ? `
@@ -703,7 +711,7 @@ function renderTurnAction(room, pend, isActive, myself) {
       html += `
       <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
-        <div class="sound-bars"><span></span><span></span><span></span><span></span></div>
+        ${renderSoundBars()}
         <div id="audio-counter" class="mono" style="color:var(--gold);font-size:13px;">${audioSecondsDisplay}s / 30s</div>
         <button class="btn btn-ghost btn-sm" data-act="play-preview">🔊 Appuyer si pas de son</button>
       </div>`;
@@ -759,11 +767,17 @@ function renderRevealButton(room, pend, label) {
   const elapsed = Date.now() - (pend.placedAt || Date.now());
   const remaining = Math.max(0, delayMs - elapsed);
   const ready = remaining <= 0;
-  const percent = Math.min(100, (elapsed / delayMs) * 100);
   const secondsLeft = Math.ceil(remaining / 1000);
+  // A smooth native CSS fill instead of a JS-stepped width: the animation
+  // runs the full delay duration, but with a negative delay equal to time
+  // already elapsed, so it starts already at the right position and then
+  // glides forward on its own — no per-tick re-render needed to look fluid.
+  const durationS = (delayMs / 1000).toFixed(2);
+  const negDelayS = (-(elapsed / 1000)).toFixed(3);
+  const fillStyle = ready ? 'width:100%;' : `width:0%;animation:revealFill ${durationS}s linear ${negDelayS}s forwards;`;
   return `
   <button class="btn btn-primary reveal-btn" data-act="reveal" ${ready ? '' : 'disabled'}>
-    <div class="reveal-fill" style="width:${percent}%;"></div>
+    <div class="reveal-fill" style="${fillStyle}"></div>
     <span class="reveal-label">${ready ? label : `${label} (${secondsLeft}s)`}</span>
   </button>`;
 }
@@ -913,12 +927,7 @@ function renderPlacementModal(room) {
 }
 
 function renderFiltersModal(room) {
-  const f = room.filters || { brackets: [], artists: [] };
-  const catalog = state.catalog || [];
-  const artists = [...new Set(catalog.map(s => s.artist).filter(Boolean))].sort();
-  const search = state.artistSearch.trim().toLowerCase();
-  const filteredArtists = search ? artists.filter(a => a.toLowerCase().includes(search)) : artists;
-
+  const f = room.filters || { brackets: [] };
   const chip = (active) => `padding:8px 12px;border-radius:999px;font-size:13px;border:1px solid ${active ? 'var(--pink)' : 'var(--line)'};background:${active ? 'rgba(255,79,129,0.15)' : 'var(--surface2)'};color:${active ? 'var(--pink)' : 'var(--text)'};`;
 
   return `
@@ -932,15 +941,6 @@ function renderFiltersModal(room) {
         ${(state.brackets || []).map(b => `
           <button data-act="toggle-bracket" data-from="${b.from}" data-to="${b.to}" style="${chip(f.brackets.some(x => x.from === b.from && x.to === b.to))}">${b.label}</button>
         `).join('')}
-      </div>
-
-      <h3 style="margin-top:16px;">Artistes ${f.artists.length ? `(${f.artists.length} sélectionné${f.artists.length > 1 ? 's' : ''})` : ''}</h3>
-      <input id="inp-artist-search" placeholder="Chercher un artiste…" value="${escapeHtml(state.artistSearch)}" style="width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;margin-top:8px;box-sizing:border-box;"/>
-      <div style="max-height:160px;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:2px;">
-        ${filteredArtists.slice(0, 60).map(a => `
-          <button data-act="toggle-artist" data-val="${escapeHtml(a)}" style="text-align:left;padding:8px 10px;border-radius:8px;font-size:13px;background:${f.artists.includes(a) ? 'rgba(255,79,129,0.15)' : 'transparent'};color:${f.artists.includes(a) ? 'var(--pink)' : 'var(--text)'};">${f.artists.includes(a) ? '✓ ' : ''}${escapeHtml(a)}</button>
-        `).join('')}
-        ${filteredArtists.length === 0 ? '<div class="empty">Aucun artiste trouvé</div>' : ''}
       </div>
 
       <div class="row" style="margin-top:16px;">
@@ -1075,8 +1075,6 @@ function attachHandlers() {
   bindNested('lib-title', 'newSong', 'title');
   bindNested('lib-artist', 'newSong', 'artist');
   bindNested('lib-year', 'newSong', 'year');
-  const artistSearchEl = document.getElementById('inp-artist-search');
-  if (artistSearchEl) artistSearchEl.oninput = e => { state.artistSearch = e.target.value; render(); };
   const maxCustomEl = document.getElementById('inp-max-custom');
   if (maxCustomEl) maxCustomEl.oninput = e => { state.maxPlayersInput = e.target.value; };
 
@@ -1140,9 +1138,8 @@ function attachHandlers() {
       else if (act === 'set-audio-loop') socket.emit('set-audio-mode', { mode: 'loop' });
       else if (act === 'set-audio-once') socket.emit('set-audio-mode', { mode: 'once' });
       else if (act === 'show-filters') { state.showFilters = true; render(); }
-      else if (act === 'close-filters') { state.showFilters = false; state.artistSearch = ''; render(); }
+      else if (act === 'close-filters') { state.showFilters = false; render(); }
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
-      else if (act === 'toggle-artist') toggleArtist(state.room, elm.getAttribute('data-val'));
       else if (act === 'reset-filters') resetFilters();
       else if (act === 'pick-dj') setDj(elm.getAttribute('data-pid'));
       else if (act === 'bot-play') botPlayTurn();

@@ -27,14 +27,13 @@ const BRACKETS = [
   { from: 2000, to: 2019, label: '2000-2019' },
   { from: 2020, to: 2026, label: '2020-2026' }
 ];
-function emptyFilters() { return { brackets: [], artists: [] }; }
+function emptyFilters() { return { brackets: [] }; }
 function songMatchesFilters(song, filters) {
   if (!filters) return true;
   if (filters.brackets && filters.brackets.length) {
     const inBracket = filters.brackets.some(b => song.year >= b.from && song.year <= b.to);
     if (!inBracket) return false;
   }
-  if (filters.artists && filters.artists.length && !filters.artists.includes(song.artist)) return false;
   return true;
 }
 
@@ -629,8 +628,7 @@ io.on('connection', (socket) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer les filtres.');
     if (room.phase !== 'lobby' || !filters) return;
     room.filters = {
-      brackets: Array.isArray(filters.brackets) ? filters.brackets : [],
-      artists: Array.isArray(filters.artists) ? filters.artists : []
+      brackets: Array.isArray(filters.brackets) ? filters.brackets : []
     };
   }));
 
