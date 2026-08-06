@@ -975,21 +975,20 @@ function renderPendingParticipants(room, pend) {
   const activeIsBot = !!activePl.isBot;
   const iAmActive = pend.activePlayerId === state.playerId;
   const meObj = me(room);
+  const challenger = pend.challenge ? room.players.find(p => p.id === pend.challenge.playerId) : null;
   let html = '<div class="stack" style="gap:8px;margin-top:6px;">';
 
   if (activeIsBot) {
     if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier le Bot (1 🪙)</button>`;
-    if (pend.challenge) html += `<p class="subtitle" style="margin:6px 0 0;">Tu as déjà défié ce placement.</p>`;
+    if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">🚨 ${escapeHtml(challenger.name)} a défié le Bot.</p>`;
     html += renderRevealButton(room, pend, '🤖 Révéler pour le Bot');
   } else if (iAmActive) {
+    if (challenger) html += `<p class="subtitle" style="margin:0 0 8px;color:var(--pink);font-weight:600;">🚨 ${escapeHtml(challenger.name)} a défié ${escapeHtml(activePl.name)} !</p>`;
     html += renderRevealButton(room, pend, 'Révéler la carte');
   } else {
     html += renderRevealInfoTimer(room, pend, activePl);
     if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier (1 🪙)</button>`;
-    if (pend.challenge) {
-      const c = room.players.find(p => p.id === pend.challenge.playerId);
-      html += `<p class="subtitle" style="margin:6px 0 0;">${escapeHtml(c.name)} a déjà défié ce placement.</p>`;
-    }
+    if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">🚨 ${escapeHtml(challenger.name)} a défié ${escapeHtml(activePl.name)}.</p>`;
     html += `<button class="btn btn-gold btn-sm" data-act="reveal">✅ Ça a l'air bon, révéler maintenant</button>`;
   }
   html += '</div>';

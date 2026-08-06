@@ -539,3 +539,17 @@ sur un appareil réel serait idéal, que je ne peux pas faire moi-même).
   fonctionnalité fonctionne identiquement dans les deux modes une fois
   activée. Si le souci persiste après ce déploiement, dis-le avec plus de
   détails (quel mode, à quel moment précis) pour qu'on creuse ensemble.
+
+## v1.40 — clarté du défi avec 3+ joueurs
+
+- Le bouton Défier était **déjà** correctement masqué pour tout le monde dès
+  qu'un défi existe (vérifié, ça marchait déjà avec 3+ joueurs) — le
+  serveur n'accepte qu'un seul défi par carte, testé explicitement avec 3
+  joueurs pour confirmer qu'un second joueur ne peut pas écraser le défi du
+  premier.
+- **Vrai bug corrigé** : contre un Bot, le message affiché était codé en
+  dur "**Tu** as déjà défié ce placement" — avec 3+ joueurs, si c'était
+  quelqu'un d'autre qui avait défié, le message était faux. Affiche
+  maintenant le vrai nom du joueur qui a défié.
+- **Ajout** : le joueur actif voit maintenant lui aussi qui l'a défié
+  ("🚨 [pseudo] a défié [pseudo] !"), ce qu'il ne voyait jamais avant.

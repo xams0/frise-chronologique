@@ -655,6 +655,54 @@ async function main() {
     await testFreeCard('together', 'tous ensemble');
     await testFreeCard('remote', 'chacun chez soi');
 
+    // ---- 3+ players: only ONE challenge can be active per pending card ----
+    const uma = io(URL, { transports: ['websocket'] });
+    const vic = io(URL, { transports: ['websocket'] });
+    const walt = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(uma, 'connect'), waitFor(vic, 'connect'), waitFor(walt, 'connect')]);
+    uma.emit('create-room', { name: 'Uma' });
+    const umaJoined = await waitFor(uma, 'joined');
+    vic.emit('join-room', { code: umaJoined.code, name: 'Vic' });
+    const vicJoined = await waitFor(vic, 'joined');
+    walt.emit('join-room', { code: umaJoined.code, name: 'Walt' });
+    const waltJoined = await waitFor(walt, 'joined');
+    uma.emit('set-reveal-delay', { seconds: 30 }); // long enough that nothing auto-resolves mid-test
+    await waitForRoomWhere(uma, r => r.revealDelaySeconds === 30);
+    uma.emit('start-game');
+    const threeGame = await waitForRoomWhere(uma, r => r.phase === 'playing' && r.players.length === 3);
+    const threeActiveId = threeGame.turnOrder[threeGame.turnIndex];
+    const idToSocket = { [umaJoined.playerId]: uma, [vicJoined.playerId]: vic, [waltJoined.playerId]: walt };
+    const threeActiveSocket = idToSocket[threeActiveId];
+    const nonActiveIds = [umaJoined.playerId, vicJoined.playerId, waltJoined.playerId].filter(id => id !== threeActiveId);
+    const firstChallenger = idToSocket[nonActiveIds[0]];
+    const secondChallenger = idToSocket[nonActiveIds[1]];
+
+    threeActiveSocket.emit('draw-card');
+    await waitForRoomWhere(threeActiveSocket, r => !!r.pending);
+    threeActiveSocket.emit('place-card', { gapIndex: 0 });
+    const placedRoom = await waitForRoomWhere(threeActiveSocket, r => r.pending && r.pending.stage === 'placed');
+
+    firstChallenger.emit('submit-challenge', { gapIndex: 1 });
+    const afterFirstChallenge = await waitForRoomWhere(firstChallenger, r => r.pending && r.pending.challenge);
+    if (afterFirstChallenge.pending.challenge.playerId === nonActiveIds[0]) {
+      ok('first challenger (of 2 eligible) successfully registered the challenge');
+    } else fail('expected the first challenger to be registered');
+
+    // a second, different player tries to also challenge the SAME pending card — must be a no-op
+    // (withRoom always broadcasts after a handler runs, even a no-op one, so
+    // we can just capture the very next broadcast this player receives)
+    let roomAfterSecondAttempt = null;
+    secondChallenger.once('room', (r) => { roomAfterSecondAttempt = r; });
+    secondChallenger.emit('submit-challenge', { gapIndex: placedRoom.pending.placement.gapIndex === 0 ? 1 : 0 });
+    await new Promise(r => setTimeout(r, 500));
+
+    if (roomAfterSecondAttempt && roomAfterSecondAttempt.pending.challenge.playerId === nonActiveIds[0]) {
+      ok('second challenger correctly could NOT overwrite the existing challenge (still belongs to the first challenger)');
+    } else {
+      fail('expected the challenge to still belong to the first challenger after a second attempt: ' + JSON.stringify(roomAfterSecondAttempt && roomAfterSecondAttempt.pending.challenge));
+    }
+    uma.disconnect(); vic.disconnect(); walt.disconnect();
+
     // ---- leave-room: game ends when too few players remain, host reassigned if needed ----
     const paul = io(URL, { transports: ['websocket'] }); // host
     const quinn = io(URL, { transports: ['websocket'] });
