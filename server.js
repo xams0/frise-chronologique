@@ -235,42 +235,49 @@ async function ensureDeezerIds() {
 }
 
 // ---------- startup readiness gate ----------
-// Nobody can create or join a room until EVERY song in the catalog has been
-// checked against Deezer this boot cycle (resolved match + confirmed playable
-// preview). `readyState` is polled by the client for the loading screen.
+// Nobody can create or join a room until every song in the catalog has been
+// matched to a Deezer track this boot cycle. This ONLY resolves the match
+// (one Deezer call per song lacking an id) — it does not also confirm the
+// preview clip works right now, which used to double the number of Deezer
+// calls needed at every single boot. That heavier, fully-thorough check is
+// still available on demand via the "🔍 Vérifier la bibliothèque" button
+// (GET /api/songs/health), and `drawPlayableCard` already silently skips any
+// card with a broken preview during real gameplay either way — so speeding
+// this up doesn't reopen the "silent unplayable card" bug from before.
 let readyState = { ready: false, checked: 0, total: 0, ok: 0 };
 
 async function verifyAndPrepareCatalog() {
   readyState = { ready: false, checked: 0, total: catalog.length, ok: 0 };
+  const todo = catalog.filter(s => !s.deezerId);
+  // Songs that already have a resolved id (e.g. this process never restarted,
+  // or a pre-resolved catalog was committed) don't need any Deezer call at all.
+  readyState.checked = catalog.length - todo.length;
+  readyState.ok = catalog.length - todo.length;
   let catalogChanged = false;
-  const BATCH = 5;
-  for (let i = 0; i < catalog.length; i += BATCH) {
-    const batch = catalog.slice(i, i + BATCH);
+  const BATCH = 8;
+  for (let i = 0; i < todo.length; i += BATCH) {
+    const batch = todo.slice(i, i + BATCH);
     await Promise.all(batch.map(async (song) => {
       try {
-        if (!song.deezerId) {
-          const results = await deezerSearch(`${song.artist} ${song.title}`);
-          if (results.length) { song.deezerId = results[0].id; catalogChanged = true; }
-        }
-        if (song.deezerId) {
-          const t = await deezerTrack(song.deezerId);
-          song._verifiedPreview = !!t.preview;
-          if (song._verifiedPreview) readyState.ok++;
+        const results = await deezerSearch(`${song.artist} ${song.title}`);
+        if (results.length) {
+          song.deezerId = results[0].id;
+          catalogChanged = true;
+          readyState.ok++;
         } else {
-          song._verifiedPreview = false;
+          console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
         }
       } catch (e) {
-        song._verifiedPreview = false;
-        console.warn(`Vérification échouée pour ${song.artist} – ${song.title}:`, e.message);
+        console.warn(`Deezer: recherche échouée pour ${song.artist} – ${song.title}:`, e.message);
       } finally {
         readyState.checked++;
       }
     }));
-    if (i + BATCH < catalog.length && !FAKE_DEEZER) await sleep(1200);
+    if (i + BATCH < todo.length && !FAKE_DEEZER) await sleep(700);
   }
   if (catalogChanged) saveCatalog();
   readyState.ready = true;
-  console.log(`Vérification terminée : ${readyState.ok}/${readyState.total} chansons confirmées jouables.`);
+  console.log(`Résolution terminée : ${readyState.ok}/${readyState.total} chansons associées à Deezer.`);
 }
 
 // ---------- room helpers ----------
@@ -606,7 +613,7 @@ io.on('connection', (socket) => {
   socket.on('start-game', withRoom((room) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut lancer la partie.');
     if (room.players.length < 2) return socket.emit('error-msg', 'Il faut au moins 2 joueurs.');
-    const pool = catalog.filter(s => s._verifiedPreview && songMatchesFilters(s, room.filters));
+    const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
     if (!pool.length || pool.length < CARDS_TO_WIN + 2) {
       return socket.emit('error-msg', `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${CARDS_TO_WIN + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).`);
     }

@@ -378,3 +378,30 @@ côte (`flex:1` sans `min-width:0`, un piège classique de flexbox où un
 `<input>` refuse de rétrécir sous sa largeur naturelle) — "Artiste ?" sortait
 de l'écran sur mobile. Les deux champs sont maintenant **empilés
 verticalement**, chacun pleine largeur.
+
+## v1.30 — démarrage plus rapide
+
+Le blocage au démarrage venait de deux choses cumulées :
+1. Chaque chanson était vérifiée en **2 appels Deezer** (recherche + test de
+   l'extrait), doublant le nombre de requêtes.
+2. Les pauses anti-quota étaient prudentes (lots de 5, pause de 1,2s).
+
+Maintenant, le démarrage ne fait plus qu'**associer** chaque chanson à
+Deezer (1 appel), avec des lots plus grands et des pauses plus courtes (lots
+de 8, pause de 0,7s) — environ 2 à 2,5× plus rapide. La vérification
+complète (extrait réellement audible) reste disponible à la demande via
+**🔍 Vérifier la bibliothèque**, et le filet de sécurité qui empêche toute
+carte muette d'arriver en jeu (`drawPlayableCard`) est inchangé — il agit
+déjà en temps réel à chaque pioche, donc rien n'est perdu en sécurité.
+
+**À savoir** : ce démarrage complet ne se reproduit vraiment que juste après
+un redéploiement. Un simple réveil après la mise en veille du tier gratuit
+Render (sans nouveau déploiement) garde normalement le même disque, donc les
+associations déjà résolues restent en mémoire et le redémarrage est quasi
+instantané.
+
+**Pour aller plus loin** : une fois le serveur démarré et toutes les
+chansons associées, tu peux exporter la bibliothèque (📚 Bibliothèque → ⬇
+Exporter) et me la transmettre — je peux alors committer directement les
+identifiants Deezer déjà résolus dans `songs.json`, ce qui rendrait même le
+tout premier démarrage après un déploiement quasi instantané.
