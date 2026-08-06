@@ -253,3 +253,15 @@ rapides 2/3/4/5/6, ou une valeur personnalisée (2 à 20) via le champ dédié.
 sa place même si le salon est "complet" — la limite ne bloque que les
 nouvelles arrivées. Impossible de fixer un maximum inférieur au nombre de
 joueurs déjà présents.
+
+## v1.18 — départ propre du salon + kick plus fiable
+
+- Cliquer "quitter" (✕) **notifie maintenant vraiment le serveur** — avant,
+  le client s'en allait localement sans jamais le dire, laissant un joueur
+  fantôme dans le salon. Le départ ajuste le tour de jeu, le DJ, réattribue
+  l'hôte si besoin, et **termine la partie si l'hôte se retrouve seul**
+  (retour au salon d'attente). Si tout le monde part, le salon est supprimé.
+- **Kick plus robuste** : en plus du message direct envoyé au joueur exclu,
+  le client détecte maintenant lui-même s'il a disparu de la liste des
+  joueurs (peu importe la cause exacte) et se déconnecte proprement — un
+  filet de sécurité qui ne dépend plus d'un seul mécanisme.

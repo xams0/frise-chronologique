@@ -168,6 +168,16 @@ socket.on('joined', ({ playerId, code, room }) => {
   render();
 });
 socket.on('room', (room) => {
+  // Robust fallback: if we're no longer in the player list for whatever
+  // reason (kicked, or the "kicked" event above didn't arrive for some
+  // reason), don't keep showing a stale room — bail out cleanly. This does
+  // not depend on any specific removal mechanism working correctly.
+  if (state.playerId && room.players && !room.players.some(p => p.id === state.playerId)) {
+    clearSession();
+    Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: 'Tu ne fais plus partie de ce salon (exclu·e, ou le salon a été fermé).' });
+    render();
+    return;
+  }
   state.room = room;
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
   render();
@@ -215,6 +225,7 @@ function joinRoom() {
   socket.emit('join-room', { code, name });
 }
 function leaveToHome() {
+  if (state.code) socket.emit('leave-room');
   clearSession();
   Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, error: '', nameInput: '', codeInput: '' });
   render();

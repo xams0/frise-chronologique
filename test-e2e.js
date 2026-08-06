@@ -452,6 +452,56 @@ async function main() {
 
     mallory.disconnect(); nathan.disconnect(); nathanAgain.disconnect(); oscar.disconnect();
 
+    // ---- leave-room: game ends when too few players remain, host reassigned if needed ----
+    const paul = io(URL, { transports: ['websocket'] }); // host
+    const quinn = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(paul, 'connect'), waitFor(quinn, 'connect')]);
+    paul.emit('create-room', { name: 'Paul' });
+    const paulJoined = await waitFor(paul, 'joined');
+    quinn.emit('join-room', { code: paulJoined.code, name: 'Quinn' });
+    const quinnJoined = await waitFor(quinn, 'joined');
+    paul.emit('set-reveal-delay', { seconds: 3 });
+    await waitForRoomWhere(paul, r => r.revealDelaySeconds === 3);
+    paul.emit('start-game');
+    await waitForRoomWhere(paul, r => r.phase === 'playing');
+
+    // Quinn (non-host) leaves mid-game -> host (Paul) is left alone -> game must end back to lobby
+    quinn.emit('leave-room');
+    const afterQuinnLeft = await waitForRoomWhere(paul, r => r.phase === 'lobby');
+    if (afterQuinnLeft.phase === 'lobby' && afterQuinnLeft.players.length === 1 && afterQuinnLeft.players[0].id === paulJoined.playerId) {
+      ok('game correctly ended (back to lobby) when the host was left alone after the other player left');
+    } else fail('expected phase="lobby" with only the host remaining, got: ' + JSON.stringify({ phase: afterQuinnLeft.phase, players: afterQuinnLeft.players.map(p => p.name) }));
+    quinn.disconnect();
+
+    // ---- leave-room: host leaving reassigns host to a remaining player ----
+    const rachel = io(URL, { transports: ['websocket'] }); // will become host
+    const steve = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(rachel, 'connect'), waitFor(steve, 'connect')]);
+    rachel.emit('create-room', { name: 'Rachel' });
+    const rachelJoined = await waitFor(rachel, 'joined');
+    steve.emit('join-room', { code: rachelJoined.code, name: 'Steve' });
+    const steveJoined = await waitFor(steve, 'joined');
+    rachel.emit('leave-room');
+    const afterHostLeft = await waitForRoomWhere(steve, r => r.hostId === steveJoined.playerId);
+    if (afterHostLeft.hostId === steveJoined.playerId && afterHostLeft.players.length === 1) {
+      ok('host reassigned to the remaining player when the original host left');
+    } else fail('expected Steve to become the new host, got hostId=' + afterHostLeft.hostId);
+    rachel.disconnect();
+
+    // last player leaving deletes the room entirely
+    steve.emit('leave-room');
+    await new Promise(r => setTimeout(r, 400));
+    const tina = io(URL, { transports: ['websocket'] });
+    await waitFor(tina, 'connect');
+    let deletedRoomError = null;
+    tina.once('error-msg', (msg) => { deletedRoomError = msg; });
+    tina.emit('join-room', { code: rachelJoined.code, name: 'Tina' });
+    await new Promise(r => setTimeout(r, 400));
+    if (deletedRoomError) ok('room was fully deleted after the last player left: "' + deletedRoomError + '"');
+    else fail('expected the room to no longer exist after everyone left it');
+    steve.disconnect(); tina.disconnect();
+    paul.disconnect();
+
     // ---- kick-player ----
     const frank = io(URL, { transports: ['websocket'] });
     const grace = io(URL, { transports: ['websocket'] });

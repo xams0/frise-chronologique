@@ -295,6 +295,54 @@ function scheduleAutoReveal(room) {
   }, delayMs);
 }
 
+// Shared cleanup for any time a player leaves the room (voluntarily or
+// kicked): fixes up turn order/pending/DJ/host, ends an in-progress game if
+// too few players remain, and deletes the room entirely if it's now empty.
+function removePlayerFromRoom(room, targetId) {
+  const idx = room.players.findIndex(p => p.id === targetId);
+  if (idx === -1) return null;
+  const removed = room.players[idx];
+  room.players.splice(idx, 1);
+
+  if (room.phase === 'playing' && room.turnOrder.length) {
+    const wasActive = room.turnOrder[room.turnIndex % room.turnOrder.length] === targetId;
+    const wasBeingChallenged = room.pending && room.pending.challenge && room.pending.challenge.playerId === targetId;
+    room.turnOrder = room.turnOrder.filter(id => id !== targetId);
+    if (wasBeingChallenged) room.pending.challenge = null;
+    if (wasActive) { clearAutoReveal(room.code); room.pending = null; }
+    if (room.turnOrder.length) room.turnIndex = room.turnIndex % room.turnOrder.length;
+  }
+
+  if (room.djId === targetId) {
+    const stillHere = room.players.find(p => !p.isBot);
+    room.djId = stillHere ? stillHere.id : null;
+  }
+
+  if (room.hostId === targetId && room.players.length) {
+    const nextHost = room.players.find(p => !p.isBot) || room.players[0];
+    room.hostId = nextHost.id;
+    room.log.push({ ts: nowStr(), text: `👑 ${nextHost.name} est maintenant l'hôte du salon.` });
+  }
+
+  // Not enough players left to keep an in-progress game going — including
+  // the specific case the host asked for: the host left alone.
+  if (room.phase === 'playing' && room.players.length < 2) {
+    clearAutoReveal(room.code);
+    room.phase = 'lobby';
+    room.pending = null;
+    room.deck = []; room.discard = [];
+    room.turnOrder = []; room.turnIndex = 0;
+    room.log.push({ ts: nowStr(), text: '🏁 Partie interrompue — plus assez de joueurs pour continuer.' });
+  }
+
+  if (room.players.length === 0) {
+    clearAutoReveal(room.code);
+    delete rooms[room.code];
+  }
+
+  return removed;
+}
+
 function resolveReveal(room) {
   const pend = room.pending;
   const active = room.players.find(pl => pl.id === pend.activePlayerId);
@@ -612,29 +660,21 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: `👥 Nombre de joueurs maximum réglé sur ${m}.` });
   }));
 
+  socket.on('leave-room', withRoom(async (room) => {
+    const targetId = socket.data.playerId;
+    const left = removePlayerFromRoom(room, targetId);
+    if (left && rooms[room.code]) room.log.push({ ts: nowStr(), text: `${left.name} a quitté le salon.` });
+    socket.leave(room.code);
+    socket.data.code = null;
+    socket.data.playerId = null;
+  }));
+
   socket.on('kick-player', withRoom(async (room, { playerId: targetId }) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut exclure un joueur.');
     if (targetId === room.hostId) return socket.emit('error-msg', 'L\'hôte ne peut pas s\'exclure lui-même.');
-    const idx = room.players.findIndex(p => p.id === targetId);
-    if (idx === -1) return;
-    const kicked = room.players[idx];
-    room.players.splice(idx, 1);
-
-    if (room.phase === 'playing' && room.turnOrder.length) {
-      const wasActive = room.turnOrder[room.turnIndex % room.turnOrder.length] === targetId;
-      const wasBeingChallenged = room.pending && room.pending.challenge && room.pending.challenge.playerId === targetId;
-      room.turnOrder = room.turnOrder.filter(id => id !== targetId);
-      if (wasBeingChallenged) room.pending.challenge = null;
-      if (room.turnOrder.length === 0) {
-        room.phase = 'lobby'; room.pending = null; // everyone else already left too — back to lobby rather than a broken game
-      } else {
-        if (wasActive) { clearAutoReveal(room.code); room.pending = null; }
-        room.turnIndex = room.turnIndex % room.turnOrder.length;
-      }
-    }
-    if (room.djId === targetId) room.djId = room.hostId;
-
-    room.log.push({ ts: nowStr(), text: `🚫 ${kicked.name} a été exclu(e) du salon par l'hôte.` });
+    const kicked = removePlayerFromRoom(room, targetId);
+    if (!kicked) return;
+    if (rooms[room.code]) room.log.push({ ts: nowStr(), text: `🚫 ${kicked.name} a été exclu(e) du salon par l'hôte.` });
 
     const sockets = await io.in(room.code).fetchSockets();
     for (const s of sockets) {
