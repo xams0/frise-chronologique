@@ -30,6 +30,12 @@ function waitFor(socket, event, timeoutMs = 4000) {
 // predicate matches makes the test robust against that ordering race.
 // Mirrors the server's gap-correctness rule, so tests can reliably pick a
 // gap that's guaranteed wrong (or right) for a timeline of any size.
+// Mirrors the server's normalize() exactly — used to build the same song
+// keys the server uses for usedSongKeys, so test comparisons actually match.
+function normalizeLikeServer(s) {
+  return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+}
+
 function correctGapsFor(sortedYears, year) {
   const gaps = [];
   for (let i = 0; i <= sortedYears.length; i++) {
@@ -824,6 +830,117 @@ async function main() {
       }
     }
     jose.disconnect(); kara.disconnect();
+
+    // ---- timestamps are in Paris time, not the server's raw local time ----
+    const parisNow = () => {
+      const d = new Date();
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) + ' ' +
+        d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    };
+    const tzHost = io(URL, { transports: ['websocket'] });
+    await waitFor(tzHost, 'connect');
+    tzHost.emit('create-room', { name: 'TzHost' });
+    const tzJoined = await waitFor(tzHost, 'joined');
+    const roomLogTs = tzJoined.room.log[0].ts;
+    const expected = parisNow();
+    // Compare only the hour — tolerate the rare case where the minute ticked
+    // over between the two computations a few ms apart, but a genuine
+    // timezone bug would be off by whole hours, which this still catches.
+    const gotHour = roomLogTs.split(' ')[1].split(':')[0];
+    const expectedHour = expected.split(' ')[1].split(':')[0];
+    if (gotHour === expectedHour) {
+      ok(`room timestamps correctly use Europe/Paris regardless of the server's own timezone: "${roomLogTs}"`);
+    } else {
+      fail(`room timestamp hour mismatch — got "${roomLogTs}", expected close to "${expected}" (Europe/Paris)`);
+    }
+    tzHost.disconnect();
+
+    // ---- no song repeats across a replay in the same room, when the pool allows it ----
+    const remy = io(URL, { transports: ['websocket'] });
+    const sacha = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(remy, 'connect'), waitFor(sacha, 'connect')]);
+    remy.emit('create-room', { name: 'Remy' });
+    const remyJoined = await waitFor(remy, 'joined');
+    if (remyJoined.room.usedSongKeys && remyJoined.room.usedSongKeys.length === 0) ok('room starts with an empty usedSongKeys list');
+    else fail('expected usedSongKeys to start empty, got: ' + JSON.stringify(remyJoined.room.usedSongKeys));
+    sacha.emit('join-room', { code: remyJoined.code, name: 'Sacha' });
+    await waitFor(sacha, 'joined');
+    remy.emit('set-reveal-delay', { seconds: 3 });
+    await waitForRoomWhere(remy, r => r.revealDelaySeconds === 3);
+    remy.emit('start-game');
+    const g1 = await waitForRoomWhere(remy, r => r.phase === 'playing');
+    const g1ActiveId = g1.turnOrder[g1.turnIndex];
+    const g1ActiveSocket = g1ActiveId === remyJoined.playerId ? remy : sacha;
+    const g1StartCards = g1.players.map(p => p.timeline[0]); // both starting cards count as "used" once the game ends
+
+    g1ActiveSocket.emit('draw-card');
+    const g1Drawn = await waitForRoomWhere(g1ActiveSocket, r => !!r.pending);
+    const drawnCardKey = { title: g1Drawn.pending.card.title, artist: g1Drawn.pending.card.artist };
+    g1ActiveSocket.emit('place-card', { gapIndex: 0 }); // outcome doesn't matter — either way this card becomes "used"
+    await waitForRoomWhere(g1ActiveSocket, r => r.pending && r.pending.stage === 'placed');
+    await waitForRoomWhere(g1ActiveSocket, r => r.pending === null, 8000);
+
+    remy.emit('play-again');
+    const backInLobby = await waitForRoomWhere(remy, r => r.phase === 'lobby');
+    const usedAfterReplayPrep = backInLobby.usedSongKeys || [];
+    const norm = normalizeLikeServer;
+    const expectStartCardsUsed = g1StartCards.every(c => usedAfterReplayPrep.includes(norm(c.title) + '|' + norm(c.artist)));
+    const expectDrawnCardUsed = usedAfterReplayPrep.includes(norm(drawnCardKey.title) + '|' + norm(drawnCardKey.artist));
+    if (expectStartCardsUsed && expectDrawnCardUsed && usedAfterReplayPrep.length >= 3) {
+      ok(`play-again correctly recorded ${usedAfterReplayPrep.length} used song(s) from the finished game before resetting`);
+    } else {
+      fail('play-again did not record used songs as expected: ' + JSON.stringify(usedAfterReplayPrep));
+    }
+
+    remy.emit('start-game');
+    const g2 = await waitForRoomWhere(remy, r => r.phase === 'playing');
+    const g2AllSongs = g2.players.flatMap(p => p.timeline).concat(g2.deck);
+    const repeats = g2AllSongs.filter(c => usedAfterReplayPrep.includes(norm(c.title) + '|' + norm(c.artist)));
+    if (repeats.length === 0) {
+      ok('the replay correctly avoided every song used in the previous game (checked across both starting hands and the full deck)');
+    } else {
+      fail(`the replay repeated ${repeats.length} song(s) that were already used: ` + JSON.stringify(repeats.slice(0, 3)));
+    }
+    remy.disconnect(); sacha.disconnect();
+
+    // ---- auto-draw: the next card starts itself if nobody draws manually ----
+    const tara = io(URL, { transports: ['websocket'] });
+    const ulysse = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(tara, 'connect'), waitFor(ulysse, 'connect')]);
+    tara.emit('create-room', { name: 'Tara' });
+    const taraJoined = await waitFor(tara, 'joined');
+    if (taraJoined.room.autoDrawSeconds === 0) ok('room defaults to autoDrawSeconds=0 (manual draw)');
+    else fail('expected default autoDrawSeconds=0, got ' + taraJoined.room.autoDrawSeconds);
+    ulysse.emit('join-room', { code: taraJoined.code, name: 'Ulysse' });
+    await waitFor(ulysse, 'joined');
+
+    let adRefused = null;
+    ulysse.once('error-msg', (msg) => { adRefused = msg; });
+    ulysse.emit('set-auto-draw-seconds', { seconds: 5 });
+    await new Promise(r => setTimeout(r, 400));
+    if (adRefused) ok('non-host correctly refused when trying to set the auto-draw delay');
+    else fail('expected non-host set-auto-draw-seconds attempt to be refused');
+
+    tara.emit('set-auto-draw-seconds', { seconds: 5 });
+    const adRoom = await waitForRoomWhere(tara, r => r.autoDrawSeconds === 5);
+    ok('host successfully set autoDrawSeconds=' + adRoom.autoDrawSeconds);
+    tara.emit('set-turn-decision-seconds', { seconds: 60 }); // keep this out of the way so it doesn't race the auto-draw
+    await waitForRoomWhere(tara, r => r.turnDecisionSeconds === 60);
+    tara.emit('start-game');
+    const adGame = await waitForRoomWhere(tara, r => r.phase === 'playing');
+    if (adGame.turnStartedAt) ok('turnStartedAt is set for the client to compute the auto-draw fill bar');
+    else fail('expected turnStartedAt to be set when the game starts');
+
+    // deliberately never emit draw-card — just wait past the 5s auto-draw delay
+    const adActiveId = adGame.turnOrder[adGame.turnIndex];
+    const adActiveSocket = adActiveId === taraJoined.playerId ? tara : ulysse;
+    const autoDrawn = await waitForRoomWhere(adActiveSocket, r => r.pending && r.pending.stage === 'listening', 8000);
+    if (autoDrawn.pending.activePlayerId === adActiveId) {
+      ok('a card was auto-drawn for the active player after the configured delay, with no manual draw-card ever sent');
+    } else {
+      fail('expected an auto-drawn pending card for the active player: ' + JSON.stringify(autoDrawn.pending));
+    }
+    tara.disconnect(); ulysse.disconnect();
 
     // ---- 3+ players: only ONE challenge can be active per pending card ----
     const uma = io(URL, { transports: ['websocket'] });

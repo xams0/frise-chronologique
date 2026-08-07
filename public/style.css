@@ -93,6 +93,17 @@
   .btn-gold{background:var(--gold);color:#241205;}
   .play-nudge{animation:playNudge 0.9s ease-in-out infinite;}
   @keyframes playNudge{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(242,184,75,0.5);}50%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(242,184,75,0);}}
+
+  .reaction-bar{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .reaction-btn{background:var(--surface);border:1px solid var(--line);border-radius:999px;width:42px;height:42px;font-size:19px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .reaction-btn:active{transform:scale(0.9);}
+  #reaction-overlay{position:fixed;inset:0;pointer-events:none;z-index:500;overflow:hidden;}
+  .reaction-fly{position:absolute;bottom:0;font-size:44px;animation-name:reactionFly;animation-timing-function:ease-out;animation-fill-mode:forwards;filter:drop-shadow(0 4px 10px rgba(0,0,0,0.4));}
+  @keyframes reactionFly{
+    0%{transform:translateY(0) scale(0.4) rotate(-8deg);opacity:0;}
+    12%{opacity:1;transform:translateY(-15vh) scale(1.15) rotate(6deg);}
+    100%{transform:translateY(-95vh) scale(1) rotate(-4deg);opacity:0;}
+  }
   .btn-teal{background:var(--teal);color:#062521;}
   .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--text);}
   .btn-danger{background:transparent;border:1px solid var(--red);color:var(--red);}

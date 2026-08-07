@@ -4744,5 +4744,2203 @@
     "year": 2025,
     "genre": "Indie Pop",
     "country": "France"
+  },
+  {
+    "title": "Meet Me in St. Louis",
+    "artist": "Billy Murray",
+    "year": 1904,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "In My Merry Oldsmobile",
+    "artist": "Billy Murray",
+    "year": 1905,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "Shine On, Harvest Moon",
+    "artist": "Nora Bayes",
+    "year": 1908,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "By the Light of the Silvery Moon",
+    "artist": "Ada Jones",
+    "year": 1909,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "Down by the Old Mill Stream",
+    "artist": "The Haydn Quartet",
+    "year": 1910,
+    "genre": "Barbershop",
+    "country": "USA"
+  },
+  {
+    "title": "Oh, You Beautiful Doll",
+    "artist": "Billy Murray",
+    "year": 1911,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "When Irish Eyes Are Smiling",
+    "artist": "Chauncey Olcott",
+    "year": 1912,
+    "genre": "Broadway",
+    "country": "USA"
+  },
+  {
+    "title": "You Made Me Love You",
+    "artist": "Al Jolson",
+    "year": 1913,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "It's a Long Way to Tipperary",
+    "artist": "John McCormack",
+    "year": 1914,
+    "genre": "War song",
+    "country": "Ireland"
+  },
+  {
+    "title": "I Didn't Raise My Boy to Be a Soldier",
+    "artist": "Morton Harvey",
+    "year": 1915,
+    "genre": "War song",
+    "country": "USA"
+  },
+  {
+    "title": "Pretty Baby",
+    "artist": "Gene Greene",
+    "year": 1916,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "For Me and My Gal",
+    "artist": "Van and Schenck",
+    "year": 1917,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "How Ya Gonna Keep 'Em Down on the Farm",
+    "artist": "Nora Bayes",
+    "year": 1918,
+    "genre": "Novelty",
+    "country": "USA"
+  },
+  {
+    "title": "I'll Say She Does",
+    "artist": "Al Jolson",
+    "year": 1918,
+    "genre": "Vaudeville",
+    "country": "USA"
+  },
+  {
+    "title": "Wang Wang Blues",
+    "artist": "Paul Whiteman",
+    "year": 1920,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "Margie",
+    "artist": "Eddie Cantor",
+    "year": 1920,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "My Man",
+    "artist": "Fanny Brice",
+    "year": 1921,
+    "genre": "Torch song",
+    "country": "USA"
+  },
+  {
+    "title": "Toot Toot Tootsie",
+    "artist": "Al Jolson",
+    "year": 1922,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "Barney Google",
+    "artist": "Billy Jones",
+    "year": 1923,
+    "genre": "Novelty",
+    "country": "USA"
+  },
+  {
+    "title": "California, Here I Come",
+    "artist": "Al Jolson",
+    "year": 1924,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "Show Me the Way to Go Home",
+    "artist": "Jack Hylton",
+    "year": 1925,
+    "genre": "Novelty",
+    "country": "UK"
+  },
+  {
+    "title": "Bam, Bam, Bamy Shore",
+    "artist": "Al Jolson",
+    "year": 1925,
+    "genre": "Tin Pan Alley",
+    "country": "USA"
+  },
+  {
+    "title": "Baby Face",
+    "artist": "Jan Garber",
+    "year": 1926,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "Singin' in the Rain",
+    "artist": "Cliff Edwards",
+    "year": 1929,
+    "genre": "Show Tune",
+    "country": "USA"
+  },
+  {
+    "title": "On the Sunny Side of the Street",
+    "artist": "Ted Lewis",
+    "year": 1930,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "Dancing in the Dark",
+    "artist": "Bing Crosby",
+    "year": 1931,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "Night and Day",
+    "artist": "Fred Astaire",
+    "year": 1932,
+    "genre": "Show Tune",
+    "country": "USA"
+  },
+  {
+    "title": "Stormy Weather",
+    "artist": "Ethel Waters",
+    "year": 1933,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "June in January",
+    "artist": "Bing Crosby",
+    "year": 1934,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "All the Things You Are",
+    "artist": "Tommy Dorsey",
+    "year": 1939,
+    "genre": "Swing",
+    "country": "USA"
+  },
+  {
+    "title": "I'll Never Smile Again",
+    "artist": "Tommy Dorsey",
+    "year": 1940,
+    "genre": "Swing",
+    "country": "USA"
+  },
+  {
+    "title": "Blues in the Night",
+    "artist": "Woody Herman",
+    "year": 1941,
+    "genre": "Swing",
+    "country": "USA"
+  },
+  {
+    "title": "There Are Such Things",
+    "artist": "Tommy Dorsey",
+    "year": 1942,
+    "genre": "Swing",
+    "country": "USA"
+  },
+  {
+    "title": "Pistol Packin' Mama",
+    "artist": "Al Dexter",
+    "year": 1943,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Swinging on a Star",
+    "artist": "Bing Crosby",
+    "year": 1944,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Accentuate the Positive",
+    "artist": "Bing Crosby",
+    "year": 1945,
+    "genre": "Swing",
+    "country": "USA"
+  },
+  {
+    "title": "Zip-A-Dee-Doo-Dah",
+    "artist": "James Baskett",
+    "year": 1946,
+    "genre": "Show Tune",
+    "country": "USA"
+  },
+  {
+    "title": "Near You",
+    "artist": "Francis Craig",
+    "year": 1947,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Cruising Down the River",
+    "artist": "Blue Barron",
+    "year": 1949,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "If I Knew You Were Comin' I'd've Baked a Cake",
+    "artist": "Eileen Barton",
+    "year": 1950,
+    "genre": "Novelty",
+    "country": "USA"
+  },
+  {
+    "title": "On Top of Old Smoky",
+    "artist": "The Weavers",
+    "year": 1951,
+    "genre": "Folk",
+    "country": "USA"
+  },
+  {
+    "title": "Botch-A-Me",
+    "artist": "Rosemary Clooney",
+    "year": 1952,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Vaya Con Dios",
+    "artist": "Les Paul",
+    "year": 1953,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Hernando's Hideaway",
+    "artist": "Archie Bleyer",
+    "year": 1954,
+    "genre": "Latin Pop",
+    "country": "USA"
+  },
+  {
+    "title": "The Yellow Rose of Texas",
+    "artist": "Mitch Miller",
+    "year": 1955,
+    "genre": "Folk",
+    "country": "USA"
+  },
+  {
+    "title": "Heartbreak Hotel",
+    "artist": "Elvis Presley",
+    "year": 1956,
+    "genre": "Rock and Roll",
+    "country": "USA"
+  },
+  {
+    "title": "Whole Lotta Shakin' Goin' On",
+    "artist": "Jerry Lee Lewis",
+    "year": 1957,
+    "genre": "Rock and Roll",
+    "country": "USA"
+  },
+  {
+    "title": "Rockin' Robin",
+    "artist": "Bobby Day",
+    "year": 1958,
+    "genre": "Rock and Roll",
+    "country": "USA"
+  },
+  {
+    "title": "Sea of Love",
+    "artist": "Phil Phillips",
+    "year": 1959,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Theme from A Summer Place",
+    "artist": "Percy Faith",
+    "year": 1960,
+    "genre": "Easy listening",
+    "country": "USA"
+  },
+  {
+    "title": "Please Mr. Postman",
+    "artist": "The Marvelettes",
+    "year": 1961,
+    "genre": "Motown",
+    "country": "USA"
+  },
+  {
+    "title": "The Wanderer",
+    "artist": "Dion",
+    "year": 1961,
+    "genre": "Doo-wop",
+    "country": "USA"
+  },
+  {
+    "title": "Sherry",
+    "artist": "The Four Seasons",
+    "year": 1962,
+    "genre": "Doo-wop",
+    "country": "USA"
+  },
+  {
+    "title": "Surfin' U.S.A.",
+    "artist": "The Beach Boys",
+    "year": 1963,
+    "genre": "Surf Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Walk On By",
+    "artist": "Dionne Warwick",
+    "year": 1964,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "Ticket to Ride",
+    "artist": "The Beatles",
+    "year": 1965,
+    "genre": "Pop Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Eleanor Rigby",
+    "artist": "The Beatles",
+    "year": 1966,
+    "genre": "Baroque pop",
+    "country": "UK"
+  },
+  {
+    "title": "Sunny",
+    "artist": "Bobby Hebb",
+    "year": 1966,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "The Letter",
+    "artist": "The Box Tops",
+    "year": 1967,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Piece of My Heart",
+    "artist": "Big Brother and the Holding Company",
+    "year": 1968,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Crimson and Clover",
+    "artist": "Tommy James and the Shondells",
+    "year": 1968,
+    "genre": "Psychedelic Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Spinning Wheel",
+    "artist": "Blood, Sweat & Tears",
+    "year": 1969,
+    "genre": "Jazz Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Everyday People",
+    "artist": "Sly and the Family Stone",
+    "year": 1968,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "It's Too Late",
+    "artist": "Carole King",
+    "year": 1971,
+    "genre": "Pop Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Alone Again (Naturally)",
+    "artist": "Gilbert O'Sullivan",
+    "year": 1972,
+    "genre": "Pop",
+    "country": "Ireland"
+  },
+  {
+    "title": "Crocodile Rock",
+    "artist": "Elton John",
+    "year": 1972,
+    "genre": "Pop Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Tie a Yellow Ribbon Round the Ole Oak Tree",
+    "artist": "Tony Orlando and Dawn",
+    "year": 1973,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Show and Tell",
+    "artist": "Al Wilson",
+    "year": 1973,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "The Way We Were",
+    "artist": "Barbra Streisand",
+    "year": 1973,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Cat's in the Cradle",
+    "artist": "Harry Chapin",
+    "year": 1974,
+    "genre": "Folk",
+    "country": "USA"
+  },
+  {
+    "title": "Philadelphia Freedom",
+    "artist": "Elton John",
+    "year": 1975,
+    "genre": "Pop Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Torn Between Two Lovers",
+    "artist": "Mary MacGregor",
+    "year": 1976,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Lucille",
+    "artist": "Kenny Rogers",
+    "year": 1977,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Just the Way You Are",
+    "artist": "Billy Joel",
+    "year": 1977,
+    "genre": "Pop Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Shadow Dancing",
+    "artist": "Andy Gibb",
+    "year": 1978,
+    "genre": "Disco",
+    "country": "UK"
+  },
+  {
+    "title": "Too Much Heaven",
+    "artist": "Bee Gees",
+    "year": 1978,
+    "genre": "Disco",
+    "country": "UK"
+  },
+  {
+    "title": "Reunited",
+    "artist": "Peaches & Herb",
+    "year": 1979,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Escape (The Piña Colada Song)",
+    "artist": "Rupert Holmes",
+    "year": 1979,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Celebration",
+    "artist": "Kool & the Gang",
+    "year": 1980,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Endless Love",
+    "artist": "Diana Ross",
+    "year": 1981,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Centerfold",
+    "artist": "The J. Geils Band",
+    "year": 1981,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "I Love Rock 'n' Roll",
+    "artist": "Joan Jett",
+    "year": 1981,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Down Under",
+    "artist": "Men at Work",
+    "year": 1982,
+    "genre": "Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Maneater",
+    "artist": "Daryl Hall & John Oates",
+    "year": 1982,
+    "genre": "Pop Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Flashdance... What a Feeling",
+    "artist": "Irene Cara",
+    "year": 1983,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Jump",
+    "artist": "Van Halen",
+    "year": 1984,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Material Girl",
+    "artist": "Madonna",
+    "year": 1985,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Say You, Say Me",
+    "artist": "Lionel Richie",
+    "year": 1985,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "That's What Friends Are For",
+    "artist": "Dionne Warwick",
+    "year": 1986,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Nikita",
+    "artist": "Elton John",
+    "year": 1985,
+    "genre": "Pop Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Alone",
+    "artist": "Heart",
+    "year": 1987,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "(I've Had) The Time of My Life",
+    "artist": "Bill Medley",
+    "year": 1987,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Roll With It",
+    "artist": "Steve Winwood",
+    "year": 1988,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Wild Wild West",
+    "artist": "The Escape Club",
+    "year": 1988,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Right Here Waiting",
+    "artist": "Richard Marx",
+    "year": 1989,
+    "genre": "Pop Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Cherish",
+    "artist": "Madonna",
+    "year": 1989,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Hold On",
+    "artist": "Wilson Phillips",
+    "year": 1990,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Unbelievable",
+    "artist": "EMF",
+    "year": 1990,
+    "genre": "Alternative Rock",
+    "country": "UK"
+  },
+  {
+    "title": "More Than Words",
+    "artist": "Extreme",
+    "year": 1991,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Dreamlover",
+    "artist": "Mariah Carey",
+    "year": 1993,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "The Power of Love",
+    "artist": "Céline Dion",
+    "year": 1993,
+    "genre": "Pop",
+    "country": "Canada"
+  },
+  {
+    "title": "Breathe Again",
+    "artist": "Toni Braxton",
+    "year": 1993,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Return to Innocence",
+    "artist": "Enigma",
+    "year": 1994,
+    "genre": "New Age",
+    "country": "Germany"
+  },
+  {
+    "title": "Take a Bow",
+    "artist": "Madonna",
+    "year": 1994,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Have You Ever Really Loved a Woman?",
+    "artist": "Bryan Adams",
+    "year": 1995,
+    "genre": "Rock",
+    "country": "Canada"
+  },
+  {
+    "title": "Un-Break My Heart",
+    "artist": "Toni Braxton",
+    "year": 1996,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "The Boy Is Mine",
+    "artist": "Brandy & Monica",
+    "year": 1998,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "I Don't Want to Miss a Thing",
+    "artist": "Aerosmith",
+    "year": 1998,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Smooth",
+    "artist": "Santana",
+    "year": 1999,
+    "genre": "Latin Rock",
+    "country": "USA"
+  },
+  {
+    "title": "It's Gonna Be Me",
+    "artist": "NSYNC",
+    "year": 2000,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Breathe",
+    "artist": "Faith Hill",
+    "year": 1999,
+    "genre": "Country Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Fallin'",
+    "artist": "Alicia Keys",
+    "year": 2001,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "A Moment Like This",
+    "artist": "Kelly Clarkson",
+    "year": 2002,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Let Me Love You",
+    "artist": "Mario",
+    "year": 2004,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Don't Cha",
+    "artist": "The Pussycat Dolls",
+    "year": 2005,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Promiscuous",
+    "artist": "Nelly Furtado",
+    "year": 2006,
+    "genre": "Pop",
+    "country": "Canada"
+  },
+  {
+    "title": "Buy U a Drank",
+    "artist": "T-Pain",
+    "year": 2007,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Low",
+    "artist": "Flo Rida",
+    "year": 2007,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Womanizer",
+    "artist": "Britney Spears",
+    "year": 2008,
+    "genre": "Dance-pop",
+    "country": "USA"
+  },
+  {
+    "title": "Right Round",
+    "artist": "Flo Rida",
+    "year": 2009,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Down",
+    "artist": "Jay Sean",
+    "year": 2009,
+    "genre": "R&B",
+    "country": "UK"
+  },
+  {
+    "title": "Dynamite",
+    "artist": "Taio Cruz",
+    "year": 2010,
+    "genre": "Dance-pop",
+    "country": "UK"
+  },
+  {
+    "title": "Moves Like Jagger",
+    "artist": "Maroon 5",
+    "year": 2011,
+    "genre": "Pop Rock",
+    "country": "USA"
+  },
+  {
+    "title": "We Are Young",
+    "artist": "fun.",
+    "year": 2012,
+    "genre": "Indie Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Locked Out of Heaven",
+    "artist": "Bruno Mars",
+    "year": 2012,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Talk Dirty",
+    "artist": "Jason Derulo",
+    "year": 2013,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Dark Horse",
+    "artist": "Katy Perry",
+    "year": 2014,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Problem",
+    "artist": "Ariana Grande",
+    "year": 2014,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "7 Years",
+    "artist": "Lukas Graham",
+    "year": 2015,
+    "genre": "Pop",
+    "country": "Denmark"
+  },
+  {
+    "title": "Faded",
+    "artist": "Alan Walker",
+    "year": 2015,
+    "genre": "EDM",
+    "country": "Norway"
+  },
+  {
+    "title": "Shape of You (Piano)",
+    "artist": "Ed Sheeran",
+    "year": 2017,
+    "genre": "Pop",
+    "country": "UK"
+  },
+  {
+    "title": "Attention",
+    "artist": "Charlie Puth",
+    "year": 2017,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "In My Feelings",
+    "artist": "Drake",
+    "year": 2018,
+    "genre": "Hip Hop",
+    "country": "Canada"
+  },
+  {
+    "title": "Talk",
+    "artist": "Khalid",
+    "year": 2019,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Roxanne",
+    "artist": "Arizona Zervas",
+    "year": 2019,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Adore You",
+    "artist": "Harry Styles",
+    "year": 2019,
+    "genre": "Pop",
+    "country": "UK"
+  },
+  {
+    "title": "Mood",
+    "artist": "24kGoldn",
+    "year": 2020,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Therefore I Am",
+    "artist": "Billie Eilish",
+    "year": 2020,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Deja Vu",
+    "artist": "Olivia Rodrigo",
+    "year": 2021,
+    "genre": "Pop Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Woman",
+    "artist": "Doja Cat",
+    "year": 2021,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Big Energy",
+    "artist": "Latto",
+    "year": 2022,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "First Class",
+    "artist": "Jack Harlow",
+    "year": 2022,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Padam Padam",
+    "artist": "Kylie Minogue",
+    "year": 2023,
+    "genre": "Dance-pop",
+    "country": "Australia"
+  },
+  {
+    "title": "Strangers",
+    "artist": "Kenya Grace",
+    "year": 2023,
+    "genre": "Drum and bass",
+    "country": "UK"
+  },
+  {
+    "title": "I Had Some Help",
+    "artist": "Post Malone",
+    "year": 2024,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "A Bar Song (Tipsy)",
+    "artist": "Shaboozey",
+    "year": 2024,
+    "genre": "Country Rap",
+    "country": "USA"
+  },
+  {
+    "title": "Million Dollar Baby",
+    "artist": "Tommy Richman",
+    "year": 2024,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Manu Chao",
+    "artist": "Manu Chao",
+    "year": 2001,
+    "genre": "World",
+    "country": "France"
+  },
+  {
+    "title": "Clandestino",
+    "artist": "Manu Chao",
+    "year": 1998,
+    "genre": "World",
+    "country": "France"
+  },
+  {
+    "title": "Le Vent Nous Portera",
+    "artist": "Noir Désir",
+    "year": 2001,
+    "genre": "Rock",
+    "country": "France"
+  },
+  {
+    "title": "Sous le vent",
+    "artist": "Garou",
+    "year": 2001,
+    "genre": "Variété",
+    "country": "France"
+  },
+  {
+    "title": "On va s'aimer",
+    "artist": "Gilbert Montagné",
+    "year": 1985,
+    "genre": "Variété",
+    "country": "France"
+  },
+  {
+    "title": "Chanson sur ma drôle de vie",
+    "artist": "Michel Delpech",
+    "year": 1972,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "L'aventurier",
+    "artist": "Indochine",
+    "year": 1982,
+    "genre": "Rock",
+    "country": "France"
+  },
+  {
+    "title": "Tout le bonheur du monde",
+    "artist": "Nolwenn Leroy",
+    "year": 2010,
+    "genre": "Variété",
+    "country": "France"
+  },
+  {
+    "title": "Basique",
+    "artist": "Orelsan",
+    "year": 2017,
+    "genre": "Rap",
+    "country": "France"
+  },
+  {
+    "title": "L'odeur de l'essence",
+    "artist": "Orelsan",
+    "year": 2017,
+    "genre": "Rap",
+    "country": "France"
+  },
+  {
+    "title": "Le Monde Est Stone",
+    "artist": "France Gall",
+    "year": 1978,
+    "genre": "Rock opera",
+    "country": "France"
+  },
+  {
+    "title": "Wuthering Heights",
+    "artist": "Kate Bush",
+    "year": 1978,
+    "genre": "Art Pop",
+    "country": "UK"
+  },
+  {
+    "title": "Running Up That Hill",
+    "artist": "Kate Bush",
+    "year": 1985,
+    "genre": "Art Pop",
+    "country": "UK"
+  },
+  {
+    "title": "Tears in Heaven",
+    "artist": "Eric Clapton",
+    "year": 1992,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Wonderful Tonight",
+    "artist": "Eric Clapton",
+    "year": 1977,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Hold the Line",
+    "artist": "Toto",
+    "year": 1978,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Rosanna",
+    "artist": "Toto",
+    "year": 1982,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Roundabout",
+    "artist": "Yes",
+    "year": 1971,
+    "genre": "Progressive Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Money",
+    "artist": "Pink Floyd",
+    "year": 1973,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Time",
+    "artist": "Pink Floyd",
+    "year": 1973,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Us and Them",
+    "artist": "Pink Floyd",
+    "year": 1973,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Roxanne",
+    "artist": "The Police",
+    "year": 1978,
+    "genre": "Reggae Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Don't Stand So Close to Me",
+    "artist": "The Police",
+    "year": 1980,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Carry On Wayward Son",
+    "artist": "Kansas",
+    "year": 1976,
+    "genre": "Progressive Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Renegade",
+    "artist": "Styx",
+    "year": 1978,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Come Sail Away",
+    "artist": "Styx",
+    "year": 1977,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Turn the Page",
+    "artist": "Bob Seger",
+    "year": 1973,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Against the Wind",
+    "artist": "Bob Seger",
+    "year": 1980,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Old Time Rock and Roll",
+    "artist": "Bob Seger",
+    "year": 1978,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Learn to Fly",
+    "artist": "Foo Fighters",
+    "year": 1999,
+    "genre": "Alternative Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Everlong",
+    "artist": "Foo Fighters",
+    "year": 1997,
+    "genre": "Alternative Rock",
+    "country": "USA"
+  },
+  {
+    "title": "My Hero",
+    "artist": "Foo Fighters",
+    "year": 1997,
+    "genre": "Alternative Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Best of You",
+    "artist": "Foo Fighters",
+    "year": 2005,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Are You Gonna Be My Girl",
+    "artist": "Jet",
+    "year": 2003,
+    "genre": "Garage Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Clint Eastwood",
+    "artist": "Gorillaz",
+    "year": 2001,
+    "genre": "Alternative",
+    "country": "UK"
+  },
+  {
+    "title": "Toxicity",
+    "artist": "System of a Down",
+    "year": 2001,
+    "genre": "Nu metal",
+    "country": "USA"
+  },
+  {
+    "title": "Duality",
+    "artist": "Slipknot",
+    "year": 2004,
+    "genre": "Nu metal",
+    "country": "USA"
+  },
+  {
+    "title": "Bodies",
+    "artist": "Drowning Pool",
+    "year": 2001,
+    "genre": "Nu metal",
+    "country": "USA"
+  },
+  {
+    "title": "Take Five",
+    "artist": "Dave Brubeck",
+    "year": 1959,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "So What",
+    "artist": "Miles Davis",
+    "year": 1959,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "My Favorite Things",
+    "artist": "John Coltrane",
+    "year": 1961,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "Feeling Good",
+    "artist": "Nina Simone",
+    "year": 1965,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "Sinnerman",
+    "artist": "Nina Simone",
+    "year": 1965,
+    "genre": "Jazz",
+    "country": "USA"
+  },
+  {
+    "title": "My Way",
+    "artist": "Frank Sinatra",
+    "year": 1969,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "New York, New York",
+    "artist": "Frank Sinatra",
+    "year": 1980,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "The Thrill Is Gone",
+    "artist": "B.B. King",
+    "year": 1969,
+    "genre": "Blues",
+    "country": "USA"
+  },
+  {
+    "title": "Sweet Home Chicago",
+    "artist": "Buddy Guy",
+    "year": 1991,
+    "genre": "Blues",
+    "country": "USA"
+  },
+  {
+    "title": "Cross Road Blues",
+    "artist": "Robert Johnson",
+    "year": 1936,
+    "genre": "Blues",
+    "country": "USA"
+  },
+  {
+    "title": "Hoochie Coochie Man",
+    "artist": "Muddy Waters",
+    "year": 1954,
+    "genre": "Blues",
+    "country": "USA"
+  },
+  {
+    "title": "I Can't Quit You Baby",
+    "artist": "Otis Rush",
+    "year": 1956,
+    "genre": "Blues",
+    "country": "USA"
+  },
+  {
+    "title": "At Last",
+    "artist": "Etta James",
+    "year": 1960,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "A Change Is Gonna Come",
+    "artist": "Sam Cooke",
+    "year": 1964,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "Cupid",
+    "artist": "Sam Cooke",
+    "year": 1961,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "Hit the Road Jack",
+    "artist": "Ray Charles",
+    "year": 1961,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Rocky Mountain High",
+    "artist": "John Denver",
+    "year": 1972,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Stand By Your Man",
+    "artist": "Tammy Wynette",
+    "year": 1968,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "He Stopped Loving Her Today",
+    "artist": "George Jones",
+    "year": 1980,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "On the Road Again",
+    "artist": "Willie Nelson",
+    "year": 1980,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Always on My Mind",
+    "artist": "Willie Nelson",
+    "year": 1982,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "The Gambler",
+    "artist": "Kenny Rogers",
+    "year": 1978,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Islands in the Stream",
+    "artist": "Kenny Rogers",
+    "year": 1983,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Forever and Ever, Amen",
+    "artist": "Randy Travis",
+    "year": 1987,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Boot Scootin' Boogie",
+    "artist": "Brooks & Dunn",
+    "year": 1992,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Wide Open Spaces",
+    "artist": "Dixie Chicks",
+    "year": 1998,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Goodbye Earl",
+    "artist": "Dixie Chicks",
+    "year": 1999,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Live Like You Were Dying",
+    "artist": "Tim McGraw",
+    "year": 2004,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "The Dance",
+    "artist": "Garth Brooks",
+    "year": 1990,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Where the Green Grass Grows",
+    "artist": "Tim McGraw",
+    "year": 1998,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Amarillo By Morning",
+    "artist": "George Strait",
+    "year": 1983,
+    "genre": "Country",
+    "country": "USA"
+  },
+  {
+    "title": "Sugar, We're Goin Down",
+    "artist": "Fall Out Boy",
+    "year": 2005,
+    "genre": "Emo",
+    "country": "USA"
+  },
+  {
+    "title": "Dance, Dance",
+    "artist": "Fall Out Boy",
+    "year": 2005,
+    "genre": "Emo",
+    "country": "USA"
+  },
+  {
+    "title": "Welcome to the Black Parade",
+    "artist": "My Chemical Romance",
+    "year": 2006,
+    "genre": "Emo",
+    "country": "USA"
+  },
+  {
+    "title": "I'm Not Okay (I Promise)",
+    "artist": "My Chemical Romance",
+    "year": 2004,
+    "genre": "Emo",
+    "country": "USA"
+  },
+  {
+    "title": "Face Down",
+    "artist": "The Red Jumpsuit Apparatus",
+    "year": 2006,
+    "genre": "Emo",
+    "country": "USA"
+  },
+  {
+    "title": "Move Along",
+    "artist": "The All-American Rejects",
+    "year": 2005,
+    "genre": "Pop Punk",
+    "country": "USA"
+  },
+  {
+    "title": "Dirty Little Secret",
+    "artist": "The All-American Rejects",
+    "year": 2005,
+    "genre": "Pop Punk",
+    "country": "USA"
+  },
+  {
+    "title": "Sk8er Boi",
+    "artist": "Avril Lavigne",
+    "year": 2002,
+    "genre": "Pop Punk",
+    "country": "Canada"
+  },
+  {
+    "title": "Misery Business",
+    "artist": "Paramore",
+    "year": 2007,
+    "genre": "Pop Punk",
+    "country": "USA"
+  },
+  {
+    "title": "Decode",
+    "artist": "Paramore",
+    "year": 2008,
+    "genre": "Alternative Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Konstantine",
+    "artist": "Something Corporate",
+    "year": 2002,
+    "genre": "Emo",
+    "country": "USA"
+  },
+  {
+    "title": "Chop Suey",
+    "artist": "Yellowcard",
+    "year": 2003,
+    "genre": "Pop Punk",
+    "country": "USA"
+  },
+  {
+    "title": "Ocean Avenue",
+    "artist": "Yellowcard",
+    "year": 2003,
+    "genre": "Pop Punk",
+    "country": "USA"
+  },
+  {
+    "title": "Little Talks",
+    "artist": "Of Monsters and Men",
+    "year": 2011,
+    "genre": "Indie Folk",
+    "country": "Iceland"
+  },
+  {
+    "title": "Ho Hey",
+    "artist": "The Lumineers",
+    "year": 2012,
+    "genre": "Indie Folk",
+    "country": "USA"
+  },
+  {
+    "title": "I Will Wait",
+    "artist": "Mumford & Sons",
+    "year": 2012,
+    "genre": "Indie Folk",
+    "country": "UK"
+  },
+  {
+    "title": "Pumped Up Kicks",
+    "artist": "Foster the People",
+    "year": 2010,
+    "genre": "Indie Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Riptide",
+    "artist": "Vance Joy",
+    "year": 2013,
+    "genre": "Indie Folk",
+    "country": "Australia"
+  },
+  {
+    "title": "Best Day of My Life",
+    "artist": "American Authors",
+    "year": 2013,
+    "genre": "Indie Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Shut Up and Dance",
+    "artist": "Walk the Moon",
+    "year": 2014,
+    "genre": "Indie Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Electric Feel",
+    "artist": "MGMT",
+    "year": 2008,
+    "genre": "Psychedelic Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Kids",
+    "artist": "MGMT",
+    "year": 2008,
+    "genre": "Psychedelic Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Two Weeks",
+    "artist": "Grizzly Bear",
+    "year": 2009,
+    "genre": "Indie Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Somebody Told Me",
+    "artist": "The Killers",
+    "year": 2004,
+    "genre": "Rock",
+    "country": "USA"
+  },
+  {
+    "title": "Do I Wanna Know?",
+    "artist": "Arctic Monkeys",
+    "year": 2013,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "R U Mine?",
+    "artist": "Arctic Monkeys",
+    "year": 2012,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "505",
+    "artist": "Arctic Monkeys",
+    "year": 2007,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Somebody Else",
+    "artist": "The 1975",
+    "year": 2016,
+    "genre": "Pop Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Chocolate",
+    "artist": "The 1975",
+    "year": 2013,
+    "genre": "Pop Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Pompeii",
+    "artist": "Bastille",
+    "year": 2013,
+    "genre": "Indie Pop",
+    "country": "UK"
+  },
+  {
+    "title": "Sweater Weather",
+    "artist": "The Neighbourhood",
+    "year": 2012,
+    "genre": "Alternative",
+    "country": "USA"
+  },
+  {
+    "title": "Marcia Baila",
+    "artist": "Rita Mitsouko",
+    "year": 1986,
+    "genre": "Rock",
+    "country": "France"
+  },
+  {
+    "title": "Les Sunlights des Tropiques",
+    "artist": "Bernard Lavilliers",
+    "year": 1986,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Elle a fait un bébé toute seule",
+    "artist": "Jean-Jacques Goldman",
+    "year": 1987,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Comme toi",
+    "artist": "Jean-Jacques Goldman",
+    "year": 1982,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Envole-moi",
+    "artist": "Jean-Jacques Goldman",
+    "year": 1984,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Puisque tu pars",
+    "artist": "Jean-Jacques Goldman",
+    "year": 1988,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "La Corrida",
+    "artist": "Francis Cabrel",
+    "year": 1994,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Petite Marie",
+    "artist": "Francis Cabrel",
+    "year": 1977,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Je l'aime à mourir",
+    "artist": "Francis Cabrel",
+    "year": 1979,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "L'Amérique",
+    "artist": "Joe Dassin",
+    "year": 1970,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Les Champs-Élysées",
+    "artist": "Joe Dassin",
+    "year": 1969,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Et si tu n'existais pas",
+    "artist": "Joe Dassin",
+    "year": 1976,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Emmenez-moi",
+    "artist": "Charles Aznavour",
+    "year": 1967,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "For Me Formidable",
+    "artist": "Charles Aznavour",
+    "year": 1963,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Que reste-t-il de nos amours",
+    "artist": "Charles Trenet",
+    "year": 1942,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "La Mer",
+    "artist": "Charles Trenet",
+    "year": 1946,
+    "genre": "Chanson",
+    "country": "France"
+  },
+  {
+    "title": "Vois sur ton chemin",
+    "artist": "Kids United",
+    "year": 2016,
+    "genre": "Pop",
+    "country": "France"
+  },
+  {
+    "title": "Solar Power",
+    "artist": "Lorde",
+    "year": 2021,
+    "genre": "Pop",
+    "country": "New Zealand"
+  },
+  {
+    "title": "Motion Sickness",
+    "artist": "Phoebe Bridgers",
+    "year": 2017,
+    "genre": "Indie Folk",
+    "country": "USA"
+  },
+  {
+    "title": "Cellophane",
+    "artist": "FKA twigs",
+    "year": 2019,
+    "genre": "Art Pop",
+    "country": "UK"
+  },
+  {
+    "title": "Money Trees",
+    "artist": "Kendrick Lamar",
+    "year": 2012,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Swimming Pools (Drank)",
+    "artist": "Kendrick Lamar",
+    "year": 2012,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Backseat Freestyle",
+    "artist": "Kendrick Lamar",
+    "year": 2012,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "DNA.",
+    "artist": "Kendrick Lamar",
+    "year": 2017,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Goosebumps",
+    "artist": "Travis Scott",
+    "year": 2016,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Antidote",
+    "artist": "Travis Scott",
+    "year": 2015,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "No Role Modelz",
+    "artist": "J. Cole",
+    "year": 2014,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Middle Child",
+    "artist": "J. Cole",
+    "year": 2019,
+    "genre": "Hip Hop",
+    "country": "USA"
+  },
+  {
+    "title": "Location",
+    "artist": "Khalid",
+    "year": 2017,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Young Dumb & Broke",
+    "artist": "Khalid",
+    "year": 2017,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "The Less I Know the Better",
+    "artist": "Tame Impala",
+    "year": 2015,
+    "genre": "Psychedelic Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Let It Happen",
+    "artist": "Tame Impala",
+    "year": 2015,
+    "genre": "Psychedelic Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Feels Like We Only Go Backwards",
+    "artist": "Tame Impala",
+    "year": 2012,
+    "genre": "Psychedelic Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "You Are the Sunshine of My Life",
+    "artist": "Stevie Wonder",
+    "year": 1973,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "Higher Ground",
+    "artist": "Stevie Wonder",
+    "year": 1973,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Master Blaster",
+    "artist": "Stevie Wonder",
+    "year": 1980,
+    "genre": "Reggae",
+    "country": "USA"
+  },
+  {
+    "title": "Part-Time Lover",
+    "artist": "Stevie Wonder",
+    "year": 1985,
+    "genre": "R&B",
+    "country": "USA"
+  },
+  {
+    "title": "Ribbon in the Sky",
+    "artist": "Stevie Wonder",
+    "year": 1982,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "Isn't She Lovely",
+    "artist": "Stevie Wonder",
+    "year": 1976,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "For Once in My Life",
+    "artist": "Stevie Wonder",
+    "year": 1968,
+    "genre": "Motown",
+    "country": "USA"
+  },
+  {
+    "title": "Uptight (Everything's Alright)",
+    "artist": "Stevie Wonder",
+    "year": 1965,
+    "genre": "Motown",
+    "country": "USA"
+  },
+  {
+    "title": "I Just Called to Say I Love You",
+    "artist": "Stevie Wonder",
+    "year": 1984,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Word Up!",
+    "artist": "Cameo",
+    "year": 1986,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Atomic Dog",
+    "artist": "George Clinton",
+    "year": 1982,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Flash Light",
+    "artist": "Parliament",
+    "year": 1977,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Give Up the Funk (Tear the Roof off the Sucker)",
+    "artist": "Parliament",
+    "year": 1976,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "One Nation Under a Groove",
+    "artist": "Funkadelic",
+    "year": 1978,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Brick House",
+    "artist": "Commodores",
+    "year": 1977,
+    "genre": "Funk",
+    "country": "USA"
+  },
+  {
+    "title": "Easy",
+    "artist": "Commodores",
+    "year": 1977,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "Three Times a Lady",
+    "artist": "Commodores",
+    "year": 1978,
+    "genre": "Soul",
+    "country": "USA"
+  },
+  {
+    "title": "All Night Long (All Night)",
+    "artist": "Lionel Richie",
+    "year": 1983,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Hello",
+    "artist": "Lionel Richie",
+    "year": 1984,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "Dancing on the Ceiling",
+    "artist": "Lionel Richie",
+    "year": 1986,
+    "genre": "Pop",
+    "country": "USA"
+  },
+  {
+    "title": "We Are the World",
+    "artist": "USA for Africa",
+    "year": 1985,
+    "genre": "Charity single",
+    "country": "USA"
+  },
+  {
+    "title": "Do They Know It's Christmas?",
+    "artist": "Band Aid",
+    "year": 1984,
+    "genre": "Charity single",
+    "country": "UK"
+  },
+  {
+    "title": "Every Time You Go Away",
+    "artist": "Paul Young",
+    "year": 1985,
+    "genre": "Blue-eyed soul",
+    "country": "UK"
+  },
+  {
+    "title": "Breaking the Law",
+    "artist": "Judas Priest",
+    "year": 1980,
+    "genre": "Metal",
+    "country": "UK"
+  },
+  {
+    "title": "Run to the Hills",
+    "artist": "Iron Maiden",
+    "year": 1982,
+    "genre": "Metal",
+    "country": "UK"
+  },
+  {
+    "title": "The Trooper",
+    "artist": "Iron Maiden",
+    "year": 1983,
+    "genre": "Metal",
+    "country": "UK"
+  },
+  {
+    "title": "Highway to Hell",
+    "artist": "AC/DC",
+    "year": 1979,
+    "genre": "Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Back in Black",
+    "artist": "AC/DC",
+    "year": 1980,
+    "genre": "Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Thunderstruck",
+    "artist": "AC/DC",
+    "year": 1990,
+    "genre": "Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "You Shook Me All Night Long",
+    "artist": "AC/DC",
+    "year": 1980,
+    "genre": "Rock",
+    "country": "Australia"
+  },
+  {
+    "title": "Smoke on the Water",
+    "artist": "Deep Purple",
+    "year": 1972,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Immigrant Song",
+    "artist": "Led Zeppelin",
+    "year": 1970,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Black Dog",
+    "artist": "Led Zeppelin",
+    "year": 1971,
+    "genre": "Rock",
+    "country": "UK"
+  },
+  {
+    "title": "Rock You Like a Hurricane",
+    "artist": "Scorpions",
+    "year": 1984,
+    "genre": "Rock",
+    "country": "Germany"
   }
 ]

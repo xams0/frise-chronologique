@@ -81,8 +81,11 @@ function genId() {
 }
 function nowStr() {
   const d = new Date();
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' +
-    d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  // Explicit timeZone — without it, this uses the SERVER's local timezone
+  // (Render's servers aren't necessarily in France), which made every
+  // timestamp look off by however many hours the server is shifted.
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) + ' ' +
+    d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 }
 function normalize(s) {
   return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
@@ -309,9 +312,12 @@ function broadcast(code) {
 function advanceTurn(room) {
   room.turnIndex = (room.turnIndex + 1) % room.turnOrder.length;
   room.pending = null;
+  room.turnStartedAt = Date.now();
+  scheduleAutoDraw(room);
 }
 
 async function finishGame(room, winner) {
+  clearAutoDraw(room.code);
   room.phase = 'finished';
   room.history.unshift({
     ts: nowStr(),
@@ -380,7 +386,10 @@ function removePlayerFromRoom(room, targetId) {
     room.turnOrder = room.turnOrder.filter(id => id !== targetId);
     if (wasBeingChallenged) room.pending.challenge = null;
     if (wasActive) { clearAutoReveal(room.code); clearAutoPass(room.code); room.pending = null; }
-    if (room.turnOrder.length) room.turnIndex = room.turnIndex % room.turnOrder.length;
+    if (room.turnOrder.length) {
+      room.turnIndex = room.turnIndex % room.turnOrder.length;
+      if (wasActive) scheduleAutoDraw(room);
+    }
   }
 
   if (room.djId === targetId) {
@@ -399,6 +408,7 @@ function removePlayerFromRoom(room, targetId) {
   if (room.phase === 'playing' && room.players.length < 2) {
     clearAutoReveal(room.code);
     clearAutoPass(room.code);
+    clearAutoDraw(room.code);
     room.phase = 'lobby';
     room.pending = null;
     room.deck = []; room.discard = [];
@@ -409,6 +419,7 @@ function removePlayerFromRoom(room, targetId) {
   if (room.players.length === 0) {
     clearAutoReveal(room.code);
     clearAutoPass(room.code);
+    clearAutoDraw(room.code);
     delete rooms[room.code];
   }
 
@@ -591,8 +602,17 @@ app.get('/api/songs/health', async (req, res) => {
 // start once every player has marked themselves ready.
 function tryStartGame(room) {
   if (room.players.length < 2) return { ok: false, error: 'Il faut au moins 2 joueurs.' };
-  const pool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
+  const basePool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
   const winCount = room.cardsToWin || CARDS_TO_WIN;
+
+  // Avoid repeating songs already drawn in a previous game in this same
+  // room — but only if there's still enough left to actually play with;
+  // otherwise fall back to the full pool rather than block the game.
+  const usedKeys = new Set(room.usedSongKeys || []);
+  const songKey = (s) => normalize(s.title) + '|' + normalize(s.artist);
+  const freshPool = usedKeys.size ? basePool.filter(s => !usedKeys.has(songKey(s))) : basePool;
+  const pool = freshPool.length >= winCount + 2 ? freshPool : basePool;
+
   if (!pool.length || pool.length < winCount + 2) {
     return { ok: false, error: `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${winCount + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).` };
   }
@@ -609,7 +629,43 @@ function tryStartGame(room) {
   room.lastResult = null;
   room.phase = 'playing';
   room.log.push({ ts: nowStr(), text: `La partie commence (${pool.length} chansons disponibles avec les filtres actifs) — chaque joueur a reçu une chanson de départ !` });
+  room.turnStartedAt = Date.now();
+  scheduleAutoDraw(room);
   return { ok: true };
+}
+
+// Shared by the manual "Piocher et écouter" click AND the auto-draw timer:
+// draws a playable card for the active player and starts their decision clock.
+async function performDraw(room, playerId) {
+  const card = await drawPlayableCard(room);
+  if (!card) return false;
+  room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null, drawnAt: Date.now() };
+  room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} pioche une chanson.` });
+  scheduleAutoPass(room);
+  return true;
+}
+
+const drawTimers = {};
+function clearAutoDraw(code) {
+  if (drawTimers[code]) { clearTimeout(drawTimers[code]); delete drawTimers[code]; }
+}
+// If the host configured an auto-draw delay, kick off a timer so the game
+// keeps moving even if nobody taps "Piocher et écouter" — the active human
+// player still gets full priority (a manual draw always cancels this).
+function scheduleAutoDraw(room) {
+  clearAutoDraw(room.code);
+  if (!room.autoDrawSeconds || room.phase !== 'playing') return;
+  const active = activePlayer(room);
+  if (!active || active.isBot || room.pending) return;
+  drawTimers[room.code] = setTimeout(async () => {
+    delete drawTimers[room.code];
+    const r = rooms[room.code];
+    if (!r || r.phase !== 'playing' || r.pending) return; // someone already acted, or the game moved on
+    const a = activePlayer(r);
+    if (!a || a.isBot) return;
+    const drew = await performDraw(r, a.id);
+    if (drew) { saveRooms(); broadcast(room.code); }
+  }, room.autoDrawSeconds * 1000);
 }
 
 io.on('connection', (socket) => {
@@ -636,6 +692,8 @@ io.on('connection', (socket) => {
       startTokens: START_TOKENS, // configurable starting token count
       freeCardEnabled: false, // "spend 3 tokens to place a card without listening" — off by default
       gameMode: 'original', // label for whichever special-mode preset was last applied
+      usedSongKeys: [], // songs actually drawn in a past game in this room — avoided on replay when possible
+      autoDrawSeconds: 0, // 0 = off; otherwise auto-draws the next card after this many seconds of nobody acting
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
       maxPlayers: null, // null = no limit
@@ -756,6 +814,30 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: `⏱️ Temps pour répondre à une carte réglé sur ${s} secondes.` });
   }));
 
+  socket.on('set-auto-draw-seconds', withRoom((room, { seconds }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    const s = parseInt(seconds, 10);
+    if (!Number.isFinite(s) || s < 0 || s > 30) return socket.emit('error-msg', 'Le délai doit être entre 0 (désactivé) et 30 secondes.');
+    room.autoDrawSeconds = s;
+    room.log.push({ ts: nowStr(), text: s === 0 ? '⏭️ Pioche automatique désactivée.' : `⏭️ La prochaine chanson se pioche automatiquement après ${s} secondes.` });
+  }));
+
+  const ALLOWED_REACTIONS = ['👏', '😂', '😭', '😱', '🤬', '🔥'];
+  socket.on('send-reaction', ({ emoji }) => {
+    // Purely ephemeral — never stored on the room, just relayed live to
+    // everyone currently in it. Deliberately NOT using withRoom here: a
+    // reaction never changes room state, so there's nothing to save or
+    // broadcast via the normal room-sync path.
+    if (!ALLOWED_REACTIONS.includes(emoji)) return;
+    const code = socket.data.code;
+    const room = rooms[code];
+    if (!room) return;
+    const p = me(room, socket.data.playerId);
+    if (!p) return;
+    io.to(code).emit('reaction', { emoji, playerName: p.name });
+  });
+
   socket.on('set-audio-mode', withRoom((room, { mode }) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
     if (room.phase !== 'lobby') return;
@@ -853,11 +935,9 @@ io.on('connection', (socket) => {
     const playerId = socket.data.playerId;
     const active = activePlayer(room);
     if (!active || active.id !== playerId || room.pending) return;
-    const card = await drawPlayableCard(room);
-    if (!card) return socket.emit('error-msg', 'Plus de chansons avec un aperçu audio jouable dans la pioche !');
-    room.pending = { card, activePlayerId: playerId, stage: 'listening', placement: null, challenge: null, guessCorrect: null, guessBy: null, drawnAt: Date.now() };
-    room.log.push({ ts: nowStr(), text: `${me(room, playerId).name} pioche une chanson.` });
-    scheduleAutoPass(room);
+    clearAutoDraw(room.code);
+    const drew = await performDraw(room, playerId);
+    if (!drew) return socket.emit('error-msg', 'Plus de chansons avec un aperçu audio jouable dans la pioche !');
   }));
 
   socket.on('skip-card', withRoom(async (room) => {
@@ -968,6 +1048,17 @@ io.on('connection', (socket) => {
   socket.on('play-again', withRoom((room) => {
     clearAutoReveal(room.code);
     clearAutoPass(room.code);
+    clearAutoDraw(room.code);
+
+    // Remember which songs were actually drawn this game (ended up in a
+    // timeline or the discard pile) so a replay in this same room can skip
+    // them next time, as long as enough others remain (checked in tryStartGame).
+    const songKey = (s) => normalize(s.title) + '|' + normalize(s.artist);
+    const used = new Set(room.usedSongKeys || []);
+    room.players.forEach(p => p.timeline.forEach(c => used.add(songKey(c))));
+    room.discard.forEach(c => used.add(songKey(c)));
+    room.usedSongKeys = Array.from(used);
+
     room.phase = 'lobby';
     room.players = room.players.map(p => ({ ...p, tokens: (room.startTokens != null ? room.startTokens : START_TOKENS), timeline: [], ready: false }));
     room.deck = []; room.discard = []; room.pending = null; room.lastResult = null;

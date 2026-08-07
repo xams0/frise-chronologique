@@ -677,3 +677,28 @@ Drained Out, Ballade. Catalogue à 718 chansons.
 - **Résumé des options replié par défaut** : les pastilles-résumé sous
   "Joueurs" sont maintenant derrière un petit volet "Résumé des options"
   avec une flèche pour l'ouvrir/fermer, pour un salon d'attente plus épuré.
+
+## v2.5 — 6 améliorations
+
+- **+314 chansons** (718 → 1032), toujours réparties sur toutes les
+  décennies et davantage de genres (funk, metal, blues, prog rock, chanson
+  française, emo/pop-punk, indie 2010s).
+- **Réactions emoji qui défilent** (👏 😂 😭 😱 🤬 🔥) — un petit bandeau de
+  boutons pendant la partie, chaque tap envoie un emoji qui monte et
+  s'estompe à l'écran de tous les joueurs pendant ~2 secondes.
+- **Pas de répétition entre deux parties dans le même salon** : les
+  chansons réellement tirées lors d'une partie sont mémorisées et évitées
+  au prochain lancement — sauf si ça laisserait trop peu de chansons
+  disponibles, auquel cas le jeu accepte des répétitions plutôt que de
+  bloquer.
+- **Fix des horaires de l'historique** : `nowStr()` n'indiquait aucun
+  fuseau horaire et utilisait celui du serveur (souvent UTC sur Render) au
+  lieu de Paris — corrigé, testé, confirmé.
+- **Scroll automatique vers le joueur actif** : dès qu'une nouvelle chanson
+  commence à être écoutée, l'écran défile en douceur vers la frise du
+  joueur dont c'est le tour, même si elle était hors de vue.
+- **Pioche automatique configurable** (0-30s, désactivée par défaut) :
+  si personne n'appuie sur "Piocher et écouter", la prochaine chanson se
+  lance toute seule après le délai réglé par l'hôte — avec une barre de
+  progression directement dans le bouton, dans le même style visuel que
+  les autres comptes à rebours du jeu.

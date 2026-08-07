@@ -18,6 +18,7 @@ let audioKey = null; // uniquely identifies which pending card is currently load
 let audioAutoplayBlocked = false; // true when the browser refused to auto-start playback — makes the manual fallback button impossible to miss
 let revealTicker = null; // interval id for animating the reveal-button countdown
 let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
+let lastAutoScrolledDrawKey = null; // prevents re-scrolling to the active player's timeline on every re-render of the same draw
 
 /* ---------- audio unlock ----------
    Browsers refuse to auto-start sound unless playback was triggered by (or
@@ -274,6 +275,27 @@ socket.on('kicked', () => {
 });
 socket.on('connect_error', () => setError('Connexion au serveur perdue — vérifie que le serveur tourne et que tu es sur le même Wi-Fi.'));
 
+// Flying emoji reactions render OUTSIDE #root (a dedicated overlay appended
+// directly to <body>) so they aren't wiped out mid-flight by the next
+// render() call's innerHTML replacement — they manage their own lifecycle
+// via plain DOM calls, independent of the normal render cycle.
+let reactionOverlay = null;
+function spawnReaction(emoji) {
+  if (!reactionOverlay) {
+    reactionOverlay = document.createElement('div');
+    reactionOverlay.id = 'reaction-overlay';
+    document.body.appendChild(reactionOverlay);
+  }
+  const el = document.createElement('div');
+  el.className = 'reaction-fly';
+  el.textContent = emoji;
+  el.style.left = (8 + Math.random() * 78) + '%';
+  el.style.animationDuration = (1.7 + Math.random() * 0.6) + 's';
+  reactionOverlay.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+socket.on('reaction', ({ emoji }) => spawnReaction(emoji));
+
 /* ---------- actions (thin — server owns all game logic) ---------- */
 function createRoom() {
   const name = state.nameInput.trim();
@@ -437,6 +459,20 @@ function render() {
     if (!publicRoomsTicker) publicRoomsTicker = setInterval(loadPublicRooms, 2500);
   } else if (publicRoomsTicker) {
     clearInterval(publicRoomsTicker); publicRoomsTicker = null;
+  }
+
+  // Gently scroll to the active player's timeline the moment a NEW card
+  // starts being listened to — so nobody has to hunt for whoever's playing
+  // if their timeline happens to be scrolled off-screen. Keyed on drawnAt so
+  // this fires once per draw, not on every one of the frequent re-renders
+  // that happen while a card is pending.
+  if (pend && pend.stage === 'listening' && pend.drawnAt && lastAutoScrolledDrawKey !== pend.drawnAt) {
+    lastAutoScrolledDrawKey = pend.drawnAt;
+    const targetId = 'timeline-' + pend.activePlayerId;
+    setTimeout(() => {
+      const target = document.getElementById(targetId);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
   }
 
   attachHandlers();
@@ -647,6 +683,7 @@ function renderLobby() {
       <div class="recap-chip">${audioMode === 'loop' ? '🔁' : '⏹️'} ${audioMode === 'loop' ? 'Boucle' : '30s'}</div>
       <div class="recap-chip">⏱️ ${room.revealDelaySeconds || 15}s</div>
       <div class="recap-chip">⏳ ${room.turnDecisionSeconds || 60}s</div>
+      <div class="recap-chip">⏭️ ${room.autoDrawSeconds ? room.autoDrawSeconds + 's' : 'Manuel'}</div>
       <div class="recap-chip">${room.freeCardEnabled ? '🛒' : '🚫'} Achat direct</div>
     </div>` : ''}
     <button class="btn btn-ghost" style="margin-top:10px;" data-act="open-options">⚙️ Options de la partie</button>
@@ -681,6 +718,7 @@ function renderOptionsModal(room) {
   const listenMode = room.listenMode || 'together';
   const revealDelay = room.revealDelaySeconds || 15;
   const turnDecisionSeconds = room.turnDecisionSeconds || 60;
+  const autoDrawSeconds = room.autoDrawSeconds || 0;
   const audioMode = room.audioMode || 'loop';
   const cardsToWin = room.cardsToWin || CARDS_TO_WIN;
   const startTokens = room.startTokens != null ? room.startTokens : 2;
@@ -790,7 +828,16 @@ function renderOptionsModal(room) {
         <button class="btn btn-ghost btn-sm" data-act="turn-decision-minus" ${turnDecisionSeconds <= 15 ? 'disabled' : ''}>−15s</button>
         <div class="code-pill" style="justify-content:center;">${turnDecisionSeconds}s</div>
         <button class="btn btn-ghost btn-sm" data-act="turn-decision-plus" ${turnDecisionSeconds >= 180 ? 'disabled' : ''}>+15s</button>
-      </div>` : `<div class="code-pill" style="justify-content:center;">${turnDecisionSeconds}s</div>`}`;
+      </div>` : `<div class="code-pill" style="justify-content:center;">${turnDecisionSeconds}s</div>`}
+
+      <h3 style="margin-top:18px;">Pioche automatique</h3>
+      <p class="subtitle" style="margin:0 0 8px;">Si personne ne pioche, la prochaine chanson se lance seule après ce délai. "Désactivé" laisse le temps qu'il faut.</p>
+      ${isHost ? `
+      <div class="row" style="align-items:center;">
+        <button class="btn btn-ghost btn-sm" data-act="auto-draw-minus" ${autoDrawSeconds <= 0 ? 'disabled' : ''}>−5s</button>
+        <div class="code-pill" style="justify-content:center;">${autoDrawSeconds > 0 ? autoDrawSeconds + 's' : 'Désactivé'}</div>
+        <button class="btn btn-ghost btn-sm" data-act="auto-draw-plus" ${autoDrawSeconds >= 30 ? 'disabled' : ''}>+5s</button>
+      </div>` : `<div class="code-pill" style="justify-content:center;">${autoDrawSeconds > 0 ? autoDrawSeconds + 's' : 'Désactivé'}</div>`}`;
   } else if (tab === 'chansons') {
     const f = room.filters || { brackets: [] };
     const chip = (active) => `padding:8px 12px;border-radius:999px;font-size:13px;border:1px solid ${active ? 'var(--pink)' : 'var(--line)'};background:${active ? 'rgba(255,79,129,0.15)' : 'var(--surface2)'};color:${active ? 'var(--pink)' : 'var(--text)'};`;
@@ -846,6 +893,10 @@ function renderGame() {
       <button class="iconbtn" data-act="leave">✕</button>
     </div>
 
+    <div class="reaction-bar">
+      ${['👏', '😂', '😭', '😱', '🤬', '🔥'].map(e => `<button class="reaction-btn" data-act="send-reaction" data-emoji="${e}">${e}</button>`).join('')}
+    </div>
+
     <div class="card-section compact">
       <div class="now-playing">
         <div class="vinyl ${pend ? 'spin' : ''}"></div>
@@ -883,9 +934,13 @@ function renderTurnAction(room, pend, isActive, myself) {
       return `<p class="subtitle" style="margin-top:10px;">En attente que ${escapeHtml(active.name)} pioche une chanson…</p>`;
     }
     const canFree = room.freeCardEnabled && myself.tokens >= 3 && (room.deck.length > 0 || room.discard.length > 0);
+    const autoDrawFill = renderAutoDrawFill(room);
     return `
       <div class="stack" style="margin-top:14px;">
-        <button class="btn btn-primary" data-act="draw-card">🎵 Piocher et écouter</button>
+        <button class="btn btn-primary reveal-btn" data-act="draw-card">
+          ${autoDrawFill}
+          <span class="reveal-label">🎵 Piocher et écouter</span>
+        </button>
         ${canFree ? `<button class="btn btn-ghost btn-sm" data-act="free-card">Échanger 3 🪙 contre une carte posée directement</button>` : ''}
       </div>`;
   }
@@ -965,6 +1020,20 @@ function renderDecisionTimer(room, pend, active, isActivePlayerTurn) {
     <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
     <span class="decision-timer-label">${label}</span>
   </div>`;
+}
+
+// Purely a visual nudge (never disables the button — clicking early is
+// always fine and just cancels the auto-draw server-side). Pure CSS
+// animation, wall-clock synced like the other countdown bars, so it needs
+// no periodic re-render to stay smooth.
+function renderAutoDrawFill(room) {
+  if (!room.autoDrawSeconds || !room.turnStartedAt) return '';
+  const delayMs = room.autoDrawSeconds * 1000;
+  const elapsed = Date.now() - room.turnStartedAt;
+  if (elapsed >= delayMs) return '';
+  const durationS = (delayMs / 1000).toFixed(2);
+  const negDelayS = (-(elapsed / 1000)).toFixed(3);
+  return `<div class="reveal-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>`;
 }
 
 function renderRevealButton(room, pend, label) {
@@ -1080,7 +1149,7 @@ function renderAllTimelines(room) {
     const isTurn = p.id === activeId;
     const playerMissed = missed.filter(m => m.playerId === p.id).slice(-5).reverse();
     return `
-    <div class="card-section compact ${isTurn ? 'turn-active' : ''}">
+    <div class="card-section compact ${isTurn ? 'turn-active' : ''}" id="timeline-${p.id}">
       <div class="timeline-owner">
         <span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
         <span class="mono" style="color:var(--gold)">${p.tokens} 🪙</span>
@@ -1327,6 +1396,7 @@ function attachHandlers() {
       else if (act === 'create-room') createRoom();
       else if (act === 'join-room') joinRoom();
       else if (act === 'leave') leaveToHome();
+      else if (act === 'send-reaction') socket.emit('send-reaction', { emoji: elm.getAttribute('data-emoji') });
       else if (act === 'copy-code') { navigator.clipboard && navigator.clipboard.writeText(state.code).catch(() => {}); }
       else if (act === 'start-game') startGame();
       else if (act === 'show-rules') { state.showRules = true; render(); }
@@ -1377,6 +1447,8 @@ function attachHandlers() {
       else if (act === 'reveal-delay-plus') socket.emit('set-reveal-delay', { seconds: Math.min(60, (state.room.revealDelaySeconds || 15) + 5) });
       else if (act === 'turn-decision-minus') socket.emit('set-turn-decision-seconds', { seconds: Math.max(15, (state.room.turnDecisionSeconds || 60) - 15) });
       else if (act === 'turn-decision-plus') socket.emit('set-turn-decision-seconds', { seconds: Math.min(180, (state.room.turnDecisionSeconds || 60) + 15) });
+      else if (act === 'auto-draw-minus') socket.emit('set-auto-draw-seconds', { seconds: Math.max(0, (state.room.autoDrawSeconds || 0) - 5) });
+      else if (act === 'auto-draw-plus') socket.emit('set-auto-draw-seconds', { seconds: Math.min(30, (state.room.autoDrawSeconds || 0) + 5) });
       else if (act === 'set-audio-loop') socket.emit('set-audio-mode', { mode: 'loop' });
       else if (act === 'set-audio-once') socket.emit('set-audio-mode', { mode: 'once' });
       else if (act === 'open-options') { state.showOptions = true; if (!state.optionsTab) state.optionsTab = 'modes'; render(); }
