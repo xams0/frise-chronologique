@@ -22,7 +22,6 @@ let lastAutoScrolledDrawKey = null; // prevents re-scrolling to the active playe
 let lastGuessResetDrawKey = null; // prevents re-clearing the guess inputs (and thus interrupting typing) on every re-render of the same draw
 let reactionSendTimes = []; // rolling record of recent reaction sends, for the client-side 5-in-20s anti-spam lockout
 let reactionLockedUntil = 0; // timestamp; while Date.now() < this, sending is blocked and the FAB shows 🚫
-let fabScrollHideTimer = null; // debounces the FAB fade-back-in after scrolling stops
 
 /* ---------- audio unlock ----------
    Browsers refuse to auto-start sound unless playback was triggered by (or
@@ -366,13 +365,6 @@ function renderTick() {
 
 function render() {
   const root = document.getElementById('root');
-
-  // Lock the body itself from scrolling while on the game screen — without
-  // this, body/html remain scrollable in parallel with .game-scroll's own
-  // internal scroll, so touching anywhere (not just the frises) could move
-  // the whole page, including the fixed header. position:fixed is the most
-  // reliable way to fully kill body scroll/bounce on mobile browsers.
-  document.body.classList.toggle('game-locked', state.screen === 'game');
 
   // Preserve focus + cursor/selection position across the rebuild below —
   // periodic re-renders (the reveal countdown ticker fires every 250ms while
@@ -915,35 +907,31 @@ function renderGame() {
   return `
   <div class="screen game-screen">
     ${renderBgPremium()}
-    <div class="game-header">
-      ${connectionBanner()}
-      ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
-      <div class="topbar">
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div class="code-pill">${room.code}</div>
-          ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>` : ''}
-        </div>
-        <button class="iconbtn" data-act="leave">✕</button>
+    ${connectionBanner()}
+    ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
+    <div class="topbar">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="code-pill">${room.code}</div>
+        ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>` : ''}
       </div>
-
-      <div class="card-section compact">
-        <div class="now-playing">
-          <div class="vinyl ${pend ? 'spin' : ''}"></div>
-          <div class="info">
-            <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
-            <div class="who">${escapeHtml(active.name)}</div>
-          </div>
-          ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">🏠 chacun chez soi</div>`}
-        </div>
-
-        ${renderTurnAction(room, pend, isActive, myself)}
-      </div>
+      <button class="iconbtn" data-act="leave">✕</button>
     </div>
 
-    <div class="game-scroll">
-      ${renderAllTimelines(room)}
-      ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
+    <div class="card-section compact">
+      <div class="now-playing">
+        <div class="vinyl ${pend ? 'spin' : ''}"></div>
+        <div class="info">
+          <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
+          <div class="who">${escapeHtml(active.name)}</div>
+        </div>
+        ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">🏠 chacun chez soi</div>`}
+      </div>
+
+      ${renderTurnAction(room, pend, isActive, myself)}
     </div>
+
+    ${renderAllTimelines(room)}
+    ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
 
     ${renderReactionFab()}
 
@@ -1007,7 +995,7 @@ function renderTurnAction(room, pend, isActive, myself) {
   if (isRemote || isDj || active.isBot) {
     if (pend.card.previewUrl) {
       html += `
-      <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;">
+      <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         ${renderSoundBars()}
         <button class="btn ${audioAutoplayBlocked ? 'btn-gold play-nudge' : 'btn-ghost'} btn-sm" data-act="play-preview">🔊 ${audioAutoplayBlocked ? 'Appuie ici pour le son' : 'Appuyer si pas de son'}</button>
@@ -1404,22 +1392,6 @@ function renderRulesModal() {
 /* ---------- event delegation ---------- */
 function attachHandlers() {
   const root = document.getElementById('root');
-
-  // Fade the reaction FAB out while the frises are being scrolled, so it
-  // never sits fixed on top of content the person is actively interacting
-  // with — it reappears shortly after scrolling stops.
-  const scrollEl = document.querySelector('.game-scroll');
-  if (scrollEl) {
-    scrollEl.onscroll = () => {
-      const fab = document.querySelector('.reaction-fab-wrap');
-      if (fab) fab.classList.add('fab-scrolling');
-      clearTimeout(fabScrollHideTimer);
-      fabScrollHideTimer = setTimeout(() => {
-        const f = document.querySelector('.reaction-fab-wrap');
-        if (f) f.classList.remove('fab-scrolling');
-      }, 500);
-    };
-  }
 
   const bind = (id, key, transform) => {
     const el = document.getElementById(id);

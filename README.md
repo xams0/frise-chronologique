@@ -790,3 +790,25 @@ Point d'honnêteté : sans appareil réel pour tester, je ne peux pas garantir
 que l'équilibre visuel entre en-tête et frises est optimal — mais la
 fonctionnalité (pouvoir scroller et voir tous les joueurs) est maintenant
 la priorité numéro un et ne peut plus être cassée par cette classe de bug.
+
+## v2.6.4 — retour en arrière complet sur la refonte du scroll
+
+Toute la tentative de "div Tour fixe / zone frises séparée" (introduite en
+v2.6, ajustée en v2.6.1/v2.6.2/v2.6.3) est annulée à ta demande, ça causait
+plus de problèmes que ça n'en résolvait :
+
+- Retrait de la séparation en-tête fixe (`.game-header`) / zone scrollable
+  dédiée (`.game-scroll`).
+- Retrait du verrouillage du `body` (`position:fixed`) pendant la partie.
+- Retrait du fondu du bouton 💬 pendant le scroll (lié au mécanisme retiré).
+- Les boutons de la zone "Tour" et le lecteur audio retrouvent leur taille
+  et leur espacement d'origine (la réduction avait été faite spécifiquement
+  pour tenter de faire tenir cette zone dans un espace fixe qui n'existe
+  plus).
+- **Retour à un simple défilement de toute la page**, comme avant la v2.6 —
+  le comportement éprouvé qui fonctionnait.
+
+Tout le reste des ajouts de v2.6-v2.6.3 (FAB emoji, effet burst, anti-spam,
+pioche automatique par défaut, fermeture des salons bot-seul, artiste dans
+la bannière, réinitialisation des champs de saisie, fix `addEventListener`)
+reste en place, ce sont des sujets distincts de cette histoire de scroll.
