@@ -600,3 +600,28 @@ chanson à Deezer avant d'ouvrir le salon — avec 712 titres au lieu de 309,
 le tout premier démarrage après ce déploiement prendra plus de temps que
 d'habitude (les démarrages suivants restent rapides tant que le disque
 persiste, voir la note v1.30 plus haut).
+
+## v2.1 — modes spéciaux (presets)
+
+Nouvel onglet **🎮 Modes** dans "Options de la partie" (premier onglet,
+avant "Partie"), avec trois préréglages qui appliquent d'un coup une
+combinaison des réglages existants :
+
+- **🎵 Original** — 10 cartes pour gagner, 2 jetons de départ, 15s pour
+  révéler, 60s pour répondre. Les réglages par défaut.
+- **🩸 Hardcore** — 0 jeton de départ (donc pas moyen de passer au premier
+  tour), 5s seulement pour révéler, 15s pour répondre.
+- **😈 Fais-toi des ennemis** — 12 cartes pour gagner, 4 jetons de départ,
+  délai de révélation allongé à 20s, pour pouvoir défier beaucoup plus
+  souvent avant que la fenêtre ne se referme.
+
+**Précision honnête** : ces modes sont de purs préréglages des réglages déjà
+existants, comme demandé — pas de nouvelle mécanique de jeu. Ça veut dire
+que "Fais-toi des ennemis" n'a pas de vraie cible-Némésis assignée en
+secret comme pitché initialement — il encourage juste les défis fréquents
+via plus de jetons et une fenêtre de révélation plus longue. Si l'envie
+vient d'ajouter la mécanique de Némésis/Vengeance plus tard, c'est un
+prochain pas naturel, distinct de ce préréglage.
+
+Le mode actif s'affiche aussi en pastille (🎵/🩸/😈) sous "Joueurs" pour
+info rapide sans ouvrir le menu.

@@ -90,7 +90,7 @@ const state = {
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showOptions: false, optionsTab: 'partie',
+  brackets: null, showOptions: false, optionsTab: 'modes',
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
@@ -644,6 +644,7 @@ function renderLobby() {
     </div>
 
     <div class="options-recap">
+      <div class="recap-chip recap-chip-mode">${{ original: '🎵', hardcore: '🩸', enemies: '😈' }[room.gameMode || 'original']} ${{ original: 'Original', hardcore: 'Hardcore', enemies: 'Ennemis' }[room.gameMode || 'original']}</div>
       <div class="recap-chip">🏆 ${cardsToWin}</div>
       <div class="recap-chip">🪙 ${startTokens}</div>
       <div class="recap-chip">👥 ${room.maxPlayers || '∞'}</div>
@@ -694,7 +695,21 @@ function renderOptionsModal(room) {
   const tabBtn = (id, label) => `<button class="opt-tab ${tab === id ? 'active' : ''}" data-act="options-tab" data-tab="${id}">${label}</button>`;
 
   let body = '';
-  if (tab === 'partie') {
+  if (tab === 'modes') {
+    const gameMode = room.gameMode || 'original';
+    const modeCard = (id, icon, title, desc) => `
+      <button class="mode-card ${gameMode === id ? 'active' : ''}" data-act="set-game-mode" data-mode="${id}" ${!isHost ? 'disabled' : ''}>
+        <div class="mode-card-title">${icon} ${title}${gameMode === id ? ' ✓' : ''}</div>
+        <div class="mode-card-desc">${desc}</div>
+      </button>`;
+    body = `
+      <p class="subtitle" style="margin:0 0 12px;">Des préréglages qui appliquent d'un coup une combinaison des réglages ci-contre — rien de nouveau, juste plus rapide à mettre en place.</p>
+      ${modeCard('original', '🎵', 'Original', '10 cartes pour gagner, 2 jetons de départ, 15s pour révéler, 60s pour répondre. Les réglages par défaut.')}
+      ${modeCard('hardcore', '🩸', 'Hardcore', '0 jeton de départ (donc pas moyen de passer au début), 5s seulement pour révéler, 15s pour répondre. Sous pression du premier tour au dernier.')}
+      ${modeCard('enemies', '😈', 'Fais-toi des ennemis', '12 cartes pour gagner, 4 jetons de départ, délai de révélation allongé à 20s — de quoi défier bien plus souvent avant que ça se referme.')}
+      ${!isHost ? `<p class="subtitle" style="margin-top:10px;">Seul l'hôte peut changer le mode.</p>` : ''}
+    `;
+  } else if (tab === 'partie') {
     body = `
       <h3>Cartes pour gagner</h3>
       <p class="subtitle" style="margin:0 0 8px;">Le premier à ce nombre de chansons bien placées remporte la partie.</p>
@@ -802,7 +817,8 @@ function renderOptionsModal(room) {
     <div class="modal" onclick="event.stopPropagation()">
       <h2>Options de la partie</h2>
       <div class="opt-tabs">
-        ${tabBtn('partie', '🎮 Partie')}
+        ${tabBtn('modes', '🎮 Modes')}
+        ${tabBtn('partie', '⚙️ Partie')}
         ${tabBtn('ecoute', '🔊 Écoute')}
         ${tabBtn('temps', '⏱️ Temps')}
         ${tabBtn('chansons', '🎵 Chansons')}
@@ -1367,7 +1383,7 @@ function attachHandlers() {
       else if (act === 'turn-decision-plus') socket.emit('set-turn-decision-seconds', { seconds: Math.min(180, (state.room.turnDecisionSeconds || 60) + 15) });
       else if (act === 'set-audio-loop') socket.emit('set-audio-mode', { mode: 'loop' });
       else if (act === 'set-audio-once') socket.emit('set-audio-mode', { mode: 'once' });
-      else if (act === 'open-options') { state.showOptions = true; if (!state.optionsTab) state.optionsTab = 'partie'; render(); }
+      else if (act === 'open-options') { state.showOptions = true; if (!state.optionsTab) state.optionsTab = 'modes'; render(); }
       else if (act === 'close-options') { state.showOptions = false; render(); }
       else if (act === 'options-tab') { state.optionsTab = elm.getAttribute('data-tab'); render(); }
       else if (act === 'cards-to-win-minus') socket.emit('set-cards-to-win', { count: Math.max(4, (state.room.cardsToWin || CARDS_TO_WIN) - 1) });
@@ -1378,6 +1394,7 @@ function attachHandlers() {
       else if (act === 'set-visibility-public') socket.emit('set-visibility', { visibility: 'public' });
       else if (act === 'set-free-card-off') socket.emit('set-free-card-enabled', { enabled: false });
       else if (act === 'set-free-card-on') socket.emit('set-free-card-enabled', { enabled: true });
+      else if (act === 'set-game-mode') socket.emit('set-game-mode', { mode: elm.getAttribute('data-mode') });
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
       else if (act === 'reset-filters') resetFilters();
       else if (act === 'pick-dj') setDj(elm.getAttribute('data-pid'));

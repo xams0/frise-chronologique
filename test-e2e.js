@@ -655,6 +655,57 @@ async function main() {
     await testFreeCard('together', 'tous ensemble');
     await testFreeCard('remote', 'chacun chez soi');
 
+    // ---- game-mode presets (bundle several existing settings at once) ----
+    const nate = io(URL, { transports: ['websocket'] });
+    const opal = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(nate, 'connect'), waitFor(opal, 'connect')]);
+    nate.emit('create-room', { name: 'Nate' });
+    const nateJoined = await waitFor(nate, 'joined');
+    if (nateJoined.room.gameMode === 'original') ok('room defaults to gameMode="original"');
+    else fail('expected default gameMode "original", got ' + nateJoined.room.gameMode);
+    opal.emit('join-room', { code: nateJoined.code, name: 'Opal' });
+    await waitFor(opal, 'joined');
+
+    let modeRefused = null;
+    opal.once('error-msg', (msg) => { modeRefused = msg; });
+    opal.emit('set-game-mode', { mode: 'hardcore' });
+    await new Promise(r => setTimeout(r, 400));
+    if (modeRefused) ok('non-host correctly refused when trying to change the game mode');
+    else fail('expected non-host set-game-mode attempt to be refused');
+
+    nate.emit('set-game-mode', { mode: 'hardcore' });
+    const hardcoreRoom = await waitForRoomWhere(nate, r => r.gameMode === 'hardcore');
+    if (hardcoreRoom.startTokens === 0 && hardcoreRoom.revealDelaySeconds === 5 && hardcoreRoom.turnDecisionSeconds === 15 && hardcoreRoom.freeCardEnabled === false) {
+      ok('Hardcore preset correctly bundled all its settings in one go');
+    } else {
+      fail('Hardcore preset did not apply expected values: ' + JSON.stringify({ startTokens: hardcoreRoom.startTokens, revealDelaySeconds: hardcoreRoom.revealDelaySeconds, turnDecisionSeconds: hardcoreRoom.turnDecisionSeconds, freeCardEnabled: hardcoreRoom.freeCardEnabled }));
+    }
+
+    nate.emit('set-game-mode', { mode: 'enemies' });
+    const enemiesRoom = await waitForRoomWhere(nate, r => r.gameMode === 'enemies');
+    if (enemiesRoom.cardsToWin === 12 && enemiesRoom.startTokens === 4 && enemiesRoom.revealDelaySeconds === 20) {
+      ok('"Fais-toi des ennemis" preset correctly bundled all its settings in one go');
+    } else {
+      fail('enemies preset did not apply expected values: ' + JSON.stringify({ cardsToWin: enemiesRoom.cardsToWin, startTokens: enemiesRoom.startTokens, revealDelaySeconds: enemiesRoom.revealDelaySeconds }));
+    }
+
+    nate.emit('set-game-mode', { mode: 'original' });
+    const backToOriginal = await waitForRoomWhere(nate, r => r.gameMode === 'original');
+    if (backToOriginal.cardsToWin === 10 && backToOriginal.startTokens === 2 && backToOriginal.revealDelaySeconds === 15 && backToOriginal.turnDecisionSeconds === 60) {
+      ok('Original preset correctly restores the default bundle');
+    } else {
+      fail('Original preset did not restore defaults: ' + JSON.stringify(backToOriginal));
+    }
+
+    let unknownModeRefused = null;
+    nate.once('error-msg', (msg) => { unknownModeRefused = msg; });
+    nate.emit('set-game-mode', { mode: 'not-a-real-mode' });
+    await new Promise(r => setTimeout(r, 400));
+    if (unknownModeRefused) ok('unknown game mode correctly refused: "' + unknownModeRefused + '"');
+    else fail('expected an unknown mode name to be refused');
+
+    nate.disconnect(); opal.disconnect();
+
     // ---- 3+ players: only ONE challenge can be active per pending card ----
     const uma = io(URL, { transports: ['websocket'] });
     const vic = io(URL, { transports: ['websocket'] });

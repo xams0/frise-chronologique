@@ -16,6 +16,16 @@ const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
 
 const CARDS_TO_WIN = 10;
 const START_TOKENS = 2;
+
+// Special game modes are pure presets: selecting one just applies a bundle
+// of the existing settings in one go. No new mechanics, no new rules —
+// everything here is something the host could already set individually.
+const GAME_MODE_PRESETS = {
+  original: { cardsToWin: CARDS_TO_WIN, startTokens: START_TOKENS, revealDelaySeconds: 15, turnDecisionSeconds: 60, freeCardEnabled: false },
+  hardcore: { cardsToWin: CARDS_TO_WIN, startTokens: 0, revealDelaySeconds: 5, turnDecisionSeconds: 15, freeCardEnabled: false },
+  enemies: { cardsToWin: 12, startTokens: 4, revealDelaySeconds: 20, turnDecisionSeconds: 60, freeCardEnabled: false },
+};
+const GAME_MODE_LABELS = { original: 'Original', hardcore: 'Hardcore', enemies: 'Fais-toi des ennemis' };
 const MAX_TOKENS = 5;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BRACKETS = [
@@ -608,6 +618,7 @@ io.on('connection', (socket) => {
       cardsToWin: CARDS_TO_WIN, // configurable win condition
       startTokens: START_TOKENS, // configurable starting token count
       freeCardEnabled: false, // "spend 3 tokens to place a card without listening" — off by default
+      gameMode: 'original', // label for whichever special-mode preset was last applied
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
       maxPlayers: null, // null = no limit
@@ -782,6 +793,16 @@ io.on('connection', (socket) => {
     if (room.phase !== 'lobby') return;
     room.freeCardEnabled = !!enabled;
     room.log.push({ ts: nowStr(), text: room.freeCardEnabled ? '🛒 Achat direct de carte (3 jetons) activé.' : '🛒 Achat direct de carte (3 jetons) désactivé.' });
+  }));
+
+  socket.on('set-game-mode', withRoom((room, { mode }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    const preset = GAME_MODE_PRESETS[mode];
+    if (!preset) return socket.emit('error-msg', 'Mode de partie inconnu.');
+    Object.assign(room, preset);
+    room.gameMode = mode;
+    room.log.push({ ts: nowStr(), text: `🎮 Mode de partie : ${GAME_MODE_LABELS[mode]}.` });
   }));
 
   socket.on('leave-room', withRoom(async (room) => {
