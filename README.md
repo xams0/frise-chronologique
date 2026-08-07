@@ -660,3 +660,9 @@ Le sablier ⏳/✅ à côté des prénoms dans le salon est retiré. Le petit po
 déjà présent à gauche du prénom (auparavant toujours vert) change
 maintenant vraiment de couleur : **rouge** si le joueur n'est pas prêt,
 **vert** dès qu'il a appuyé sur "Prêt(e)".
+
+## v2.3.2 — ajout de Percheye
+
+6 titres de l'artiste indie pop français **Percheye** (Tristan Rolland),
+2022-2025 : Will You Come Home, Mr. Conflict, Getting Occupied, Call Me,
+Drained Out, Ballade. Catalogue à 718 chansons.
