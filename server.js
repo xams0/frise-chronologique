@@ -452,14 +452,19 @@ function resolveReveal(room) {
 
   // Hardcore mode: getting it wrong doesn't just cost the drawn card — it
   // costs one of your OWN, picked at random from your timeline, shuffled
-  // back into the deck to be drawn again later by anyone.
-  if (!activeCorrect && room.gameMode === 'hardcore' && active.timeline.length > 0) {
-    const idx = Math.floor(Math.random() * active.timeline.length);
-    const lostCard = active.timeline.splice(idx, 1)[0];
-    const insertAt = Math.floor(Math.random() * (room.deck.length + 1));
-    room.deck.splice(insertAt, 0, lostCard);
-    room.log.push({ ts: nowStr(), text: `🩸 Hardcore : ${active.name} perd "${lostCard.title}" (${lostCard.year}) de sa frise !` });
-    if (room.lastResult) room.lastResult.hardcorePenalty = { playerName: active.name, title: lostCard.title, year: lostCard.year };
+  // back into the deck to be drawn again later by anyone. The very first
+  // card dealt at the start of the game is exempt — it wasn't earned, so
+  // it shouldn't be at risk of being randomly stripped away.
+  if (!activeCorrect && room.gameMode === 'hardcore') {
+    const eligibleIndexes = active.timeline.map((c, i) => i).filter(i => !active.timeline[i].isStartingCard);
+    if (eligibleIndexes.length > 0) {
+      const idx = eligibleIndexes[Math.floor(Math.random() * eligibleIndexes.length)];
+      const lostCard = active.timeline.splice(idx, 1)[0];
+      const insertAt = Math.floor(Math.random() * (room.deck.length + 1));
+      room.deck.splice(insertAt, 0, lostCard);
+      room.log.push({ ts: nowStr(), text: `🩸 Hardcore : ${active.name} perd "${lostCard.title}" (${lostCard.year}) de sa frise !` });
+      if (room.lastResult) room.lastResult.hardcorePenalty = { playerName: active.name, title: lostCard.title, year: lostCard.year };
+    }
   }
 
   room.pending = null;
@@ -594,7 +599,7 @@ function tryStartGame(room) {
   let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
   const startingTokens = room.startTokens != null ? room.startTokens : START_TOKENS;
   const players = room.players.map(p => ({ ...p, tokens: startingTokens, timeline: [], ready: false }));
-  players.forEach(p => { p.timeline = [deck.pop()]; });
+  players.forEach(p => { p.timeline = [{ ...deck.pop(), isStartingCard: true }]; });
   room.players = players;
   room.deck = deck;
   room.discard = [];

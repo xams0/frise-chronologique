@@ -28,6 +28,18 @@ function waitFor(socket, event, timeoutMs = 4000) {
 // action that this socket never consumed (e.g. a room-wide broadcast sent
 // while this socket was busy doing something else). Draining until the
 // predicate matches makes the test robust against that ordering race.
+// Mirrors the server's gap-correctness rule, so tests can reliably pick a
+// gap that's guaranteed wrong (or right) for a timeline of any size.
+function correctGapsFor(sortedYears, year) {
+  const gaps = [];
+  for (let i = 0; i <= sortedYears.length; i++) {
+    const lower = i > 0 ? sortedYears[i - 1] : -Infinity;
+    const upper = i < sortedYears.length ? sortedYears[i] : Infinity;
+    if (year >= lower && year <= upper) gaps.push(i);
+  }
+  return gaps;
+}
+
 function waitForRoomWhere(socket, predicate, timeoutMs = 4000) {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
@@ -706,7 +718,8 @@ async function main() {
 
     nate.disconnect(); opal.disconnect();
 
-    // ---- Hardcore rule: a wrong placement costs a random card from your OWN timeline too ----
+    // ---- Hardcore rule: wrong placement costs a random card from your OWN
+    // timeline, EXCEPT the starting card, which is always protected ----
     const hank = io(URL, { transports: ['websocket'] });
     const iris = io(URL, { transports: ['websocket'] });
     await Promise.all([waitFor(hank, 'connect'), waitFor(iris, 'connect')]);
@@ -721,34 +734,96 @@ async function main() {
     const hcActiveId = hcGame.turnOrder[hcGame.turnIndex];
     const hcActiveSocket = hcActiveId === hankJoined.playerId ? hank : iris;
     const startingCard = hcGame.players.find(p => p.id === hcActiveId).timeline[0];
+    if (startingCard.isStartingCard === true) ok('the initial card dealt at game start is tagged isStartingCard');
+    else fail('expected the dealt starting card to be tagged isStartingCard=true');
 
+    // Case 1: player has ONLY their starting card and gets it wrong — the
+    // penalty must NOT apply, since there's nothing eligible to lose.
     hcActiveSocket.emit('draw-card');
     const hcDrawn = await waitForRoomWhere(hcActiveSocket, r => !!r.pending);
     const hcNewYear = hcDrawn.pending.card.year;
-    const hcWrongGap = hcNewYear >= startingCard.year ? 0 : 1; // deliberately wrong relative to the only existing card
+    const hcWrongGap = hcNewYear >= startingCard.year ? 0 : 1;
     hcActiveSocket.emit('place-card', { gapIndex: hcWrongGap });
     await waitForRoomWhere(hcActiveSocket, r => r.pending && r.pending.stage === 'placed');
-    // hardcore's own revealDelaySeconds (5s) applies — wait for the auto-reveal, no manual reveal needed
     const hcResolved = await waitForRoomWhere(hcActiveSocket, r => r.pending === null && r.lastResult, 8000);
 
     if (hcResolved.lastResult.kind === 'wrong') {
       const activeAfter = hcResolved.players.find(p => p.id === hcActiveId);
-      const lostCardBackInDeck = hcResolved.deck.some(c => c.title === startingCard.title && c.year === startingCard.year);
-      if (activeAfter.timeline.length === 0 && lostCardBackInDeck) {
-        ok('Hardcore correctly removed the wrong player\'s only timeline card and shuffled it back into the deck');
+      if (activeAfter.timeline.length === 1 && activeAfter.timeline[0].isStartingCard === true && !hcResolved.lastResult.hardcorePenalty) {
+        ok('starting card correctly PROTECTED — wrong placement with only the starting card in hand triggered no penalty at all');
       } else {
-        fail('Hardcore penalty did not behave as expected: ' + JSON.stringify({ timelineLen: activeAfter.timeline.length, lostCardBackInDeck }));
-      }
-      if (hcResolved.lastResult.hardcorePenalty && hcResolved.lastResult.hardcorePenalty.title === startingCard.title) {
-        ok('lastResult correctly carries the hardcorePenalty details for the client to display');
-      } else {
-        fail('expected lastResult.hardcorePenalty to describe the lost card: ' + JSON.stringify(hcResolved.lastResult.hardcorePenalty));
+        fail('expected the starting card to survive with no penalty applied: ' + JSON.stringify({ timeline: activeAfter.timeline, penalty: hcResolved.lastResult.hardcorePenalty }));
       }
     } else {
-      // the deliberately-"wrong" gap happened to tie on year — rare edge case, not a bug
-      log(`  (this run resolved as "${hcResolved.lastResult.kind}" instead of "wrong" — equal-year edge case; skipping the hardcore-penalty assertion this run)`);
+      log(`  (this run resolved as "${hcResolved.lastResult.kind}" instead of "wrong" — equal-year edge case; skipping this run's assertion)`);
     }
     hank.disconnect(); iris.disconnect();
+
+    // Case 2: once a player has EARNED a second card, a later wrong
+    // placement can still cost them a card — just never the starting one.
+    const jose = io(URL, { transports: ['websocket'] });
+    const kara = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(jose, 'connect'), waitFor(kara, 'connect')]);
+    jose.emit('create-room', { name: 'Jose' });
+    const joseJoined = await waitFor(jose, 'joined');
+    kara.emit('join-room', { code: joseJoined.code, name: 'Kara' });
+    const karaJoined = await waitFor(kara, 'joined');
+    jose.emit('set-game-mode', { mode: 'hardcore' });
+    await waitForRoomWhere(jose, r => r.gameMode === 'hardcore');
+    jose.emit('start-game');
+    const jkGame = await waitForRoomWhere(jose, r => r.phase === 'playing');
+    const firstActiveId = jkGame.turnOrder[jkGame.turnIndex];
+    const firstActiveSocket = firstActiveId === joseJoined.playerId ? jose : kara;
+    const firstActiveStartCard = jkGame.players.find(p => p.id === firstActiveId).timeline[0];
+
+    // Turn 1 (firstActive): place CORRECTLY to grow their timeline to 2 cards.
+    firstActiveSocket.emit('draw-card');
+    const jkDrawn1 = await waitForRoomWhere(firstActiveSocket, r => !!r.pending);
+    const correctGaps1 = correctGapsFor([firstActiveStartCard.year], jkDrawn1.pending.card.year);
+    firstActiveSocket.emit('place-card', { gapIndex: correctGaps1[0] });
+    await waitForRoomWhere(firstActiveSocket, r => r.pending && r.pending.stage === 'placed');
+    const afterTurn1 = await waitForRoomWhere(firstActiveSocket, r => r.pending === null && r.turnIndex !== jkGame.turnIndex, 8000);
+
+    if (afterTurn1.players.find(p => p.id === firstActiveId).timeline.length !== 2) {
+      log('  (turn 1 did not resolve as correct — equal-year edge case; skipping the rest of this scenario)');
+    } else {
+      // Turn 2 (the OTHER player) — outcome doesn't matter, just need the turn to pass back.
+      const secondActiveId = afterTurn1.turnOrder[afterTurn1.turnIndex];
+      const secondActiveSocket = secondActiveId === joseJoined.playerId ? jose : kara;
+      secondActiveSocket.emit('draw-card');
+      const jkDrawn2 = await waitForRoomWhere(secondActiveSocket, r => !!r.pending);
+      secondActiveSocket.emit('place-card', { gapIndex: 0 });
+      await waitForRoomWhere(secondActiveSocket, r => r.pending && r.pending.stage === 'placed');
+      const afterTurn2 = await waitForRoomWhere(secondActiveSocket, r => r.pending === null, 8000);
+
+      // Turn 3: back to firstActive, now with 2 cards — place deliberately WRONG.
+      const thirdActiveId = afterTurn2.turnOrder[afterTurn2.turnIndex];
+      if (thirdActiveId === firstActiveId) {
+        const timelineNow = afterTurn2.players.find(p => p.id === firstActiveId).timeline;
+        const years = timelineNow.map(c => c.year).sort((a, b) => a - b);
+        firstActiveSocket.emit('draw-card');
+        const jkDrawn3 = await waitForRoomWhere(firstActiveSocket, r => !!r.pending);
+        const correctGaps3 = correctGapsFor(years, jkDrawn3.pending.card.year);
+        const wrongGap3 = [0, 1, 2].find(g => !correctGaps3.includes(g));
+        firstActiveSocket.emit('place-card', { gapIndex: wrongGap3 });
+        await waitForRoomWhere(firstActiveSocket, r => r.pending && r.pending.stage === 'placed');
+        const finalRoom = await waitForRoomWhere(firstActiveSocket, r => r.pending === null && r.lastResult, 8000);
+
+        if (finalRoom.lastResult.kind === 'wrong') {
+          const finalTimeline = finalRoom.players.find(p => p.id === firstActiveId).timeline;
+          if (finalTimeline.length === 1 && finalTimeline[0].isStartingCard === true) {
+            ok('an EARNED card was correctly lost to the Hardcore penalty, while the starting card survived untouched');
+          } else {
+            fail('expected only the earned card to be lost, starting card intact: ' + JSON.stringify(finalTimeline));
+          }
+        } else {
+          log(`  (turn 3 resolved as "${finalRoom.lastResult.kind}" instead of "wrong" — edge case; skipping this run's assertion)`);
+        }
+      } else {
+        log('  (turn order landed differently than expected this run — skipping this scenario)');
+      }
+    }
+    jose.disconnect(); kara.disconnect();
 
     // ---- 3+ players: only ONE challenge can be active per pending card ----
     const uma = io(URL, { transports: ['websocket'] });

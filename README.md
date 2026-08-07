@@ -641,3 +641,15 @@ Visible dans la bannière de résultat : "🩸 Hardcore : [pseudo] perd aussi
 C'est la seule vraie mécanique de jeu (pas juste un préréglage de réglages
 existants) parmi les modes spéciaux, et elle est strictement limitée au
 mode Hardcore.
+
+## v2.3 — la carte de départ est protégée en Hardcore
+
+Confirmation utile : non, elle **pouvait** être perdue jusqu'ici (la v2.2
+n'avait aucune protection). Corrigé : la toute première carte reçue au
+lancement de la partie est maintenant **exemptée** de la pénalité Hardcore
+— seules les cartes gagnées en cours de partie peuvent être reperdues au
+hasard. Si un joueur n'a encore que sa carte de départ, une erreur ne lui
+coûte plus rien de plus que la chanson piochée.
+
+Testé de bout en bout dans les deux sens : la carte de départ survit seule
+en main, et une carte gagnée peut toujours être perdue par la suite.
