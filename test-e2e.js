@@ -709,8 +709,8 @@ async function main() {
 
     nate.emit('set-game-mode', { mode: 'original' });
     const backToOriginal = await waitForRoomWhere(nate, r => r.gameMode === 'original');
-    if (backToOriginal.cardsToWin === 10 && backToOriginal.startTokens === 2 && backToOriginal.revealDelaySeconds === 15 && backToOriginal.turnDecisionSeconds === 60) {
-      ok('Original preset correctly restores the default bundle');
+    if (backToOriginal.cardsToWin === 10 && backToOriginal.startTokens === 2 && backToOriginal.revealDelaySeconds === 15 && backToOriginal.turnDecisionSeconds === 60 && backToOriginal.autoDrawSeconds === 5) {
+      ok('Original preset correctly restores the default bundle, including autoDrawSeconds=5');
     } else {
       fail('Original preset did not restore defaults: ' + JSON.stringify(backToOriginal));
     }
@@ -909,20 +909,20 @@ async function main() {
     await Promise.all([waitFor(tara, 'connect'), waitFor(ulysse, 'connect')]);
     tara.emit('create-room', { name: 'Tara' });
     const taraJoined = await waitFor(tara, 'joined');
-    if (taraJoined.room.autoDrawSeconds === 0) ok('room defaults to autoDrawSeconds=0 (manual draw)');
-    else fail('expected default autoDrawSeconds=0, got ' + taraJoined.room.autoDrawSeconds);
+    if (taraJoined.room.autoDrawSeconds === 5) ok('room defaults to autoDrawSeconds=5 (matches the Original mode preset)');
+    else fail('expected default autoDrawSeconds=5, got ' + taraJoined.room.autoDrawSeconds);
     ulysse.emit('join-room', { code: taraJoined.code, name: 'Ulysse' });
     await waitFor(ulysse, 'joined');
 
     let adRefused = null;
     ulysse.once('error-msg', (msg) => { adRefused = msg; });
-    ulysse.emit('set-auto-draw-seconds', { seconds: 5 });
+    ulysse.emit('set-auto-draw-seconds', { seconds: 8 });
     await new Promise(r => setTimeout(r, 400));
     if (adRefused) ok('non-host correctly refused when trying to set the auto-draw delay');
     else fail('expected non-host set-auto-draw-seconds attempt to be refused');
 
-    tara.emit('set-auto-draw-seconds', { seconds: 5 });
-    const adRoom = await waitForRoomWhere(tara, r => r.autoDrawSeconds === 5);
+    tara.emit('set-auto-draw-seconds', { seconds: 8 });
+    const adRoom = await waitForRoomWhere(tara, r => r.autoDrawSeconds === 8);
     ok('host successfully set autoDrawSeconds=' + adRoom.autoDrawSeconds);
     tara.emit('set-turn-decision-seconds', { seconds: 60 }); // keep this out of the way so it doesn't race the auto-draw
     await waitForRoomWhere(tara, r => r.turnDecisionSeconds === 60);
@@ -931,16 +931,68 @@ async function main() {
     if (adGame.turnStartedAt) ok('turnStartedAt is set for the client to compute the auto-draw fill bar');
     else fail('expected turnStartedAt to be set when the game starts');
 
-    // deliberately never emit draw-card — just wait past the 5s auto-draw delay
+    // deliberately never emit draw-card — just wait past the 8s auto-draw delay
     const adActiveId = adGame.turnOrder[adGame.turnIndex];
     const adActiveSocket = adActiveId === taraJoined.playerId ? tara : ulysse;
-    const autoDrawn = await waitForRoomWhere(adActiveSocket, r => r.pending && r.pending.stage === 'listening', 8000);
+    const autoDrawn = await waitForRoomWhere(adActiveSocket, r => r.pending && r.pending.stage === 'listening', 11000);
     if (autoDrawn.pending.activePlayerId === adActiveId) {
       ok('a card was auto-drawn for the active player after the configured delay, with no manual draw-card ever sent');
     } else {
       fail('expected an auto-drawn pending card for the active player: ' + JSON.stringify(autoDrawn.pending));
     }
     tara.disconnect(); ulysse.disconnect();
+
+    // ---- reaction anti-spam: max 5 within 20s, 6th is dropped server-side ----
+    const xena = io(URL, { transports: ['websocket'] });
+    const remy2 = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(xena, 'connect'), waitFor(remy2, 'connect')]);
+    xena.emit('create-room', { name: 'Xena' });
+    const xenaJoined = await waitFor(xena, 'joined');
+    remy2.emit('join-room', { code: xenaJoined.code, name: 'Remy2' });
+    await waitFor(remy2, 'joined');
+
+    let receivedByRen = [];
+    remy2.on('reaction', (r) => receivedByRen.push(r));
+    for (let i = 0; i < 6; i++) xena.emit('send-reaction', { emoji: '🔥' });
+    await new Promise(r => setTimeout(r, 500));
+    if (receivedByRen.length === 5) {
+      ok('server correctly relayed only 5 of 6 rapid reactions (anti-spam cap enforced)');
+    } else {
+      fail(`expected exactly 5 relayed reactions, got ${receivedByRen.length}`);
+    }
+    // one more, still within the same burst — still dropped
+    receivedByRen = [];
+    xena.emit('send-reaction', { emoji: '🔥' });
+    await new Promise(r => setTimeout(r, 400));
+    if (receivedByRen.length === 0) ok('a 7th rapid reaction is still correctly dropped while the anti-spam window is active');
+    else fail('expected the 7th reaction to also be dropped, got ' + receivedByRen.length);
+
+    let clapReceived = false;
+    remy2.once('reaction', (r) => { if (r.emoji === '👏') clapReceived = true; });
+    xena.emit('send-reaction', { emoji: '👏' });
+    await new Promise(r => setTimeout(r, 400));
+    if (!clapReceived) ok('the removed 👏 emoji is correctly rejected as not in the allowed list');
+    else fail('expected 👏 to be rejected, but it was relayed');
+    xena.disconnect(); remy2.disconnect();
+
+    // ---- a room left with only a bot auto-closes ----
+    const sol = io(URL, { transports: ['websocket'] });
+    await waitFor(sol, 'connect');
+    sol.emit('create-room', { name: 'Sol' });
+    const solJoined = await waitFor(sol, 'joined');
+    sol.emit('add-bot');
+    await waitForRoomWhere(sol, r => r.players.some(p => p.isBot));
+    sol.emit('leave-room');
+    await new Promise(r => setTimeout(r, 500));
+    const rejoinAttempt = io(URL, { transports: ['websocket'] });
+    await waitFor(rejoinAttempt, 'connect');
+    let rejoinError = null;
+    rejoinAttempt.once('error-msg', (msg) => { rejoinError = msg; });
+    rejoinAttempt.emit('join-room', { code: solJoined.code, name: 'Trying' });
+    await new Promise(r => setTimeout(r, 500));
+    if (rejoinError) ok('room with only a bot left correctly auto-closed (rejoin attempt failed: "' + rejoinError + '")');
+    else fail('expected the bot-only room to no longer exist');
+    sol.disconnect(); rejoinAttempt.disconnect();
 
     // ---- 3+ players: only ONE challenge can be active per pending card ----
     const uma = io(URL, { transports: ['websocket'] });

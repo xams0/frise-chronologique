@@ -19,6 +19,9 @@ let audioAutoplayBlocked = false; // true when the browser refused to auto-start
 let revealTicker = null; // interval id for animating the reveal-button countdown
 let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
 let lastAutoScrolledDrawKey = null; // prevents re-scrolling to the active player's timeline on every re-render of the same draw
+let lastGuessResetDrawKey = null; // prevents re-clearing the guess inputs (and thus interrupting typing) on every re-render of the same draw
+let reactionSendTimes = []; // rolling record of recent reaction sends, for the client-side 5-in-20s anti-spam lockout
+let reactionLockedUntil = 0; // timestamp; while Date.now() < this, sending is blocked and the FAB shows 🚫
 
 /* ---------- audio unlock ----------
    Browsers refuse to auto-start sound unless playback was triggered by (or
@@ -90,7 +93,7 @@ const state = {
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false,
+  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false,
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
@@ -369,6 +372,19 @@ function render() {
   // Preserve a live <audio> across re-renders so playback never restarts.
   let preservedAudio = null;
   if (audioEl) { preservedAudio = audioEl; preservedAudio.remove(); }
+
+  // Clear any leftover guess text from a previous, never-submitted round the
+  // moment a NEW card starts being listened to — otherwise a half-typed
+  // answer for the last song could still be sitting there for the new one.
+  // Done here, before the HTML below is built, so the cleared value shows
+  // up in THIS render rather than one render late.
+  {
+    const pendNow = state.room && state.room.pending;
+    if (pendNow && pendNow.stage === 'listening' && pendNow.drawnAt && lastGuessResetDrawKey !== pendNow.drawnAt) {
+      lastGuessResetDrawKey = pendNow.drawnAt;
+      state.guessTitle = ''; state.guessArtist = '';
+    }
+  }
 
   let html;
   if (state.screen === 'welcome') html = renderWelcome();
@@ -883,41 +899,62 @@ function renderGame() {
   return `
   <div class="screen game-screen">
     ${renderBgPremium()}
-    ${connectionBanner()}
-    ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
-    <div class="topbar">
-      <div style="display:flex;gap:8px;align-items:center;">
-        <div class="code-pill">${room.code}</div>
-        ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>` : ''}
-      </div>
-      <button class="iconbtn" data-act="leave">✕</button>
-    </div>
-
-    <div class="reaction-bar">
-      ${['👏', '😂', '😭', '😱', '🤬', '🔥'].map(e => `<button class="reaction-btn" data-act="send-reaction" data-emoji="${e}">${e}</button>`).join('')}
-    </div>
-
-    <div class="card-section compact">
-      <div class="now-playing">
-        <div class="vinyl ${pend ? 'spin' : ''}"></div>
-        <div class="info">
-          <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
-          <div class="who">${escapeHtml(active.name)}</div>
+    <div class="game-header">
+      ${connectionBanner()}
+      ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
+      <div class="topbar">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="code-pill">${room.code}</div>
+          ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>` : ''}
         </div>
-        ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">🏠 chacun chez soi</div>`}
+        <button class="iconbtn" data-act="leave">✕</button>
       </div>
 
-      ${renderTurnAction(room, pend, isActive, myself)}
+      <div class="card-section compact">
+        <div class="now-playing">
+          <div class="vinyl ${pend ? 'spin' : ''}"></div>
+          <div class="info">
+            <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
+            <div class="who">${escapeHtml(active.name)}</div>
+          </div>
+          ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">🏠 chacun chez soi</div>`}
+        </div>
+
+        ${renderTurnAction(room, pend, isActive, myself)}
+      </div>
     </div>
 
-    ${renderAllTimelines(room)}
+    <div class="game-scroll">
+      ${renderAllTimelines(room)}
+      ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
+    </div>
 
-    ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
+    ${renderReactionFab()}
 
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
     ${state.showDjPicker ? renderDjModal(room) : ''}
     ${state.cardDetail ? renderCardDetailModal() : ''}
+  </div>`;
+}
+
+function renderReactionFab() {
+  const emojis = ['😂', '😭', '😱', '🤬', '🔥'];
+  const angles = [90, 112.5, 135, 157.5, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
+  const radius = 74;
+  const locked = reactionLockedUntil > Date.now();
+  return `
+  ${state.reactionMenuOpen && !locked ? `<div class="reaction-backdrop" data-act="toggle-reaction-menu"></div>` : ''}
+  <div class="reaction-fab-wrap">
+    <div class="reaction-petals ${state.reactionMenuOpen && !locked ? 'open' : ''}">
+      ${emojis.map((e, i) => {
+        const rad = angles[i] * Math.PI / 180;
+        const tx = (radius * Math.cos(rad)).toFixed(1);
+        const ty = (-radius * Math.sin(rad)).toFixed(1);
+        return `<button class="reaction-petal" data-act="send-reaction" data-emoji="${e}" style="--tx:${tx}px;--ty:${ty}px;">${e}</button>`;
+      }).join('')}
+    </div>
+    <button class="reaction-fab ${locked ? 'locked' : ''}" data-act="toggle-reaction-menu">${locked ? '🚫' : '💬'}</button>
   </div>`;
 }
 
@@ -1105,9 +1142,9 @@ function renderResultBanner(r) {
   if (isFirstRender) lastAnimatedResultTs = r.ts;
   const flashCls = isFirstRender ? (r.kind === 'wrong' ? 'flash-wrong' : 'flash-correct') : '';
   let text;
-  if (r.kind === 'wrong') text = `❌ "${escapeHtml(r.title)}" (${r.year}) — mal placée, défaussée.`;
-  else if (r.kind === 'stolen') text = `🎯 "${escapeHtml(r.title)}" (${r.year}) — ${escapeHtml(r.activeName)} s'est trompé, ${escapeHtml(r.extraName)} récupère la carte !`;
-  else text = `✅ "${escapeHtml(r.title)}" (${r.year}) — bien placée par ${escapeHtml(r.activeName)} !`;
+  if (r.kind === 'wrong') text = `❌ "${escapeHtml(r.title)}" de ${escapeHtml(r.artist)} (${r.year}) — mal placée, défaussée.`;
+  else if (r.kind === 'stolen') text = `🎯 "${escapeHtml(r.title)}" de ${escapeHtml(r.artist)} (${r.year}) — ${escapeHtml(r.activeName)} s'est trompé, ${escapeHtml(r.extraName)} récupère la carte !`;
+  else text = `✅ "${escapeHtml(r.title)}" de ${escapeHtml(r.artist)} (${r.year}) — bien placée par ${escapeHtml(r.activeName)} !`;
   const penalty = r.hardcorePenalty
     ? `<div style="margin-top:6px;font-size:12.5px;color:var(--pink);font-weight:700;">🩸 Hardcore : ${escapeHtml(r.hardcorePenalty.playerName)} perd aussi "${escapeHtml(r.hardcorePenalty.title)}" (${r.hardcorePenalty.year}) de sa frise !</div>`
     : '';
@@ -1372,7 +1409,13 @@ function attachHandlers() {
   if (maxCustomEl) maxCustomEl.oninput = e => { state.maxPlayersInput = e.target.value; };
 
   root.querySelectorAll('[data-act]').forEach(elm => {
-    elm.addEventListener('click', (e) => {
+    // .onclick assignment, NOT addEventListener: assignment always REPLACES
+    // the previous handler, so no matter how many times attachHandlers()
+    // runs against the same element, there is only ever one handler bound.
+    // addEventListener stacks instead — this was the root cause of clicks
+    // firing an action multiple times after enough re-renders had happened
+    // (most visibly: one emoji-reaction tap spawning many).
+    elm.onclick = (e) => {
       const act = elm.getAttribute('data-act');
       state.error = '';
       if (act === 'welcome-continue') {
@@ -1396,7 +1439,25 @@ function attachHandlers() {
       else if (act === 'create-room') createRoom();
       else if (act === 'join-room') joinRoom();
       else if (act === 'leave') leaveToHome();
-      else if (act === 'send-reaction') socket.emit('send-reaction', { emoji: elm.getAttribute('data-emoji') });
+      else if (act === 'send-reaction') {
+        const now = Date.now();
+        if (now < reactionLockedUntil) return; // still locked out, ignore the tap entirely
+        reactionSendTimes = reactionSendTimes.filter(t => now - t < 20000);
+        reactionSendTimes.push(now);
+        if (reactionSendTimes.length >= 5) {
+          reactionLockedUntil = now + 20000;
+          reactionSendTimes = [];
+          setTimeout(render, 20000); // flips the FAB icon back from 🚫 to 💬 once the lockout ends
+        }
+        socket.emit('send-reaction', { emoji: elm.getAttribute('data-emoji') });
+        state.reactionMenuOpen = false;
+        render();
+      }
+      else if (act === 'toggle-reaction-menu') {
+        if (Date.now() < reactionLockedUntil) return;
+        state.reactionMenuOpen = !state.reactionMenuOpen;
+        render();
+      }
       else if (act === 'copy-code') { navigator.clipboard && navigator.clipboard.writeText(state.code).catch(() => {}); }
       else if (act === 'start-game') startGame();
       else if (act === 'show-rules') { state.showRules = true; render(); }
@@ -1489,7 +1550,7 @@ function attachHandlers() {
         else socket.emit('place-card', { gapIndex: gap });
         render();
       }
-    });
+    };
   });
 }
 

@@ -21,7 +21,7 @@ const START_TOKENS = 2;
 // of the existing settings in one go. No new mechanics, no new rules —
 // everything here is something the host could already set individually.
 const GAME_MODE_PRESETS = {
-  original: { cardsToWin: CARDS_TO_WIN, startTokens: START_TOKENS, revealDelaySeconds: 15, turnDecisionSeconds: 60, freeCardEnabled: false },
+  original: { cardsToWin: CARDS_TO_WIN, startTokens: START_TOKENS, revealDelaySeconds: 15, turnDecisionSeconds: 60, freeCardEnabled: false, autoDrawSeconds: 5 },
   hardcore: { cardsToWin: CARDS_TO_WIN, startTokens: 0, revealDelaySeconds: 5, turnDecisionSeconds: 15, freeCardEnabled: false },
   enemies: { cardsToWin: 12, startTokens: 4, revealDelaySeconds: 20, turnDecisionSeconds: 60, freeCardEnabled: false },
 };
@@ -416,7 +416,7 @@ function removePlayerFromRoom(room, targetId) {
     room.log.push({ ts: nowStr(), text: '🏁 Partie interrompue — plus assez de joueurs pour continuer.' });
   }
 
-  if (room.players.length === 0) {
+  if (room.players.length === 0 || room.players.every(p => p.isBot)) {
     clearAutoReveal(room.code);
     clearAutoPass(room.code);
     clearAutoDraw(room.code);
@@ -693,7 +693,7 @@ io.on('connection', (socket) => {
       freeCardEnabled: false, // "spend 3 tokens to place a card without listening" — off by default
       gameMode: 'original', // label for whichever special-mode preset was last applied
       usedSongKeys: [], // songs actually drawn in a past game in this room — avoided on replay when possible
-      autoDrawSeconds: 0, // 0 = off; otherwise auto-draws the next card after this many seconds of nobody acting
+      autoDrawSeconds: 5, // 0 = off; otherwise auto-draws the next card after this many seconds of nobody acting
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
       missedCards: [], // history of wrong guesses, per player, shown under their timeline
       maxPlayers: null, // null = no limit
@@ -823,7 +823,8 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: s === 0 ? '⏭️ Pioche automatique désactivée.' : `⏭️ La prochaine chanson se pioche automatiquement après ${s} secondes.` });
   }));
 
-  const ALLOWED_REACTIONS = ['👏', '😂', '😭', '😱', '🤬', '🔥'];
+  const ALLOWED_REACTIONS = ['😂', '😭', '😱', '🤬', '🔥'];
+  const reactionTimestamps = new Map(); // socket.id -> array of recent send times, for a light anti-spam guard
   socket.on('send-reaction', ({ emoji }) => {
     // Purely ephemeral — never stored on the room, just relayed live to
     // everyone currently in it. Deliberately NOT using withRoom here: a
@@ -835,6 +836,14 @@ io.on('connection', (socket) => {
     if (!room) return;
     const p = me(room, socket.data.playerId);
     if (!p) return;
+    // Anti-spam: max 5 reactions within a 20s window per socket. This
+    // mirrors the client-side lockout so a modified/buggy client can't
+    // flood the room even if the client-side guard fails.
+    const now = Date.now();
+    const recent = (reactionTimestamps.get(socket.id) || []).filter(t => now - t < 20000);
+    if (recent.length >= 5) return;
+    recent.push(now);
+    reactionTimestamps.set(socket.id, recent);
     io.to(code).emit('reaction', { emoji, playerName: p.name });
   });
 

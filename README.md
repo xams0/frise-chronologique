@@ -702,3 +702,32 @@ Drained Out, Ballade. Catalogue à 718 chansons.
   lance toute seule après le délai réglé par l'hôte — avec une barre de
   progression directement dans le bouton, dans le même style visuel que
   les autres comptes à rebours du jeu.
+
+## v2.6 — 9 corrections/ajouts
+
+- **Vrai bug transversal corrigé** : les boutons de l'app utilisaient
+  `addEventListener('click', ...)`, qui **empile** les gestionnaires au
+  lieu de les remplacer à chaque re-rendu. Après suffisamment de rendus, un
+  seul clic pouvait déclencher l'action plusieurs fois — c'était la cause
+  exacte du "un clic sur l'emoji en fait apparaître une dizaine". Remplacé
+  par une assignation `.onclick =` (toujours idempotente) partout dans
+  l'app — ce fix corrige potentiellement d'autres doubles-déclenchements
+  latents, pas seulement les réactions.
+- **Réactions emoji redessinées** : fini la barre en haut — un bouton 💬
+  flottant en bas à droite ouvre un éventail des 5 emojis (👏 retiré, reste
+  😂 😭 😱 🤬 🔥) qui s'écartent en cercle autour de lui.
+- **Anti-spam** : 5 réactions maximum, puis 20 secondes de blocage (💬
+  devient 🚫) — appliqué côté client ET côté serveur en garde-fou.
+- **Pioche automatique à 5s par défaut**, y compris dans le préréglage
+  mode Original.
+- **Salon avec un Bot seul** : se ferme maintenant automatiquement.
+- **Div "Tour" fixe** : l'écran de partie est restructuré en en-tête fixe
+  (lecture en cours + boutons Révéler/Défier/Piocher) et zone scrollable
+  séparée pour les frises des joueurs — le scroll n'affecte plus que les
+  frises.
+- **Bannière de résultat sans l'artiste** : vrai bug confirmé — le serveur
+  l'envoyait déjà, mais l'affichage l'ignorait. Corrigé.
+- **Champs Titre/Artiste qui ne se réinitialisaient pas** : vrai bug
+  confirmé — un texte à moitié tapé pour une chanson pouvait rester affiché
+  pour la suivante. Corrigé, avec le bon timing pour que ça s'applique dès
+  le rendu où la nouvelle chanson démarre.
