@@ -767,3 +767,26 @@ encore, dis-le et je réduirai davantage.
   l'en-tête fixe. Corrigé en verrouillant complètement le `body`
   (`position:fixed`) pendant l'écran de partie, pour que seule la zone des
   frises puisse bouger.
+
+## v2.6.3 — fix critique du scroll complètement cassé
+
+Vraie cause trouvée grâce à ta capture d'écran : `.game-scroll` avait une
+hauteur **fixe** de 60vh, mais l'en-tête (lecture en cours + boutons +
+champs Titre/Artiste) n'avait, lui, aucune limite de hauteur — il prenait
+toute la place dont il avait besoin. Résultat : en-tête + zone fixe à 60vh
+dépassaient largement les 100vh disponibles, et `.game-screen` (avec
+`overflow:hidden`) coupait purement et simplement tout ce qui débordait —
+y compris la quasi-totalité de la zone censée être scrollable, la rendant
+inaccessible.
+
+Corrigé en priorisant le fonctionnel sur le "60% pile" : la zone des
+frises reprend un dimensionnement flexible (`flex:1` + `min-height:0`) qui
+s'adapte toujours à l'espace réellement disponible après l'en-tête —
+garantissant qu'elle reste accessible et scrollable quelle que soit la
+taille de l'en-tête. En complément, l'en-tête a été légèrement compacté
+(lecteur audio moins d'espacement).
+
+Point d'honnêteté : sans appareil réel pour tester, je ne peux pas garantir
+que l'équilibre visuel entre en-tête et frises est optimal — mais la
+fonctionnalité (pouvoir scroller et voir tous les joueurs) est maintenant
+la priorité numéro un et ne peut plus être cassée par cette classe de bug.

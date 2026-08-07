@@ -1007,7 +1007,7 @@ function renderTurnAction(room, pend, isActive, myself) {
   if (isRemote || isDj || active.isBot) {
     if (pend.card.previewUrl) {
       html += `
-      <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:10px;display:flex;flex-direction:column;align-items:center;gap:6px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         ${renderSoundBars()}
         <button class="btn ${audioAutoplayBlocked ? 'btn-gold play-nudge' : 'btn-ghost'} btn-sm" data-act="play-preview">🔊 ${audioAutoplayBlocked ? 'Appuie ici pour le son' : 'Appuyer si pas de son'}</button>
