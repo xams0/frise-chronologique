@@ -22,6 +22,7 @@ let lastAutoScrolledDrawKey = null; // prevents re-scrolling to the active playe
 let lastGuessResetDrawKey = null; // prevents re-clearing the guess inputs (and thus interrupting typing) on every re-render of the same draw
 let reactionSendTimes = []; // rolling record of recent reaction sends, for the client-side 5-in-20s anti-spam lockout
 let reactionLockedUntil = 0; // timestamp; while Date.now() < this, sending is blocked and the FAB shows 🚫
+let fabScrollHideTimer = null; // debounces the FAB fade-back-in after scrolling stops
 
 /* ---------- audio unlock ----------
    Browsers refuse to auto-start sound unless playback was triggered by (or
@@ -365,6 +366,13 @@ function renderTick() {
 
 function render() {
   const root = document.getElementById('root');
+
+  // Lock the body itself from scrolling while on the game screen — without
+  // this, body/html remain scrollable in parallel with .game-scroll's own
+  // internal scroll, so touching anywhere (not just the frises) could move
+  // the whole page, including the fixed header. position:fixed is the most
+  // reliable way to fully kill body scroll/bounce on mobile browsers.
+  document.body.classList.toggle('game-locked', state.screen === 'game');
 
   // Preserve focus + cursor/selection position across the rebuild below —
   // periodic re-renders (the reveal countdown ticker fires every 250ms while
@@ -947,9 +955,9 @@ function renderGame() {
 }
 
 function renderReactionFab() {
-  const emojis = ['😂', '😭', '😱', '🤬', '🔥'];
-  const angles = [90, 112.5, 135, 157.5, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
-  const radius = 145; // was 74 — too tight, buttons overlapped and caused accidental double-taps
+  const emojis = ['😭', '😱', '🤬', '🔥'];
+  const angles = [90, 120, 150, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
+  const radius = 100; // 74 was too tight (overlapping taps), 145 was too spread out — this is the middle ground
   const locked = reactionLockedUntil > Date.now();
   return `
   ${state.reactionMenuOpen && !locked ? `<div class="reaction-backdrop" data-act="toggle-reaction-menu"></div>` : ''}
@@ -1396,6 +1404,22 @@ function renderRulesModal() {
 /* ---------- event delegation ---------- */
 function attachHandlers() {
   const root = document.getElementById('root');
+
+  // Fade the reaction FAB out while the frises are being scrolled, so it
+  // never sits fixed on top of content the person is actively interacting
+  // with — it reappears shortly after scrolling stops.
+  const scrollEl = document.querySelector('.game-scroll');
+  if (scrollEl) {
+    scrollEl.onscroll = () => {
+      const fab = document.querySelector('.reaction-fab-wrap');
+      if (fab) fab.classList.add('fab-scrolling');
+      clearTimeout(fabScrollHideTimer);
+      fabScrollHideTimer = setTimeout(() => {
+        const f = document.querySelector('.reaction-fab-wrap');
+        if (f) f.classList.remove('fab-scrolling');
+      }, 500);
+    };
+  }
 
   const bind = (id, key, transform) => {
     const el = document.getElementById(id);

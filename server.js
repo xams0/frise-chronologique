@@ -823,7 +823,7 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: s === 0 ? '⏭️ Pioche automatique désactivée.' : `⏭️ La prochaine chanson se pioche automatiquement après ${s} secondes.` });
   }));
 
-  const ALLOWED_REACTIONS = ['😂', '😭', '😱', '🤬', '🔥'];
+  const ALLOWED_REACTIONS = ['😭', '😱', '🤬', '🔥'];
   const reactionTimestamps = new Map(); // socket.id -> array of recent send times, for a light anti-spam guard
   socket.on('send-reaction', ({ emoji }) => {
     // Purely ephemeral — never stored on the room, just relayed live to

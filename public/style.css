@@ -17,6 +17,11 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;
     width:100%;overflow-x:hidden;overscroll-behavior:none;touch-action:manipulation;position:relative;}
+  /* While on the game screen, fully pin the body so ONLY .game-scroll can
+     move — position:fixed is the most reliable cross-browser way to kill
+     body-level scroll/bounce on mobile (a plain overflow:hidden isn't
+     always enough to stop touch-driven scroll/rubber-banding on iOS). */
+  body.game-locked{position:fixed;inset:0;overflow:hidden;}
   #root{min-height:100vh;display:flex;flex-direction:column;width:100%;max-width:100vw;overflow-x:hidden;}
   h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;margin:0;}
   .mono{font-family:'IBM Plex Mono',monospace;}
@@ -103,7 +108,8 @@
   .game-header{flex-shrink:0;overflow:hidden;}
   .game-scroll{height:60vh;flex:0 0 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:90px;}
 
-  .reaction-fab-wrap{position:fixed;bottom:22px;right:18px;z-index:150;}
+  .reaction-fab-wrap{position:fixed;bottom:22px;right:18px;z-index:150;transition:opacity 0.25s;}
+  .reaction-fab-wrap.fab-scrolling{opacity:0.12;pointer-events:none;}
   .reaction-fab{width:52px;height:52px;border-radius:50%;background:var(--pink);border:none;color:#fff;font-size:23px;box-shadow:0 6px 18px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;}
   .reaction-fab.locked{background:var(--surface2);color:var(--text-dim);}
   .reaction-fab:active{transform:scale(0.94);}

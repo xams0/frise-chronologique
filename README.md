@@ -753,3 +753,17 @@ Point d'attention honnête : je n'ai pas d'appareil réel pour vérifier
 visuellement que l'en-tête (topbar + lecture en cours + boutons) tient bien
 dans les 40% restants après la réduction des boutons — si ça déborde
 encore, dis-le et je réduirai davantage.
+
+## v2.6.2 — ajustements suite à capture d'écran
+
+- **4 emojis au lieu de 5** (😭 😱 🤬 🔥), 😂 retiré, rayon réduit à 100px
+  (entre le 74px trop resserré et le 145px trop écarté).
+- **Le bouton 💬 s'estompe pendant le scroll** des frises, et réapparaît
+  environ une demi-seconde après l'arrêt — il ne reste plus fixe par-dessus
+  le contenu qu'on essaie de consulter.
+- **Vraie cause du "scroll qui bouge tout" trouvée** : le corps de la page
+  (`body`) restait scrollable en parallèle de la zone dédiée aux frises —
+  toucher n'importe où pouvait donc faire défiler toute la page, y compris
+  l'en-tête fixe. Corrigé en verrouillant complètement le `body`
+  (`position:fixed`) pendant l'écran de partie, pour que seule la zone des
+  frises puisse bouger.
