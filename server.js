@@ -450,6 +450,18 @@ function resolveReveal(room) {
     room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
   }
 
+  // Hardcore mode: getting it wrong doesn't just cost the drawn card — it
+  // costs one of your OWN, picked at random from your timeline, shuffled
+  // back into the deck to be drawn again later by anyone.
+  if (!activeCorrect && room.gameMode === 'hardcore' && active.timeline.length > 0) {
+    const idx = Math.floor(Math.random() * active.timeline.length);
+    const lostCard = active.timeline.splice(idx, 1)[0];
+    const insertAt = Math.floor(Math.random() * (room.deck.length + 1));
+    room.deck.splice(insertAt, 0, lostCard);
+    room.log.push({ ts: nowStr(), text: `🩸 Hardcore : ${active.name} perd "${lostCard.title}" (${lostCard.year}) de sa frise !` });
+    if (room.lastResult) room.lastResult.hardcorePenalty = { playerName: active.name, title: lostCard.title, year: lostCard.year };
+  }
+
   room.pending = null;
   clearAutoReveal(room.code);
 

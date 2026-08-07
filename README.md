@@ -625,3 +625,19 @@ prochain pas naturel, distinct de ce préréglage.
 
 Le mode actif s'affiche aussi en pastille (🎵/🩸/😈) sous "Joueurs" pour
 info rapide sans ouvrir le menu.
+
+## v2.2 — Hardcore fait vraiment mal maintenant
+
+Ajout de la règle qui manquait au preset Hardcore (repérée après coup) :
+**une erreur de placement fait perdre une carte au hasard de sa propre
+frise**, en plus de défausser la chanson qui venait d'être piochée. La
+carte perdue est remélangée dans la pioche — quelqu'un pourra la retirer
+plus tard. Si le placement est volé par un adversaire via un défi réussi,
+la pénalité s'applique aussi (l'actif s'est quand même trompé).
+
+Visible dans la bannière de résultat : "🩸 Hardcore : [pseudo] perd aussi
+'[titre]' de sa frise !" en plus du message habituel.
+
+C'est la seule vraie mécanique de jeu (pas juste un préréglage de réglages
+existants) parmi les modes spéciaux, et elle est strictement limitée au
+mode Hardcore.

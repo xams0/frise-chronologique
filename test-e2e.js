@@ -706,6 +706,50 @@ async function main() {
 
     nate.disconnect(); opal.disconnect();
 
+    // ---- Hardcore rule: a wrong placement costs a random card from your OWN timeline too ----
+    const hank = io(URL, { transports: ['websocket'] });
+    const iris = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(hank, 'connect'), waitFor(iris, 'connect')]);
+    hank.emit('create-room', { name: 'Hank' });
+    const hankJoined = await waitFor(hank, 'joined');
+    iris.emit('join-room', { code: hankJoined.code, name: 'Iris' });
+    await waitFor(iris, 'joined');
+    hank.emit('set-game-mode', { mode: 'hardcore' });
+    await waitForRoomWhere(hank, r => r.gameMode === 'hardcore');
+    hank.emit('start-game');
+    const hcGame = await waitForRoomWhere(hank, r => r.phase === 'playing');
+    const hcActiveId = hcGame.turnOrder[hcGame.turnIndex];
+    const hcActiveSocket = hcActiveId === hankJoined.playerId ? hank : iris;
+    const startingCard = hcGame.players.find(p => p.id === hcActiveId).timeline[0];
+
+    hcActiveSocket.emit('draw-card');
+    const hcDrawn = await waitForRoomWhere(hcActiveSocket, r => !!r.pending);
+    const hcNewYear = hcDrawn.pending.card.year;
+    const hcWrongGap = hcNewYear >= startingCard.year ? 0 : 1; // deliberately wrong relative to the only existing card
+    hcActiveSocket.emit('place-card', { gapIndex: hcWrongGap });
+    await waitForRoomWhere(hcActiveSocket, r => r.pending && r.pending.stage === 'placed');
+    // hardcore's own revealDelaySeconds (5s) applies — wait for the auto-reveal, no manual reveal needed
+    const hcResolved = await waitForRoomWhere(hcActiveSocket, r => r.pending === null && r.lastResult, 8000);
+
+    if (hcResolved.lastResult.kind === 'wrong') {
+      const activeAfter = hcResolved.players.find(p => p.id === hcActiveId);
+      const lostCardBackInDeck = hcResolved.deck.some(c => c.title === startingCard.title && c.year === startingCard.year);
+      if (activeAfter.timeline.length === 0 && lostCardBackInDeck) {
+        ok('Hardcore correctly removed the wrong player\'s only timeline card and shuffled it back into the deck');
+      } else {
+        fail('Hardcore penalty did not behave as expected: ' + JSON.stringify({ timelineLen: activeAfter.timeline.length, lostCardBackInDeck }));
+      }
+      if (hcResolved.lastResult.hardcorePenalty && hcResolved.lastResult.hardcorePenalty.title === startingCard.title) {
+        ok('lastResult correctly carries the hardcorePenalty details for the client to display');
+      } else {
+        fail('expected lastResult.hardcorePenalty to describe the lost card: ' + JSON.stringify(hcResolved.lastResult.hardcorePenalty));
+      }
+    } else {
+      // the deliberately-"wrong" gap happened to tie on year — rare edge case, not a bug
+      log(`  (this run resolved as "${hcResolved.lastResult.kind}" instead of "wrong" — equal-year edge case; skipping the hardcore-penalty assertion this run)`);
+    }
+    hank.disconnect(); iris.disconnect();
+
     // ---- 3+ players: only ONE challenge can be active per pending card ----
     const uma = io(URL, { transports: ['websocket'] });
     const vic = io(URL, { transports: ['websocket'] });

@@ -705,7 +705,7 @@ function renderOptionsModal(room) {
     body = `
       <p class="subtitle" style="margin:0 0 12px;">Des préréglages qui appliquent d'un coup une combinaison des réglages ci-contre — rien de nouveau, juste plus rapide à mettre en place.</p>
       ${modeCard('original', '🎵', 'Original', '10 cartes pour gagner, 2 jetons de départ, 15s pour révéler, 60s pour répondre. Les réglages par défaut.')}
-      ${modeCard('hardcore', '🩸', 'Hardcore', '0 jeton de départ (donc pas moyen de passer au début), 5s seulement pour révéler, 15s pour répondre. Sous pression du premier tour au dernier.')}
+      ${modeCard('hardcore', '🩸', 'Hardcore', '0 jeton de départ (donc pas moyen de passer au début), 5s seulement pour révéler, 15s pour répondre. En plus : chaque erreur fait perdre une carte au hasard de sa propre frise, remise dans la pioche.')}
       ${modeCard('enemies', '😈', 'Fais-toi des ennemis', '12 cartes pour gagner, 4 jetons de départ, délai de révélation allongé à 20s — de quoi défier bien plus souvent avant que ça se referme.')}
       ${!isHost ? `<p class="subtitle" style="margin-top:10px;">Seul l'hôte peut changer le mode.</p>` : ''}
     `;
@@ -1046,9 +1046,12 @@ function renderResultBanner(r) {
   if (r.kind === 'wrong') text = `❌ "${escapeHtml(r.title)}" (${r.year}) — mal placée, défaussée.`;
   else if (r.kind === 'stolen') text = `🎯 "${escapeHtml(r.title)}" (${r.year}) — ${escapeHtml(r.activeName)} s'est trompé, ${escapeHtml(r.extraName)} récupère la carte !`;
   else text = `✅ "${escapeHtml(r.title)}" (${r.year}) — bien placée par ${escapeHtml(r.activeName)} !`;
+  const penalty = r.hardcorePenalty
+    ? `<div style="margin-top:6px;font-size:12.5px;color:var(--pink);font-weight:700;">🩸 Hardcore : ${escapeHtml(r.hardcorePenalty.playerName)} perd aussi "${escapeHtml(r.hardcorePenalty.title)}" (${r.hardcorePenalty.year}) de sa frise !</div>`
+    : '';
   return `<div class="result-banner ${tintCls} ${flashCls}">
     ${r.cover ? `<img src="${escapeHtml(r.cover)}" alt="" style="width:44px;height:44px;border-radius:8px;flex-shrink:0;object-fit:cover;"/>` : ''}
-    <div style="flex:1;">${text}</div>
+    <div style="flex:1;">${text}${penalty}</div>
     <button class="btn btn-ghost btn-sm" data-act="dismiss-result" data-ts="${r.ts}">OK</button>
   </div>`;
 }
