@@ -666,3 +666,14 @@ maintenant vraiment de couleur : **rouge** si le joueur n'est pas prêt,
 6 titres de l'artiste indie pop français **Percheye** (Tristan Rolland),
 2022-2025 : Will You Come Home, Mr. Conflict, Getting Occupied, Call Me,
 Drained Out, Ballade. Catalogue à 718 chansons.
+
+## v2.4 — interface épurée
+
+- **Compteur "Xs / 30s" retiré** de l'écran d'écoute (l'égaliseur animé
+  suffit à montrer que le son joue).
+- **Fenêtre "Options de la partie" à taille fixe** : la zone de contenu a
+  maintenant une hauteur fixe (50vh) au lieu de s'ajuster au contenu de
+  chaque onglet — plus de saut de taille en changeant d'onglet.
+- **Résumé des options replié par défaut** : les pastilles-résumé sous
+  "Joueurs" sont maintenant derrière un petit volet "Résumé des options"
+  avec une flèche pour l'ouvrir/fermer, pour un salon d'attente plus épuré.

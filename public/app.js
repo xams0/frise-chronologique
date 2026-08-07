@@ -15,7 +15,6 @@ let hasConnectedOnce = false;
 /* ---------- audio preview player (survives re-renders without restarting) ---------- */
 let audioEl = null;
 let audioKey = null; // uniquely identifies which pending card is currently loaded
-let audioSecondsDisplay = 0; // last-known playback position — used as the template's starting value so a re-render never visibly resets the counter to 0
 let audioAutoplayBlocked = false; // true when the browser refused to auto-start playback — makes the manual fallback button impossible to miss
 let revealTicker = null; // interval id for animating the reveal-button countdown
 let publicRoomsTicker = null; // interval id for auto-refreshing the public rooms list
@@ -90,7 +89,7 @@ const state = {
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showOptions: false, optionsTab: 'modes',
+  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false,
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
@@ -378,7 +377,6 @@ function render() {
     } else {
       const shouldLoop = (state.room && state.room.audioMode) !== 'once';
       audioKey = wantKey;
-      audioSecondsDisplay = 0; // fresh track — reset the last-known playback position
       audioAutoplayBlocked = false;
       const a = document.createElement('audio');
       a.id = 'audio-slot';
@@ -388,15 +386,6 @@ function render() {
       // clips — restarting manually on 'ended' makes the loop actually work.
       // In "once" mode we deliberately do NOT restart, so it plays exactly once.
       if (shouldLoop) a.addEventListener('ended', () => { a.currentTime = 0; a.play().catch(() => {}); });
-      // Drives the "Xs / 30s" counter directly via the DOM, independent of
-      // the render cycle — timeupdate fires ~4x/sec, far too often to run a
-      // full page re-render for. Always re-queries the element fresh so it
-      // still finds the right node even if the page got rebuilt meanwhile.
-      a.addEventListener('timeupdate', () => {
-        audioSecondsDisplay = Math.min(30, Math.floor(a.currentTime));
-        const counterEl = document.getElementById('audio-counter');
-        if (counterEl) counterEl.textContent = audioSecondsDisplay + 's / 30s';
-      });
       slot.replaceWith(a);
       audioEl = a;
       audioAutoplayBlocked = false;
@@ -643,6 +632,11 @@ function renderLobby() {
       <button class="btn ${myself && myself.ready ? 'btn-ghost' : 'btn-gold'} btn-sm" style="margin-top:10px;width:100%;" data-act="toggle-ready">${myself && myself.ready ? '⏳ Se marquer non prêt(e)' : '✅ Prêt(e) (active le son)'}</button>
     </div>
 
+    <button class="recap-toggle" data-act="toggle-recap">
+      <span>Résumé des options</span>
+      <span class="recap-arrow ${state.showRecap ? 'open' : ''}">▾</span>
+    </button>
+    ${state.showRecap ? `
     <div class="options-recap">
       <div class="recap-chip recap-chip-mode">${{ original: '🎵', hardcore: '🩸', enemies: '😈' }[room.gameMode || 'original']} ${{ original: 'Original', hardcore: 'Hardcore', enemies: 'Ennemis' }[room.gameMode || 'original']}</div>
       <div class="recap-chip">🏆 ${cardsToWin}</div>
@@ -654,7 +648,7 @@ function renderLobby() {
       <div class="recap-chip">⏱️ ${room.revealDelaySeconds || 15}s</div>
       <div class="recap-chip">⏳ ${room.turnDecisionSeconds || 60}s</div>
       <div class="recap-chip">${room.freeCardEnabled ? '🛒' : '🚫'} Achat direct</div>
-    </div>
+    </div>` : ''}
     <button class="btn btn-ghost" style="margin-top:10px;" data-act="open-options">⚙️ Options de la partie</button>
 
     ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
@@ -908,7 +902,6 @@ function renderTurnAction(room, pend, isActive, myself) {
       <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         ${renderSoundBars()}
-        <div id="audio-counter" class="mono" style="color:var(--gold);font-size:13px;">${audioSecondsDisplay}s / 30s</div>
         <button class="btn ${audioAutoplayBlocked ? 'btn-gold play-nudge' : 'btn-ghost'} btn-sm" data-act="play-preview">🔊 ${audioAutoplayBlocked ? 'Appuie ici pour le son' : 'Appuyer si pas de son'}</button>
       </div>`;
     } else {
@@ -1387,6 +1380,7 @@ function attachHandlers() {
       else if (act === 'set-audio-loop') socket.emit('set-audio-mode', { mode: 'loop' });
       else if (act === 'set-audio-once') socket.emit('set-audio-mode', { mode: 'once' });
       else if (act === 'open-options') { state.showOptions = true; if (!state.optionsTab) state.optionsTab = 'modes'; render(); }
+      else if (act === 'toggle-recap') { state.showRecap = !state.showRecap; render(); }
       else if (act === 'close-options') { state.showOptions = false; render(); }
       else if (act === 'options-tab') { state.optionsTab = elm.getAttribute('data-tab'); render(); }
       else if (act === 'cards-to-win-minus') socket.emit('set-cards-to-win', { count: Math.max(4, (state.room.cardsToWin || CARDS_TO_WIN) - 1) });
