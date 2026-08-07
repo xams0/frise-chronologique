@@ -731,3 +731,25 @@ Drained Out, Ballade. Catalogue à 718 chansons.
   confirmé — un texte à moitié tapé pour une chanson pouvait rester affiché
   pour la suivante. Corrigé, avec le bon timing pour que ça s'applique dès
   le rendu où la nouvelle chanson démarre.
+
+## v2.6.1 — ajustements des réactions et du layout
+
+- **Effet "burst"** : un seul tap sur un emoji fait maintenant apparaître
+  10 à 15 exemplaires qui s'envolent en cascade, au lieu d'un seul.
+- **Éventail moins resserré** : rayon augmenté (74px → 145px) pour éviter
+  de taper sur deux emojis à la fois par accident.
+- **Le menu reste ouvert** après avoir tapé un emoji, pour pouvoir en
+  envoyer plusieurs d'affilée sans le rouvrir à chaque fois.
+- **Boutons de la zone "Tour" réduits** (Révéler, Défier, Piocher…) —
+  padding et taille de police à peu près divisés par deux, pour que
+  l'en-tête fixe prenne moins de place.
+- **Fix du scroll bugué** : vraie cause identifiée — `.game-scroll`
+  utilisait `flex:1` sans `min-height:0`, un piège classique du flexbox où
+  l'élément grandit pour s'adapter à son contenu au lieu de rester dans
+  l'espace disponible et de défiler en interne.
+- **Zone des frises fixée à 60% de la hauteur d'écran**, comme demandé.
+
+Point d'attention honnête : je n'ai pas d'appareil réel pour vérifier
+visuellement que l'en-tête (topbar + lecture en cours + boutons) tient bien
+dans les 40% restants après la réduction des boutons — si ça déborde
+encore, dis-le et je réduirai davantage.

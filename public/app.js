@@ -283,7 +283,7 @@ socket.on('connect_error', () => setError('Connexion au serveur perdue — véri
 // render() call's innerHTML replacement — they manage their own lifecycle
 // via plain DOM calls, independent of the normal render cycle.
 let reactionOverlay = null;
-function spawnReaction(emoji) {
+function spawnOneReaction(emoji) {
   if (!reactionOverlay) {
     reactionOverlay = document.createElement('div');
     reactionOverlay.id = 'reaction-overlay';
@@ -296,6 +296,14 @@ function spawnReaction(emoji) {
   el.style.animationDuration = (1.7 + Math.random() * 0.6) + 's';
   reactionOverlay.appendChild(el);
   setTimeout(() => el.remove(), 2500);
+}
+// One reaction from one tap should feel like a burst, not a single icon —
+// several instances, staggered slightly so they don't all move in lockstep.
+function spawnReaction(emoji) {
+  const count = 10 + Math.floor(Math.random() * 6); // 10-15
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => spawnOneReaction(emoji), i * 45);
+  }
 }
 socket.on('reaction', ({ emoji }) => spawnReaction(emoji));
 
@@ -941,7 +949,7 @@ function renderGame() {
 function renderReactionFab() {
   const emojis = ['😂', '😭', '😱', '🤬', '🔥'];
   const angles = [90, 112.5, 135, 157.5, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
-  const radius = 74;
+  const radius = 145; // was 74 — too tight, buttons overlapped and caused accidental double-taps
   const locked = reactionLockedUntil > Date.now();
   return `
   ${state.reactionMenuOpen && !locked ? `<div class="reaction-backdrop" data-act="toggle-reaction-menu"></div>` : ''}
@@ -1450,8 +1458,10 @@ function attachHandlers() {
           setTimeout(render, 20000); // flips the FAB icon back from 🚫 to 💬 once the lockout ends
         }
         socket.emit('send-reaction', { emoji: elm.getAttribute('data-emoji') });
-        state.reactionMenuOpen = false;
-        render();
+        // Deliberately NOT closing the menu here — tapping an emoji should let
+        // the person keep sending more without having to reopen it every time.
+        // The lockout itself (or tapping the FAB / backdrop) closes it instead.
+        if (Date.now() < reactionLockedUntil) render(); // reflect the 🚫 state immediately if this tap triggered the lockout
       }
       else if (act === 'toggle-reaction-menu') {
         if (Date.now() < reactionLockedUntil) return;

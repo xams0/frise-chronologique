@@ -80,6 +80,12 @@
   .field input.code{text-transform:uppercase;letter-spacing:0.3em;font-family:'IBM Plex Mono',monospace;text-align:center;font-size:22px;}
 
   .btn{border-radius:14px;padding:15px 20px;font-size:16px;font-weight:700;width:100%;transition:transform .1s;display:inline-block;text-decoration:none;text-align:center;box-sizing:border-box;}
+  /* The "Tour" header (now-playing + Révéler/Défier/Piocher/etc.) is fixed
+     on screen at all times, so it needs to stay compact — roughly half the
+     padding/font-size of a normal button, applied only in this zone. */
+  .game-header .card-section.compact .btn{padding:8px 12px;font-size:13px;border-radius:10px;}
+  .game-header .card-section.compact .decision-timer{height:22px;margin-top:6px;}
+  .game-header .card-section.compact .decision-timer-label{font-size:11px;}
   .reveal-btn{position:relative;overflow:hidden;}
   .btn.reveal-btn:disabled{opacity:1;}
   .reveal-fill{position:absolute;top:0;left:0;bottom:0;background:linear-gradient(90deg, rgba(255,255,255,0.18), rgba(255,255,255,0.5));z-index:1;}
@@ -94,8 +100,8 @@
   .play-nudge{animation:playNudge 0.9s ease-in-out infinite;}
   @keyframes playNudge{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(242,184,75,0.5);}50%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(242,184,75,0);}}
 
-  .game-header{flex-shrink:0;}
-  .game-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:90px;}
+  .game-header{flex-shrink:0;overflow:hidden;}
+  .game-scroll{height:60vh;flex:0 0 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:90px;}
 
   .reaction-fab-wrap{position:fixed;bottom:22px;right:18px;z-index:150;}
   .reaction-fab{width:52px;height:52px;border-radius:50%;background:var(--pink);border:none;color:#fff;font-size:23px;box-shadow:0 6px 18px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;}
