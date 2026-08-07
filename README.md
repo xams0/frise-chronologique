@@ -653,3 +653,10 @@ coûte plus rien de plus que la chanson piochée.
 
 Testé de bout en bout dans les deux sens : la carte de départ survit seule
 en main, et une carte gagnée peut toujours être perdue par la suite.
+
+## v2.3.1 — le point à côté du prénom reflète le statut prêt
+
+Le sablier ⏳/✅ à côté des prénoms dans le salon est retiré. Le petit point
+déjà présent à gauche du prénom (auparavant toujours vert) change
+maintenant vraiment de couleur : **rouge** si le joueur n'est pas prêt,
+**vert** dès qu'il a appuyé sur "Prêt(e)".
