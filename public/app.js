@@ -1289,7 +1289,7 @@ function renderAllTimelines(room) {
     const playerMissed = missed.filter(m => m.playerId === p.id).slice(-5).reverse();
     const dotColor = p.color || '#8B93A6';
     return `
-    <div class="card-section compact ${isTurn ? 'turn-active' : 'turn-inactive'}" id="timeline-${p.id}" style="--player-glow:${dotColor};border-left:3px solid ${dotColor};">
+    <div class="card-section compact ${isTurn ? 'turn-active' : 'turn-inactive'}" id="timeline-${p.id}" style="--player-glow:${dotColor};border-left:3px solid ${dotColor};${isTurn ? `animation-delay:${(-((Date.now() % 4800) / 1000)).toFixed(3)}s;` : ''}">
       <div class="timeline-owner">
         <span><span class="player-dot" style="background:${dotColor};"></span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
         <span class="mono" style="color:var(--gold)">${p.tokens} 🪙</span>

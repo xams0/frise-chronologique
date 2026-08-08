@@ -944,3 +944,21 @@ Testé de bout en bout dans les trois cas : choix délibéré en conflit
 (rejeté avec la liste), choix délibéré libre (accepté), collision non
 délibérée (résolue silencieusement). 126-127 tests, exécutés trois fois
 d'affilée pour confirmer la stabilité après le fix.
+
+## v3.2.1 — retrait de la bordure lumineuse tournante, bug confirmé
+
+Confirmé sur tes captures : la tentative de "lumière qui parcourt le
+contour" (gradient conique + masque CSS) ne rendait pas du tout comme
+prévu — un trait diagonal cassé, qui empirait pendant la lecture audio.
+Cause probable : le support du masquage CSS (`mask-composite`) est
+incohérent selon les navigateurs, en particulier sur Safari iOS, et
+l'animation redémarrait en plein cycle à chaque rafraîchissement de
+l'écran (toutes les 250ms pendant qu'une musique joue), provoquant le
+comportement erratique observé.
+
+Retiré entièrement cette technique complexe. Retour à un simple halo
+pulsant (comme demandé — "une animation simple, lumineuse"), rendu
+robuste aux rafraîchissements fréquents : sa phase est maintenant
+synchronisée sur l'horloge, donc même si la zone du joueur actif est
+reconstruite plusieurs fois par seconde pendant qu'une chanson joue, le
+pulse garde une phase cohérente au lieu de repartir de zéro à chaque fois.

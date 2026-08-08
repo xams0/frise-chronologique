@@ -164,13 +164,14 @@
 
   .card-section{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
   .card-section.compact{padding:10px 12px;margin-bottom:8px;}
-  /* Active player's zone: background genuinely tinted with THEIR color (was
-     hard-coded pink before), a soft pulse glow, plus a thin ring of light
-     that continuously travels around the border via a rotating conic-gradient
-     on a pseudo-element — broadly compatible (no @property needed). */
-  .card-section.turn-active{position:relative;background:color-mix(in srgb, var(--player-glow, var(--pink)) 12%, var(--surface));border-color:var(--player-glow, var(--pink));box-shadow:0 0 14px 1px color-mix(in srgb, var(--player-glow, var(--pink)) 55%, transparent);animation:turnGlow 2.4s ease-in-out infinite alternate;overflow:visible;}
-  .card-section.turn-active::before{content:'';position:absolute;inset:-3px;border-radius:19px;padding:2px;background:conic-gradient(from 0deg, transparent 0%, var(--player-glow, var(--pink)) 12%, transparent 26%);-webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:spinBorder 2.6s linear infinite;pointer-events:none;}
-  @keyframes spinBorder{to{transform:rotate(360deg);}}
+  /* Active player's zone: background genuinely tinted with THEIR color, plus
+     a simple pulsing glow. A previous attempt added a rotating conic-gradient
+     ring here for a "light traveling around the border" effect — pulled out
+     entirely: it rendered as a broken diagonal line (mask-composite support
+     is inconsistent, especially on iOS Safari), and got dramatically worse
+     during frequent re-renders (e.g. while a song plays) since the animation
+     restarted mid-cycle every time. A plain pulse is far more robust. */
+  .card-section.turn-active{background:color-mix(in srgb, var(--player-glow, var(--pink)) 12%, var(--surface));border-color:var(--player-glow, var(--pink));animation:turnGlow 2.4s ease-in-out infinite alternate;}
   @keyframes turnGlow{
     0%{box-shadow:0 0 8px 0 color-mix(in srgb, var(--player-glow, var(--pink)) 35%, transparent);}
     100%{box-shadow:0 0 18px 2px color-mix(in srgb, var(--player-glow, var(--pink)) 65%, transparent);}
