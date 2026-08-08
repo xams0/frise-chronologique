@@ -994,3 +994,14 @@ chevauchent visuellement comme sur la capture envoyée.
   ici" — sans révéler la carte elle-même (toujours un "?", pas d'année),
   juste sa position, pour pouvoir vraiment choisir un autre endroit en
   connaissance de cause.
+
+## v3.2.4 — fond assorti à la bordure, pulse bien plus marqué
+
+- **Fond de la zone joueur** : reprend maintenant vraiment la couleur de sa
+  bordure — 28% de teinte pour le joueur actif, 16% pour les autres (au
+  lieu de 12% uniquement pour l'actif et rien du tout pour les autres
+  avant). Appliqué à tous les joueurs, pas seulement celui en cours.
+- **Pulse nettement amplifié** : la plage du halo est passée de 8px→18px de
+  flou à 4px→28px, avec une intensité de couleur qui va de 25% à 90% (au
+  lieu de 35%→65%) — le mouvement de respiration devrait maintenant se
+  voir clairement. Cycle légèrement accéléré (2s au lieu de 2,4s par sens).

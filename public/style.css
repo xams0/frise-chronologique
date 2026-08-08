@@ -164,17 +164,14 @@
 
   .card-section{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
   .card-section.compact{padding:10px 12px;margin-bottom:8px;}
-  /* Active player's zone: background genuinely tinted with THEIR color, plus
-     a simple pulsing glow. A previous attempt added a rotating conic-gradient
-     ring here for a "light traveling around the border" effect — pulled out
-     entirely: it rendered as a broken diagonal line (mask-composite support
-     is inconsistent, especially on iOS Safari), and got dramatically worse
-     during frequent re-renders (e.g. while a song plays) since the animation
-     restarted mid-cycle every time. A plain pulse is far more robust. */
-  .card-section.turn-active{background:color-mix(in srgb, var(--player-glow, var(--pink)) 12%, var(--surface));border-color:var(--player-glow, var(--pink));animation:turnGlow 2.4s ease-in-out infinite alternate;}
+  /* Background is set inline per-player now (tinted with THEIR own color,
+     stronger for the active zone), so this class only needs the border +
+     pulsing glow. Range widened noticeably (was 8px→18px blur) since the
+     previous pulse was too subtle to actually notice at a glance. */
+  .card-section.turn-active{border-color:var(--player-glow, var(--pink));animation:turnGlow 2s ease-in-out infinite alternate;}
   @keyframes turnGlow{
-    0%{box-shadow:0 0 8px 0 color-mix(in srgb, var(--player-glow, var(--pink)) 35%, transparent);}
-    100%{box-shadow:0 0 18px 2px color-mix(in srgb, var(--player-glow, var(--pink)) 65%, transparent);}
+    0%{box-shadow:0 0 4px 0 color-mix(in srgb, var(--player-glow, var(--pink)) 25%, transparent);}
+    100%{box-shadow:0 0 28px 6px color-mix(in srgb, var(--player-glow, var(--pink)) 90%, transparent);}
   }
   .card-section.turn-inactive{opacity:0.72;filter:brightness(0.85);}
   .player-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0;}
