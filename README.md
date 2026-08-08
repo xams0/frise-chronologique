@@ -861,3 +861,23 @@ enregistrements acoustiques d'avant-guerre n'étant pas systématiquement
 numérisés sur les plateformes de streaming. Pas vérifiées une par une
 individuellement par manque de temps, mais aucun signe d'erreur
 d'attribution de mon côté pour celles-là contrairement aux françaises.
+
+## v2.8 — 4 ajustements
+
+- **Cercle des emojis réduit** encore un cran (rayon 100px → 78px, boutons
+  44px → 38px).
+- **Fix du freeze en tapant pendant l'envoi d'un emoji** : cause probable
+  trouvée — `filter:drop-shadow` sur chaque emoji volant est l'une des
+  propriétés CSS les plus coûteuses à animer, et avec 10-15 exemplaires
+  simultanés ça pouvait saturer le fil principal du navigateur. Retiré (les
+  emojis restent lisibles sans), garde le nombre de 10-15 par salve.
+- **Vrai bug corrigé : le texte "Xs pour répondre" restait figé** pendant
+  qu'on tapait dans Titre ou Artiste, alors que la barre de progression
+  continuait d'avancer normalement. Cause : mon fix précédent (protéger la
+  frappe) sautait complètement le rendu pendant la saisie, y compris pour
+  ces chiffres qui n'ont pourtant rien à voir avec le champ de texte. Les
+  chiffres sont maintenant mis à jour directement (sans toucher au champ en
+  cours de frappe), donc toujours à jour même en tapant.
+- **Le bouton 💬 est maintenant déplaçable** par glisser-déposer — un tap
+  ouvre le menu comme avant, un vrai glissement le déplace et retient sa
+  nouvelle position.

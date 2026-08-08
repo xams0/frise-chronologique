@@ -22,6 +22,7 @@ let lastAutoScrolledDrawKey = null; // prevents re-scrolling to the active playe
 let lastGuessResetDrawKey = null; // prevents re-clearing the guess inputs (and thus interrupting typing) on every re-render of the same draw
 let reactionSendTimes = []; // rolling record of recent reaction sends, for the client-side 5-in-20s anti-spam lockout
 let reactionLockedUntil = 0; // timestamp; while Date.now() < this, sending is blocked and the FAB shows 🚫
+let fabDragMoved = false; // true briefly right after a drag ends, so the resulting click doesn't also toggle the menu
 
 /* ---------- audio unlock ----------
    Browsers refuse to auto-start sound unless playback was triggered by (or
@@ -93,7 +94,7 @@ const state = {
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false,
+  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false, fabPos: null,
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
@@ -355,9 +356,32 @@ function getDjName(room) { const p = room.players.find(pl => pl.id === getDjId(r
 // while the user has an input/textarea focused, so typing (title/artist
 // guesses, name fields, etc.) is never interrupted by a periodic rebuild.
 // The countdown fill bars are pure CSS (wall-clock synced), so they keep
-// animating smoothly on their own even when a tick is skipped — only the
-// numeric label/button-enabled state pauses briefly until the user blurs.
+// animating smoothly on their own even when a tick is skipped — but the
+// numeric labels are plain text set at render time, so without this they'd
+// go stale (frozen) for as long as an input stays focused. Patching just
+// the `.tick-seconds` text nodes directly — never touching any input — lets
+// the numbers stay live even during typing, with zero risk to focus/typing.
+function updateTimerLabelsDirectly() {
+  const room = state.room;
+  const pend = room && room.pending;
+  if (!pend) return;
+  if (pend.stage === 'placed' && pend.placedAt) {
+    const delayMs = (room.revealDelaySeconds || 15) * 1000;
+    const remaining = Math.max(0, delayMs - (Date.now() - pend.placedAt));
+    const secondsLeft = Math.ceil(remaining / 1000);
+    document.querySelectorAll('.tick-seconds[data-timer="reveal"]').forEach(el => { el.textContent = secondsLeft; });
+    document.querySelectorAll('.tick-seconds[data-timer="reveal-info"]').forEach(el => { el.textContent = secondsLeft; });
+  }
+  if (pend.stage === 'listening' && pend.drawnAt) {
+    const delayMs = (room.turnDecisionSeconds || 60) * 1000;
+    const remaining = Math.max(0, delayMs - (Date.now() - pend.drawnAt));
+    const secondsLeft = Math.ceil(remaining / 1000);
+    document.querySelectorAll('.tick-seconds[data-timer="decision"]').forEach(el => { el.textContent = secondsLeft; });
+  }
+}
+
 function renderTick() {
+  updateTimerLabelsDirectly();
   const activeTag = document.activeElement && document.activeElement.tagName;
   if (activeTag === 'INPUT' || activeTag === 'TEXTAREA') return;
   render();
@@ -945,11 +969,12 @@ function renderGame() {
 function renderReactionFab() {
   const emojis = ['😭', '😱', '🤬', '🔥'];
   const angles = [90, 120, 150, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
-  const radius = 100; // 74 was too tight (overlapping taps), 145 was too spread out — this is the middle ground
+  const radius = 78; // 100 still felt big — shrinking further while keeping enough gap to avoid mis-taps
   const locked = reactionLockedUntil > Date.now();
+  const posStyle = state.fabPos ? `left:${state.fabPos.left}px;top:${state.fabPos.top}px;right:auto;bottom:auto;` : '';
   return `
   ${state.reactionMenuOpen && !locked ? `<div class="reaction-backdrop" data-act="toggle-reaction-menu"></div>` : ''}
-  <div class="reaction-fab-wrap">
+  <div class="reaction-fab-wrap" style="${posStyle}">
     <div class="reaction-petals ${state.reactionMenuOpen && !locked ? 'open' : ''}">
       ${emojis.map((e, i) => {
         const rad = angles[i] * Math.PI / 180;
@@ -1055,11 +1080,11 @@ function renderDecisionTimer(room, pend, active, isActivePlayerTurn) {
   const secondsLeft = Math.ceil(remaining / 1000);
   const durationS = (delayMs / 1000).toFixed(2);
   const negDelayS = (-(elapsed / 1000)).toFixed(3);
-  const label = isActivePlayerTurn ? `⏱️ ${secondsLeft}s pour répondre` : `⏱️ ${secondsLeft}s restantes pour ${escapeHtml(active.name)}`;
+  const suffix = isActivePlayerTurn ? 's pour répondre' : `s restantes pour ${escapeHtml(active.name)}`;
   return `
   <div class="decision-timer">
     <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
-    <span class="decision-timer-label">${label}</span>
+    <span class="decision-timer-label">⏱️ <span class="tick-seconds" data-timer="decision">${secondsLeft}</span>${suffix}</span>
   </div>`;
 }
 
@@ -1093,7 +1118,7 @@ function renderRevealButton(room, pend, label) {
   return `
   <button class="btn btn-primary reveal-btn" data-act="reveal" ${ready ? '' : 'disabled'}>
     <div class="reveal-fill" style="${fillStyle}"></div>
-    <span class="reveal-label">${ready ? label : `${label} (${secondsLeft}s)`}</span>
+    <span class="reveal-label">${ready ? label : `${label} (<span class="tick-seconds" data-timer="reveal">${secondsLeft}</span>s)`}</span>
   </button>`;
 }
 
@@ -1133,7 +1158,7 @@ function renderRevealInfoTimer(room, pend, activePl) {
   return `
   <div class="decision-timer">
     <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
-    <span class="decision-timer-label">⏱️ ${secondsLeft}s avant que ${escapeHtml(activePl.name)} puisse révéler</span>
+    <span class="decision-timer-label">⏱️ <span class="tick-seconds" data-timer="reveal-info">${secondsLeft}</span>s avant que ${escapeHtml(activePl.name)} puisse révéler</span>
   </div>`;
 }
 
@@ -1393,6 +1418,46 @@ function renderRulesModal() {
 function attachHandlers() {
   const root = document.getElementById('root');
 
+  // Drag-and-drop for the reaction FAB: dragging the button moves the whole
+  // wrap (button + petals together). A short move-distance is still treated
+  // as a plain tap (opens the menu as usual) — only a real drag suppresses
+  // the click and persists the new position so it survives re-renders.
+  const fabButton = document.querySelector('.reaction-fab');
+  const fabWrap = document.querySelector('.reaction-fab-wrap');
+  if (fabButton && fabWrap) {
+    let dragging = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+    fabButton.onpointerdown = (e) => {
+      dragging = true; moved = false;
+      startX = e.clientX; startY = e.clientY;
+      const rect = fabWrap.getBoundingClientRect();
+      startLeft = rect.left; startTop = rect.top;
+      try { fabButton.setPointerCapture(e.pointerId); } catch (err) {}
+    };
+    fabButton.onpointermove = (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+      if (!moved) return;
+      const w = fabWrap.offsetWidth, h = fabWrap.offsetHeight;
+      const left = Math.max(4, Math.min(window.innerWidth - w - 4, startLeft + dx));
+      const top = Math.max(4, Math.min(window.innerHeight - h - 4, startTop + dy));
+      fabWrap.style.left = left + 'px';
+      fabWrap.style.top = top + 'px';
+      fabWrap.style.right = 'auto';
+      fabWrap.style.bottom = 'auto';
+    };
+    fabButton.onpointerup = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      if (moved) {
+        const rect = fabWrap.getBoundingClientRect();
+        state.fabPos = { left: rect.left, top: rect.top };
+        fabDragMoved = true;
+        setTimeout(() => { fabDragMoved = false; }, 50); // clears just after the resulting click event, if any
+      }
+    };
+  }
+
   const bind = (id, key, transform) => {
     const el = document.getElementById(id);
     if (el) el.oninput = e => { state[key] = transform ? transform(e.target.value) : e.target.value; };
@@ -1460,6 +1525,7 @@ function attachHandlers() {
         if (Date.now() < reactionLockedUntil) render(); // reflect the 🚫 state immediately if this tap triggered the lockout
       }
       else if (act === 'toggle-reaction-menu') {
+        if (fabDragMoved) return; // a drag just ended — don't also toggle the menu
         if (Date.now() < reactionLockedUntil) return;
         state.reactionMenuOpen = !state.reactionMenuOpen;
         render();
