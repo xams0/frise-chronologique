@@ -835,3 +835,29 @@ reste en place, ce sont des sujets distincts de cette histoire de scroll.
   (sans deezerId pré-rempli) pour continuer à tester ces scénarios
   correctement malgré le catalogue désormais pré-résolu — sinon ils ne
   testaient plus rien de pertinent.
+
+## v2.7.1 — les 5 chansons françaises non résolues avaient toutes le mauvais artiste
+
+En creusant pourquoi certaines chansons françaises ne trouvaient pas de
+correspondance sur Deezer, la réponse était gênante mais utile à trouver :
+**les 5 chansons françaises sur les 16 non résolues avaient toutes un
+artiste erroné de ma part**, pas un problème de recherche Deezer :
+
+| Titre | Attribué à tort à | Vrai interprète |
+|---|---|---|
+| Chanson sur ma drôle de vie | Michel Delpech | Véronique Sanson |
+| Le Monde Est Stone | France Gall | Fabienne Thibeault |
+| Tout le bonheur du monde | Nolwenn Leroy | Sinsemilia |
+| Les Sunlights des Tropiques | Bernard Lavilliers | Gilbert Montagné |
+| Vois sur ton chemin | Kids United | Jean-Baptiste Maunier |
+
+Corrigé dans `songs.json`. Elles se résoudront normalement au prochain
+démarrage réel (sandbox de développement sans accès internet direct à
+Deezer pour vérifier ici).
+
+Les 11 chansons restantes sont des enregistrements très anciens
+(1902-1930) — probablement simplement absents du catalogue Deezer, ces
+enregistrements acoustiques d'avant-guerre n'étant pas systématiquement
+numérisés sur les plateformes de streaming. Pas vérifiées une par une
+individuellement par manque de temps, mais aucun signe d'erreur
+d'attribution de mon côté pour celles-là contrairement aux françaises.
