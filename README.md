@@ -981,3 +981,16 @@ avance.
 Au passage : les raccourcis 🤘🏻/🔪 se masquent maintenant automatiquement
 quand l'éventail de réactions est ouvert, pour éviter que les deux se
 chevauchent visuellement comme sur la capture envoyée.
+
+## v3.2.3 — "+" recentré, placement adverse visible en défi
+
+- **Fix du "+" mal centré** : `.slot button` n'avait jamais de centrage
+  flex explicite pour son texte — invisible en mode normal, ça sautait aux
+  yeux dès qu'un anneau coloré (mode défi) attirait le regard sur le
+  cercle. Corrigé universellement.
+- **Vrai manque comblé** : en tant que défieur, l'emplacement déjà choisi
+  par le joueur actif n'était que désactivé, jamais montré. Le modal de
+  défi affiche maintenant ce même emplacement comme une carte "a placé
+  ici" — sans révéler la carte elle-même (toujours un "?", pas d'année),
+  juste sa position, pour pouvoir vraiment choisir un autre endroit en
+  connaissance de cause.

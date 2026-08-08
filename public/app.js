@@ -1375,10 +1375,19 @@ function renderPlacementModal(room) {
   let slots = '';
   const plusStyle = isChallenge ? `style="border-color:${target.color || '#8B93A6'};color:${target.color || '#8B93A6'};box-shadow:0 0 8px 1px ${target.color || '#8B93A6'}66;"` : '';
   for (let i = 0; i <= sorted.length; i++) {
-    const disabled = i === excludeGap;
+    const isExcluded = i === excludeGap;
     const selected = state.selectedGap === i;
-    if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">Ici</div></div></div>`;
-    else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''} ${plusStyle}>+</button></div>`;
+    if (selected) {
+      slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">Ici</div></div></div>`;
+    } else if (isExcluded) {
+      // This is exactly where the active player already placed their guess —
+      // show it as a reference marker (same "En attente" look used in the
+      // main ribbon) instead of a normal "+", so the challenger can actually
+      // SEE what they're disagreeing with, not just have that slot disabled.
+      slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(target.name)}</div><div class="meta-artist">a placé ici</div></div></div>`;
+    } else {
+      slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${plusStyle}>+</button></div>`;
+    }
     if (i < sorted.length) slots += `<div class="ticket ${sorted[i].stolenFrom ? 'ticket-stolen-permanent' : ''}"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div>${sorted[i].stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(sorted[i].stolenFrom)}</div>` : ''}</div></div>`;
   }
 
@@ -1386,7 +1395,7 @@ function renderPlacementModal(room) {
   <div class="modal-bg" data-act="close-modal">
     <div class="modal" onclick="event.stopPropagation()">
       <h2>${isChallenge ? 'Où penses-tu que ça se place ?' : 'Place ta carte'}</h2>
-      <p class="subtitle" style="margin-top:0;">Sur la frise de ${escapeHtml(target.name)} — appuie sur un + pour choisir l'emplacement, puis valide.</p>
+      <p class="subtitle" style="margin-top:0;">Sur la frise de ${escapeHtml(target.name)} — ${isChallenge ? `la carte marquée "a placé ici" montre son choix — appuie sur un + ailleurs pour proposer un autre emplacement, puis valide.` : `appuie sur un + pour choisir l'emplacement, puis valide.`}</p>
       <div class="ribbon" style="margin-top:14px;">${slots}</div>
       <div class="row" style="margin-top:14px;">
         <button class="btn btn-ghost" data-act="close-modal">Annuler</button>
