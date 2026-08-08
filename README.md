@@ -881,3 +881,23 @@ d'attribution de mon côté pour celles-là contrairement aux françaises.
 - **Le bouton 💬 est maintenant déplaçable** par glisser-déposer — un tap
   ouvre le menu comme avant, un vrai glissement le déplace et retient sa
   nouvelle position.
+
+## v3.0.0 — 🎉 6 changements majeurs
+
+- **Zone du joueur actif toujours en premier** dans la liste des frises,
+  pour rester lisible même avec beaucoup de joueurs.
+- **Raccourcis 🤘🏻 (Placer une carte) et 🔪 (Défier)** à côté de 💬 —
+  n'apparaissent que quand l'action est réellement possible, réutilisent
+  exactement la même logique que les boutons habituels.
+- **Drag-and-drop du bouton 💬 retiré**, comme demandé.
+- **Couleur par joueur** : palette de 10 couleurs, choisie au hasard par
+  défaut, modifiable sur l'écran d'accueil à côté du champ Pseudo (mémorisée
+  pour les prochaines parties). Les bots ont une couleur neutre fixe.
+- **Le contour de la frise du joueur actif brille légèrement**, dans sa
+  propre couleur, avec une animation de pulsation douce.
+- **Les autres frises sont légèrement assombries** pour mieux distinguer
+  qui joue en un coup d'œil.
+
+Testé de bout en bout : couleur explicite conservée, couleur invalide
+automatiquement remplacée par une couleur valide de la palette, bot avec
+couleur neutre fixe. 123-124/124 tests, exécutés deux fois.

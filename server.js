@@ -26,6 +26,13 @@ const GAME_MODE_PRESETS = {
   enemies: { cardsToWin: 12, startTokens: 4, revealDelaySeconds: 20, turnDecisionSeconds: 60, freeCardEnabled: false },
 };
 const GAME_MODE_LABELS = { original: 'Original', hardcore: 'Hardcore', enemies: 'Fais-toi des ennemis' };
+
+// Player colors: a fixed palette (not a free color picker) so every color
+// stays readable against the dark theme. Chosen randomly by default; the
+// client lets the person pick one explicitly instead.
+const PLAYER_COLORS = ['#FF4F81', '#3FD9C4', '#F2B84B', '#7C83FD', '#4FD1FF', '#FF8A4F', '#B4FF4F', '#FF4FE0', '#4FFFB0', '#FFD34F'];
+function randomPlayerColor() { return PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]; }
+function sanitizePlayerColor(c) { return PLAYER_COLORS.includes(c) ? c : randomPlayerColor(); }
 const MAX_TOKENS = 5;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const BRACKETS = [
@@ -685,7 +692,7 @@ function scheduleAutoDraw(room) {
 
 io.on('connection', (socket) => {
 
-  socket.on('create-room', ({ name, visibility }) => {
+  socket.on('create-room', ({ name, visibility, color }) => {
     if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
     name = (name || '').trim().slice(0, 20);
     if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
@@ -696,7 +703,7 @@ io.on('connection', (socket) => {
       code, phase: 'lobby',
       visibility: visibility === 'public' ? 'public' : 'private',
       hostId: playerId, // the creator — only they can start the game or change settings
-      players: [{ id: playerId, name, tokens: START_TOKENS, timeline: [], ready: false }],
+      players: [{ id: playerId, name, color: sanitizePlayerColor(color), tokens: START_TOKENS, timeline: [], ready: false }],
       turnOrder: [], turnIndex: 0,
       deck: [], discard: [], pending: null, lastResult: null,
       djId: playerId,
@@ -725,7 +732,7 @@ io.on('connection', (socket) => {
     broadcast(code);
   });
 
-  socket.on('join-room', ({ code, name }) => {
+  socket.on('join-room', ({ code, name, color }) => {
     if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
     code = (code || '').trim().toUpperCase();
     name = (name || '').trim().slice(0, 20);
@@ -747,7 +754,7 @@ io.on('connection', (socket) => {
       return socket.emit('error-msg', `Ce salon est complet (maximum ${room.maxPlayers} joueurs).`);
     }
     const playerId = genId();
-    room.players.push({ id: playerId, name, tokens: START_TOKENS, timeline: [], ready: false });
+    room.players.push({ id: playerId, name, color: sanitizePlayerColor(color), tokens: START_TOKENS, timeline: [], ready: false });
     room.log.push({ ts: nowStr(), text: `${name} a rejoint le salon.` });
     saveRooms();
     socket.join(code);
@@ -1101,7 +1108,7 @@ io.on('connection', (socket) => {
 
   socket.on('add-bot', withRoom((room) => {
     if (room.players.some(p => p.isBot)) return;
-    const bot = { id: 'bot-' + genId(), name: 'Bot 🤖', tokens: (room.startTokens != null ? room.startTokens : START_TOKENS), timeline: [], isBot: true };
+    const bot = { id: 'bot-' + genId(), name: 'Bot 🤖', color: '#8B93A6', tokens: (room.startTokens != null ? room.startTokens : START_TOKENS), timeline: [], isBot: true };
     room.players.push(bot);
     room.log.push({ ts: nowStr(), text: 'Bot de test ajouté — tu peux lancer une partie en solo.' });
   }));

@@ -77,6 +77,9 @@
   .field label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;}
   .field input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--text);font-size:17px;outline:none;}
   .field input:focus{border-color:var(--pink);}
+  .color-swatch-row{display:flex;flex-wrap:wrap;gap:10px;}
+  .color-swatch{width:36px;height:36px;border-radius:50%;border:3px solid transparent;padding:0;}
+  .color-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--bg);}
   .field input.code{text-transform:uppercase;letter-spacing:0.3em;font-family:'IBM Plex Mono',monospace;text-align:center;font-size:22px;}
 
   .btn{border-radius:14px;padding:15px 20px;font-size:16px;font-weight:700;width:100%;transition:transform .1s;display:inline-block;text-decoration:none;text-align:center;box-sizing:border-box;}
@@ -95,7 +98,11 @@
   @keyframes playNudge{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(242,184,75,0.5);}50%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(242,184,75,0);}}
 
   .reaction-fab-wrap{position:fixed;bottom:22px;right:18px;z-index:150;}
-  .reaction-fab{width:52px;height:52px;border-radius:50%;background:var(--pink);border:none;color:#fff;font-size:23px;box-shadow:0 6px 18px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;touch-action:none;cursor:grab;}
+  .quick-fab-stack{position:fixed;bottom:22px;right:82px;z-index:150;display:flex;flex-direction:column-reverse;gap:10px;}
+  .quick-fab{width:46px;height:46px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--text);font-size:20px;box-shadow:0 6px 16px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;}
+  .quick-fab:active{transform:scale(0.94);}
+  .quick-fab-challenge{background:var(--pink);border-color:var(--pink);}
+  .reaction-fab{width:52px;height:52px;border-radius:50%;background:var(--pink);border:none;color:#fff;font-size:23px;box-shadow:0 6px 18px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;}
   .reaction-fab.locked{background:var(--surface2);color:var(--text-dim);}
   .reaction-fab:active{transform:scale(0.94);}
   .reaction-backdrop{position:fixed;inset:0;z-index:140;background:transparent;}
@@ -155,7 +162,13 @@
 
   .card-section{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
   .card-section.compact{padding:10px 12px;margin-bottom:8px;}
-  .card-section.turn-active{background:rgba(255,79,129,0.10);border-color:var(--pink);}
+  .card-section.turn-active{background:rgba(255,79,129,0.10);border-color:var(--player-glow, var(--pink));box-shadow:0 0 14px 1px color-mix(in srgb, var(--player-glow, var(--pink)) 55%, transparent);animation:turnGlow 2.4s ease-in-out infinite alternate;}
+  @keyframes turnGlow{
+    0%{box-shadow:0 0 8px 0 color-mix(in srgb, var(--player-glow, var(--pink)) 35%, transparent);}
+    100%{box-shadow:0 0 18px 2px color-mix(in srgb, var(--player-glow, var(--pink)) 65%, transparent);}
+  }
+  .card-section.turn-inactive{opacity:0.72;filter:brightness(0.85);}
+  .player-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle;flex-shrink:0;}
   .card-section h3{font-size:14px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);margin-bottom:10px;}
 
   /* now playing */

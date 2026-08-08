@@ -5,6 +5,7 @@ const { io } = require('socket.io-client');
 
 const PORT = 3210;
 const CARDS_TO_WIN = 10; // mirrors the server-side constant, kept in sync manually since this is a standalone test script
+const PLAYER_COLORS = ['#FF4F81', '#3FD9C4', '#F2B84B', '#7C83FD', '#4FD1FF', '#FF8A4F', '#B4FF4F', '#FF4FE0', '#4FFFB0', '#FFD34F']; // mirrors the server-side palette
 const URL = `http://localhost:${PORT}`;
 
 // Start from a clean slate each run, exactly like a first-ever launch.
@@ -1343,6 +1344,29 @@ async function main() {
     if (filteredGameStarted.phase === 'playing') ok('start-game succeeds once filters are reset to "all songs"');
     else fail('start-game did not succeed after resetting filters');
     dave.disconnect();
+
+    // ---- player colors: explicit valid choice kept, invalid/missing sanitized, bots get a fixed neutral color ----
+    const wynn = io(URL, { transports: ['websocket'] });
+    const xico = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(wynn, 'connect'), waitFor(xico, 'connect')]);
+    wynn.emit('create-room', { name: 'Wynn', color: '#3FD9C4' });
+    const wynnJoined = await waitFor(wynn, 'joined');
+    const wynnPlayer = wynnJoined.room.players.find(p => p.id === wynnJoined.playerId);
+    if (wynnPlayer.color === '#3FD9C4') ok('an explicit valid color is kept as-is for the room creator');
+    else fail('expected color #3FD9C4 to be kept, got ' + wynnPlayer.color);
+
+    xico.emit('join-room', { code: wynnJoined.code, name: 'Xico', color: 'not-a-real-color' });
+    const xicoJoined = await waitFor(xico, 'joined');
+    const xicoPlayer = xicoJoined.room.players.find(p => p.id === xicoJoined.playerId);
+    if (PLAYER_COLORS.includes(xicoPlayer.color)) ok('an invalid/unrecognized color is sanitized to a valid palette color: ' + xicoPlayer.color);
+    else fail('expected an invalid color to be replaced with a palette color, got ' + xicoPlayer.color);
+
+    wynn.emit('add-bot');
+    const withBot = await waitForRoomWhere(wynn, r => r.players.some(p => p.isBot));
+    const botPlayer = withBot.players.find(p => p.isBot);
+    if (botPlayer.color === '#8B93A6') ok('bots get a fixed neutral color, not a random palette one');
+    else fail('expected the bot to have the fixed neutral color, got ' + botPlayer.color);
+    wynn.disconnect(); xico.disconnect();
 
     alice.disconnect(); bob.disconnect(); carol.disconnect();
     ok('ALL TESTS COMPLETED');

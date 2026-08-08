@@ -8,6 +8,8 @@
 const CARDS_TO_WIN = 10;
 const SESSION_KEY = 'chronolozik_session';
 const LAST_NAME_KEY = 'chronolozik_last_name';
+const PLAYER_COLOR_KEY = 'chronolozik_player_color';
+const PLAYER_COLORS = ['#FF4F81', '#3FD9C4', '#F2B84B', '#7C83FD', '#4FD1FF', '#FF8A4F', '#B4FF4F', '#FF4FE0', '#4FFFB0', '#FFD34F'];
 const WELCOME_KEY = 'chronolozik_seen_welcome';
 const socket = io({ reconnection: true, reconnectionDelay: 500, reconnectionDelayMax: 3000 });
 let hasConnectedOnce = false;
@@ -22,7 +24,6 @@ let lastAutoScrolledDrawKey = null; // prevents re-scrolling to the active playe
 let lastGuessResetDrawKey = null; // prevents re-clearing the guess inputs (and thus interrupting typing) on every re-render of the same draw
 let reactionSendTimes = []; // rolling record of recent reaction sends, for the client-side 5-in-20s anti-spam lockout
 let reactionLockedUntil = 0; // timestamp; while Date.now() < this, sending is blocked and the FAB shows 🚫
-let fabDragMoved = false; // true briefly right after a drag ends, so the resulting click doesn't also toggle the menu
 
 /* ---------- audio unlock ----------
    Browsers refuse to auto-start sound unless playback was triggered by (or
@@ -74,6 +75,16 @@ function saveLastName(name) {
 function loadLastName() {
   try { return localStorage.getItem(LAST_NAME_KEY) || ''; } catch (e) { return ''; }
 }
+function saveLastColor(color) {
+  try { localStorage.setItem(PLAYER_COLOR_KEY, color); } catch (e) {}
+}
+function loadLastColor() {
+  try {
+    const saved = localStorage.getItem(PLAYER_COLOR_KEY);
+    if (saved && PLAYER_COLORS.includes(saved)) return saved;
+  } catch (e) {}
+  return PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]; // random default, as requested
+}
 
 /* ---------- one-time welcome/rules screen ---------- */
 function hasSeenWelcome() {
@@ -87,14 +98,14 @@ function markWelcomeSeen() {
 const state = {
   screen: hasSeenWelcome() ? 'loading' : 'welcome', // welcome | loading | home | lobby | game
   mode: 'create',            // create | join
-  nameInput: loadLastName(), codeInput: '', error: '', busy: false,
+  nameInput: loadLastName(), codeInput: '', error: '', busy: false, playerColor: loadLastColor(),
   playerId: null, playerName: null, code: null, room: null,
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
-  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false, fabPos: null,
+  brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false,
   healthReport: null, healthChecking: false,
   ready: null,
   connected: true, reconnecting: false,
@@ -313,7 +324,7 @@ function createRoom() {
   const name = state.nameInput.trim();
   if (!name) return setError('Entre ton prénom.');
   state.busy = true; render();
-  socket.emit('create-room', { name, visibility: state.roomVisibility });
+  socket.emit('create-room', { name, visibility: state.roomVisibility, color: state.playerColor });
 }
 function joinRoom() {
   const name = state.nameInput.trim();
@@ -321,7 +332,7 @@ function joinRoom() {
   if (!name) return setError('Entre ton prénom.');
   if (code.length < 4) return setError('Entre le code du salon (4 caractères).');
   state.busy = true; render();
-  socket.emit('join-room', { code, name });
+  socket.emit('join-room', { code, name, color: state.playerColor });
 }
 function leaveToHome() {
   if (state.code) socket.emit('leave-room');
@@ -627,6 +638,13 @@ function renderHome() {
       <div class="field">
         <label>Ton prénom</label>
         <input id="inp-name" type="text" placeholder="Ex. Léa" value="${escapeHtml(state.nameInput)}" maxlength="20"/>
+      </div>
+
+      <div class="field">
+        <label>Ta couleur</label>
+        <div class="color-swatch-row">
+          ${PLAYER_COLORS.map(c => `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''}" data-act="pick-color" data-color="${c}" style="background:${c};"></button>`).join('')}
+        </div>
       </div>
 
       ${state.mode === 'create' ? `
@@ -957,6 +975,7 @@ function renderGame() {
     ${renderAllTimelines(room)}
     ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
 
+    ${renderQuickActionFabs(room, pend, isActive, myself, active)}
     ${renderReactionFab()}
 
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
@@ -966,15 +985,25 @@ function renderGame() {
   </div>`;
 }
 
+function renderQuickActionFabs(room, pend, isActive, myself, active) {
+  const canPlace = pend && pend.stage === 'listening' && isActive && !active.isBot;
+  const canChallenge = pend && pend.stage === 'placed' && !pend.challenge && myself && myself.tokens >= 1 && (active.isBot || pend.activePlayerId !== state.playerId);
+  if (!canPlace && !canChallenge) return '';
+  return `
+  <div class="quick-fab-stack">
+    ${canPlace ? `<button class="quick-fab" data-act="open-placement" title="Placer la carte">🤘🏻</button>` : ''}
+    ${canChallenge ? `<button class="quick-fab quick-fab-challenge" data-act="open-challenge" title="Défier">🔪</button>` : ''}
+  </div>`;
+}
+
 function renderReactionFab() {
   const emojis = ['😭', '😱', '🤬', '🔥'];
   const angles = [90, 120, 150, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
   const radius = 78; // 100 still felt big — shrinking further while keeping enough gap to avoid mis-taps
   const locked = reactionLockedUntil > Date.now();
-  const posStyle = state.fabPos ? `left:${state.fabPos.left}px;top:${state.fabPos.top}px;right:auto;bottom:auto;` : '';
   return `
   ${state.reactionMenuOpen && !locked ? `<div class="reaction-backdrop" data-act="toggle-reaction-menu"></div>` : ''}
-  <div class="reaction-fab-wrap" style="${posStyle}">
+  <div class="reaction-fab-wrap">
     <div class="reaction-petals ${state.reactionMenuOpen && !locked ? 'open' : ''}">
       ${emojis.map((e, i) => {
         const rad = angles[i] * Math.PI / 180;
@@ -1203,7 +1232,15 @@ function renderAllTimelines(room) {
   const showWonHighlight = lr && lr.kind !== 'wrong' && (Date.now() - lr.ts) < RESULT_NOTICE_MS;
   const wonPlayerName = showWonHighlight ? (lr.kind === 'stolen' ? lr.extraName : lr.activeName) : null;
 
-  return room.players.map(p => {
+  // The active player's zone always renders first, so it's never buried
+  // below a wall of other players' timelines when there are many of them.
+  const orderedPlayers = room.players.slice().sort((a, b) => {
+    if (a.id === activeId) return -1;
+    if (b.id === activeId) return 1;
+    return 0;
+  });
+
+  return orderedPlayers.map(p => {
     const sorted = p.timeline.slice().sort((a, b) => a.year - b.year);
     let markers = [];
     if (pend && pend.activePlayerId === p.id && pend.placement) markers.push({ gapIndex: pend.placement.gapIndex, cls: 'pending', label: 'En attente' });
@@ -1214,10 +1251,11 @@ function renderAllTimelines(room) {
     const items = buildRibbonItems(sorted, markers);
     const isTurn = p.id === activeId;
     const playerMissed = missed.filter(m => m.playerId === p.id).slice(-5).reverse();
+    const dotColor = p.color || '#8B93A6';
     return `
-    <div class="card-section compact ${isTurn ? 'turn-active' : ''}" id="timeline-${p.id}">
+    <div class="card-section compact ${isTurn ? 'turn-active' : 'turn-inactive'}" id="timeline-${p.id}" style="${isTurn ? `--player-glow:${dotColor};` : ''}">
       <div class="timeline-owner">
-        <span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
+        <span><span class="player-dot" style="background:${dotColor};"></span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
         <span class="mono" style="color:var(--gold)">${p.tokens} 🪙</span>
       </div>
       <div class="ribbon">
@@ -1418,46 +1456,6 @@ function renderRulesModal() {
 function attachHandlers() {
   const root = document.getElementById('root');
 
-  // Drag-and-drop for the reaction FAB: dragging the button moves the whole
-  // wrap (button + petals together). A short move-distance is still treated
-  // as a plain tap (opens the menu as usual) — only a real drag suppresses
-  // the click and persists the new position so it survives re-renders.
-  const fabButton = document.querySelector('.reaction-fab');
-  const fabWrap = document.querySelector('.reaction-fab-wrap');
-  if (fabButton && fabWrap) {
-    let dragging = false, moved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
-    fabButton.onpointerdown = (e) => {
-      dragging = true; moved = false;
-      startX = e.clientX; startY = e.clientY;
-      const rect = fabWrap.getBoundingClientRect();
-      startLeft = rect.left; startTop = rect.top;
-      try { fabButton.setPointerCapture(e.pointerId); } catch (err) {}
-    };
-    fabButton.onpointermove = (e) => {
-      if (!dragging) return;
-      const dx = e.clientX - startX, dy = e.clientY - startY;
-      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
-      if (!moved) return;
-      const w = fabWrap.offsetWidth, h = fabWrap.offsetHeight;
-      const left = Math.max(4, Math.min(window.innerWidth - w - 4, startLeft + dx));
-      const top = Math.max(4, Math.min(window.innerHeight - h - 4, startTop + dy));
-      fabWrap.style.left = left + 'px';
-      fabWrap.style.top = top + 'px';
-      fabWrap.style.right = 'auto';
-      fabWrap.style.bottom = 'auto';
-    };
-    fabButton.onpointerup = (e) => {
-      if (!dragging) return;
-      dragging = false;
-      if (moved) {
-        const rect = fabWrap.getBoundingClientRect();
-        state.fabPos = { left: rect.left, top: rect.top };
-        fabDragMoved = true;
-        setTimeout(() => { fabDragMoved = false; }, 50); // clears just after the resulting click event, if any
-      }
-    };
-  }
-
   const bind = (id, key, transform) => {
     const el = document.getElementById(id);
     if (el) el.oninput = e => { state[key] = transform ? transform(e.target.value) : e.target.value; };
@@ -1497,13 +1495,14 @@ function attachHandlers() {
       else if (act === 'mode-join') { state.mode = 'join'; render(); if (state.publicRooms === null) loadPublicRooms(); }
       else if (act === 'visibility-private') { state.roomVisibility = 'private'; render(); }
       else if (act === 'visibility-public') { state.roomVisibility = 'public'; render(); }
+      else if (act === 'pick-color') { state.playerColor = elm.getAttribute('data-color'); saveLastColor(state.playerColor); render(); }
       else if (act === 'refresh-public-rooms') loadPublicRooms();
       else if (act === 'join-public-room') {
         const name = state.nameInput.trim();
         if (!name) { setError('Entre ton prénom d\'abord.'); return; }
         state.codeInput = elm.getAttribute('data-code');
         state.busy = true; render();
-        socket.emit('join-room', { code: state.codeInput, name });
+        socket.emit('join-room', { code: state.codeInput, name, color: state.playerColor });
       }
       else if (act === 'create-room') createRoom();
       else if (act === 'join-room') joinRoom();
@@ -1525,7 +1524,6 @@ function attachHandlers() {
         if (Date.now() < reactionLockedUntil) render(); // reflect the 🚫 state immediately if this tap triggered the lockout
       }
       else if (act === 'toggle-reaction-menu') {
-        if (fabDragMoved) return; // a drag just ended — don't also toggle the menu
         if (Date.now() < reactionLockedUntil) return;
         state.reactionMenuOpen = !state.reactionMenuOpen;
         render();
