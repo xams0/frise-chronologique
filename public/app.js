@@ -116,7 +116,7 @@ const state = {
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
   seenResultAt: 0, ytMuted: true,
   brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false,
-  healthReport: null, healthChecking: false,
+  healthReport: null, healthChecking: false, auditReport: null, auditRunning: false,
   ready: null,
   connected: true, reconnecting: false,
   version: null, roomVisibility: 'private', publicRooms: null, maxPlayersInput: '', showFinalTimelines: false,
@@ -200,6 +200,37 @@ async function checkCatalogHealth() {
   } catch (e) { state.healthReport = null; }
   state.healthChecking = false;
   render();
+}
+async function startDeezerAudit() {
+  state.auditRunning = true; state.auditReport = null; render();
+  try {
+    await fetch('/api/songs/audit', { method: 'POST' });
+  } catch (e) {
+    state.auditRunning = false; render(); return;
+  }
+  pollDeezerAudit();
+}
+async function pollDeezerAudit() {
+  try {
+    const res = await fetch('/api/songs/audit');
+    const data = await res.json();
+    state.auditReport = data;
+    if (data.running) {
+      setTimeout(pollDeezerAudit, 1000);
+    } else {
+      state.auditRunning = false;
+      // A mismatch found during the audit clears that song's deezerId —
+      // refresh the local catalog copy so the library list reflects it.
+      try {
+        const catRes = await fetch('/api/songs');
+        state.catalog = await catRes.json();
+      } catch (e) {}
+    }
+    render();
+  } catch (e) {
+    state.auditRunning = false;
+    render();
+  }
 }
 async function removeSong(title, artist) {
   try {
@@ -805,6 +836,7 @@ function renderLobby() {
       <div class="recap-chip">⏳ ${room.turnDecisionSeconds || 60}s</div>
       <div class="recap-chip">⏭️ ${room.autoDrawSeconds ? room.autoDrawSeconds + 's' : 'Manuel'}</div>
       <div class="recap-chip">${room.freeCardEnabled ? '🛒' : '🚫'} Achat direct</div>
+      <div class="recap-chip">${room.partialGuessBonus ? '🎯' : '🚫'} Bonus partiel</div>
     </div>` : ''}
     <button class="btn btn-ghost" style="margin-top:10px;" data-act="open-options">⚙️ Options de la partie</button>
 
@@ -905,7 +937,15 @@ function renderOptionsModal(room) {
       <div class="row" style="margin-top:8px;">
         <button class="btn ${!room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-off">🚫 Désactivé</button>
         <button class="btn ${room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-on">🛒 Activé</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.freeCardEnabled ? '🛒 Activé' : '🚫 Désactivé'}</div>`}`;
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.freeCardEnabled ? '🛒 Activé' : '🚫 Désactivé'}</div>`}
+
+      <h3 style="margin-top:18px;">Bonus partiel titre/artiste</h3>
+      <p class="subtitle" style="margin:0 0 8px;">Trouver seulement le titre OU seulement l'artiste (pas les deux) rapporte quand même +0,5 jeton, au lieu de rien.</p>
+      ${isHost ? `
+      <div class="row" style="margin-top:8px;">
+        <button class="btn ${!room.partialGuessBonus ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-partial-guess-off">🚫 Désactivé</button>
+        <button class="btn ${room.partialGuessBonus ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-partial-guess-on">🎯 Activé</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.partialGuessBonus ? '🎯 Activé' : '🚫 Désactivé'}</div>`}`;
   } else if (tab === 'ecoute') {
     body = `
       <h3>Où êtes-vous ?</h3>
@@ -1149,7 +1189,7 @@ function renderTurnAction(room, pend, isActive, myself) {
         <input id="inp-title" placeholder="Titre ?" value="${escapeHtml(state.guessTitle)}"/>
         <input id="inp-artist" placeholder="Artiste ?" value="${escapeHtml(state.guessArtist)}"/>
       </div>
-      <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre + artiste (+1 🪙)</button>`;
+      <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre + artiste (+1 🪙)${room.partialGuessBonus ? ' — ou un seul des deux (+0,5 🪙)' : ''}</button>`;
     }
     if (guessDone && pend.guessBy !== 'bot-na') {
       const guessKey = pend.placedAt + '-' + pend.guessBy;
@@ -1466,9 +1506,40 @@ function renderLibraryModal() {
         ${renderHealthReport()}
       </div>
 
+      <div class="card-section" style="background:var(--surface2);margin-top:14px;">
+        <h3>Vérifier les associations Deezer</h3>
+        <p class="subtitle" style="margin:0 0 10px;">Recontrôle que chaque chanson pointe bien vers la bonne piste sur Deezer (titre + artiste), pas juste qu'elle a un extrait audio — corrige automatiquement les mauvaises associations trouvées.</p>
+        <button class="btn btn-teal btn-sm" data-act="start-deezer-audit" ${state.auditRunning ? 'disabled' : ''}>${state.auditRunning ? `Vérification en cours… (${state.auditReport ? state.auditReport.checked : 0}/${state.auditReport ? state.auditReport.total : '?'})` : '🔎 Vérifier les associations'}</button>
+        ${renderAuditReport()}
+      </div>
+
       <button class="btn btn-ghost" style="margin-top:14px;" data-act="close-library">Fermer</button>
     </div>
   </div>`;
+}
+
+function renderAuditReport() {
+  const r = state.auditReport;
+  if (!r) return '';
+  if (r.running) {
+    return `<p class="subtitle" style="margin-top:10px;">${r.checked}/${r.total} vérifiées…</p>`;
+  }
+  const mismatches = r.mismatches || [];
+  return `
+    <div style="margin-top:12px;">
+      <p style="font-size:13px;color:${mismatches.length ? 'var(--red)' : 'var(--teal)'};margin:0 0 8px;font-weight:600;">
+        ${mismatches.length === 0 ? `Aucun désaccord trouvé sur ${r.total} chansons vérifiées.` : `${mismatches.length} mauvaise${mismatches.length > 1 ? 's' : ''} association${mismatches.length > 1 ? 's' : ''} trouvée${mismatches.length > 1 ? 's' : ''} et corrigée${mismatches.length > 1 ? 's' : ''} (sur ${r.total}) — se re-résoudront au prochain démarrage.`}
+      </p>
+      ${mismatches.length ? `
+      <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+        ${mismatches.map(m => `
+          <div class="log-line">
+            <b>Attendu :</b> ${escapeHtml(m.expectedTitle)} · ${escapeHtml(m.expectedArtist)}<br>
+            <span style="color:var(--red);">Deezer avait :</span> ${escapeHtml(m.gotTitle)} · ${escapeHtml(m.gotArtist)}
+          </div>
+        `).join('')}
+      </div>` : ''}
+    </div>`;
 }
 
 function renderHealthReport() {
@@ -1623,6 +1694,7 @@ function attachHandlers() {
       else if (act === 'toggle-import') { state.showImport = !state.showImport; state.importError = ''; render(); }
       else if (act === 'import-catalog') importCatalog();
       else if (act === 'check-health') checkCatalogHealth();
+      else if (act === 'start-deezer-audit') startDeezerAudit();
       else if (act === 'remove-song') removeSong(elm.getAttribute('data-title'), elm.getAttribute('data-artist'));
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
@@ -1677,6 +1749,8 @@ function attachHandlers() {
       else if (act === 'set-visibility-public') socket.emit('set-visibility', { visibility: 'public' });
       else if (act === 'set-free-card-off') socket.emit('set-free-card-enabled', { enabled: false });
       else if (act === 'set-free-card-on') socket.emit('set-free-card-enabled', { enabled: true });
+      else if (act === 'set-partial-guess-off') socket.emit('set-partial-guess-bonus', { enabled: false });
+      else if (act === 'set-partial-guess-on') socket.emit('set-partial-guess-bonus', { enabled: true });
       else if (act === 'set-game-mode') socket.emit('set-game-mode', { mode: elm.getAttribute('data-mode') });
       else if (act === 'toggle-bracket') toggleBracket(state.room, { from: parseInt(elm.getAttribute('data-from'), 10), to: parseInt(elm.getAttribute('data-to'), 10) });
       else if (act === 'reset-filters') resetFilters();

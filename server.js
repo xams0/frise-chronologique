@@ -124,7 +124,7 @@ function closeEnough(guess, real) {
   const maxDist = Math.max(1, Math.round(real.length * 0.22));
   return levenshtein(guess, real) <= maxDist;
 }
-function matchGuess(gt, ga, real) {
+function matchGuessDetail(gt, ga, real) {
   const nt = normalize(gt), na = normalize(ga);
   const rt = normalize(real.title), ra = normalize(real.artist.split(' ft.')[0].split(' feat.')[0]);
   // >= 2 rather than > 2 — some real artist names are exactly 2 characters
@@ -132,7 +132,10 @@ function matchGuess(gt, ga, real) {
   // guess correctly, regardless of how it was typed.
   const titleOk = nt.length >= 2 && closeEnough(nt, rt);
   const artistOk = na.length >= 2 && closeEnough(na, ra);
-  return titleOk && artistOk;
+  return { titleOk, artistOk, bothOk: titleOk && artistOk };
+}
+function matchGuess(gt, ga, real) {
+  return matchGuessDetail(gt, ga, real).bothOk;
 }
 function timelineYears(timeline) { return timeline.map(c => c.year).sort((a, b) => a - b); }
 function gapCorrect(sortedYears, gapIndex, year) {
@@ -189,6 +192,7 @@ async function deezerFetchJson(url, retries = 4) {
 const FAKE_DEEZER_FAIL = process.env.FAKE_DEEZER_FAIL === '1';
 const FAKE_DEEZER_MISMATCH = process.env.FAKE_DEEZER_MISMATCH === '1';
 const FAKE_DEEZER_TRIBUTE = process.env.FAKE_DEEZER_TRIBUTE === '1';
+const FAKE_DEEZER_AUDIT_MISMATCH = process.env.FAKE_DEEZER_AUDIT_MISMATCH === '1';
 
 async function deezerSearch(artist, title) {
   const query = `${artist} ${title}`;
@@ -211,7 +215,20 @@ async function deezerSearch(artist, title) {
   return data.data || [];
 }
 async function deezerTrack(id) {
-  if (FAKE_DEEZER) return FAKE_DEEZER_FAIL ? { preview: null } : { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' } };
+  if (FAKE_DEEZER) {
+    if (FAKE_DEEZER_FAIL) return { preview: null };
+    if (FAKE_DEEZER_AUDIT_MISMATCH) return { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' }, title: 'Speed Demon', artist: { name: 'Michael Jackson' } };
+    // Echoes back whatever the catalog currently expects for this id, so a
+    // routine audit run (nothing actually wrong) correctly reports zero
+    // mismatches in tests.
+    const known = catalog.find(s => String(s.deezerId) === String(id));
+    return {
+      preview: 'https://example.invalid/fake-preview-' + id + '.mp3',
+      album: { cover_medium: 'https://example.invalid/fake-cover.jpg' },
+      title: known ? known.title : 'Unknown',
+      artist: { name: known ? known.artist : 'Unknown' },
+    };
+  }
   return await deezerFetchJson(`https://api.deezer.com/track/${id}`);
 }
 // Best-effort: attach {previewUrl, cover} to a card object for THIS turn only.
@@ -328,6 +345,52 @@ function pickBestDeezerMatch(results, expectedTitle, expectedArtist) {
     const titleOk = closeByRatio(stripTitleNoise(expectedTitle), stripTitleNoise(gotTitle), 0.15);
     return artistOk && titleOk;
   }) || null;
+}
+
+// On-demand full audit: unlike the boot-time verification (which trusts
+// already-resolved entries for 30 days to keep boots fast), this actually
+// re-fetches every resolved track's real title/artist from Deezer and
+// compares it against what the catalog expects — catching a bad match that
+// slipped through even if it's well within its 30-day trust window. This is
+// deliberately NOT run automatically; it's triggered on demand (e.g. from
+// the library screen) since checking ~1000 tracks takes real time.
+let deezerAuditState = { running: false, checked: 0, total: 0, mismatches: [] };
+async function runDeezerAudit() {
+  if (deezerAuditState.running) return;
+  const toCheck = catalog.filter(s => s.deezerId);
+  deezerAuditState = { running: true, checked: 0, total: toCheck.length, mismatches: [] };
+  let catalogChanged = false;
+  const BATCH = 5;
+  for (let i = 0; i < toCheck.length; i += BATCH) {
+    const batch = toCheck.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (song) => {
+      try {
+        const track = await deezerTrack(song.deezerId);
+        const gotTitle = track.title || '';
+        const gotArtist = (track.artist && track.artist.name) || '';
+        const artistOk = closeByRatio(song.artist, gotArtist, 0.10);
+        const titleOk = closeByRatio(stripTitleNoise(song.title), stripTitleNoise(gotTitle), 0.15);
+        if (!artistOk || !titleOk) {
+          deezerAuditState.mismatches.push({ expectedTitle: song.title, expectedArtist: song.artist, gotTitle, gotArtist, deezerId: song.deezerId });
+          // Clear the bad id rather than leave it in place — the normal
+          // resolution flow will search for a better match on the next
+          // boot (or the next time this audit runs, since a cleared id
+          // makes it eligible for re-checking again either way).
+          delete song.deezerId;
+          delete song.verifiedAt;
+          catalogChanged = true;
+        }
+      } catch (e) {
+        console.warn('Audit Deezer: échec pour', song.artist, '-', song.title, e.message);
+      } finally {
+        deezerAuditState.checked++;
+      }
+    }));
+    if (i + BATCH < toCheck.length && !FAKE_DEEZER) await sleep(700);
+  }
+  if (catalogChanged) saveCatalog();
+  deezerAuditState.running = false;
+  console.log(`Audit Deezer terminé : ${deezerAuditState.mismatches.length} désaccord(s) trouvé(s) sur ${deezerAuditState.total} vérifiés.`);
 }
 
 async function verifyAndPrepareCatalog() {
@@ -680,6 +743,15 @@ app.get('/api/songs/health', async (req, res) => {
   res.json({ total: catalog.length, ok: okCount, noMatch, noPreview });
 });
 
+// Starts a full audit in the background (fire-and-forget) — poll
+// /api/songs/audit for progress. Refuses to start a second one concurrently.
+app.post('/api/songs/audit', (req, res) => {
+  if (deezerAuditState.running) return res.status(409).json({ error: 'Un audit est déjà en cours.' });
+  runDeezerAudit();
+  res.json({ started: true, total: catalog.filter(s => s.deezerId).length });
+});
+app.get('/api/songs/audit', (req, res) => res.json(deezerAuditState));
+
 // ---------- socket.io: real-time game events ----------
 // Shared by the host's explicit "Lancer la partie" click AND the automatic
 // start once every player has marked themselves ready.
@@ -775,6 +847,7 @@ io.on('connection', (socket) => {
       startTokens: START_TOKENS, // configurable starting token count
       freeCardEnabled: false, // "spend 3 tokens to place a card without listening" — off by default
       gameMode: 'original', // label for whichever special-mode preset was last applied
+      partialGuessBonus: false, // when true, guessing only the title OR only the artist (not both) still earns +0.5 tokens
       usedSongKeys: [], // songs actually drawn in a past game in this room — avoided on replay when possible
       autoDrawSeconds: 5, // 0 = off; otherwise auto-draws the next card after this many seconds of nobody acting
       audioMode: 'loop', // 'loop' = repeat the 30s preview | 'once' = play once and stop
@@ -1002,6 +1075,13 @@ io.on('connection', (socket) => {
     room.log.push({ ts: nowStr(), text: room.freeCardEnabled ? '🛒 Achat direct de carte (3 jetons) activé.' : '🛒 Achat direct de carte (3 jetons) désactivé.' });
   }));
 
+  socket.on('set-partial-guess-bonus', withRoom((room, { enabled }) => {
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (room.phase !== 'lobby') return;
+    room.partialGuessBonus = !!enabled;
+    room.log.push({ ts: nowStr(), text: room.partialGuessBonus ? '🎯 Bonus partiel (+0,5 jeton pour titre OU artiste) activé.' : '🎯 Bonus partiel désactivé.' });
+  }));
+
   socket.on('set-game-mode', withRoom((room, { mode }) => {
     if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
     if (room.phase !== 'lobby') return;
@@ -1117,13 +1197,18 @@ io.on('connection', (socket) => {
   socket.on('submit-guess', withRoom((room, { title, artist }) => {
     const playerId = socket.data.playerId;
     if (!room.pending || room.pending.guessBy || room.pending.activePlayerId !== playerId) return;
-    const correct = matchGuess(title, artist, room.pending.card);
-    room.pending.guessCorrect = correct;
+    const detail = matchGuessDetail(title, artist, room.pending.card);
+    room.pending.guessCorrect = detail.bothOk;
     room.pending.guessBy = playerId;
     const p = me(room, playerId);
-    if (correct) {
-      if (p.tokens < MAX_TOKENS) p.tokens += 1;
+    if (detail.bothOk) {
+      p.tokens = Math.min(MAX_TOKENS, p.tokens + 1);
       room.log.push({ ts: nowStr(), text: `${p.name} trouve le titre et l'artiste — +1 jeton !` });
+    } else if (room.partialGuessBonus && (detail.titleOk || detail.artistOk)) {
+      p.tokens = Math.min(MAX_TOKENS, p.tokens + 0.5);
+      const found = detail.titleOk ? 'le titre' : 'l\'artiste';
+      room.pending.guessPartial = true;
+      room.log.push({ ts: nowStr(), text: `${p.name} trouve ${found} — +0,5 jeton !` });
     } else {
       room.log.push({ ts: nowStr(), text: `${p.name} n'a pas trouvé le titre/artiste.` });
     }

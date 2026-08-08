@@ -1065,3 +1065,23 @@ inclusion), variations de titre légitimes (remasters, live, feat.)
 explicitement reconnues et ignorées plutôt que tolérées en vrac. Testé
 directement avec le scénario "tribute band" — confirmé rejeté, alors que
 l'ancienne logique l'aurait accepté à tort.
+
+## v3.4.0 — vérification Deezer à la demande + bonus partiel
+
+- **Nouveau bouton "🔎 Vérifier les associations"** dans la Bibliothèque
+  (📚) : re-télécharge le titre/artiste réel de chaque chanson déjà
+  résolue sur Deezer et le compare à ce qui est attendu (avec le
+  comparateur strict de la v3.3.1), même pour les entrées "de confiance"
+  qui ne seraient normalement plus re-vérifiées avant 30 jours. Toute
+  mauvaise association trouvée a son `deezerId` retiré automatiquement
+  (se re-résout proprement au prochain démarrage). Barre de progression
+  et rapport détaillé (attendu vs reçu par Deezer) pour chaque désaccord.
+- **Bonus partiel titre/artiste** : nouveau réglage dans Options de la
+  partie → Partie, désactivé par défaut. Une fois activé, trouver
+  seulement le titre OU seulement l'artiste (pas les deux) rapporte quand
+  même +0,5 jeton au lieu de rien.
+
+Testé de bout en bout : audit sans désaccord (deezerId conservé), audit
+avec un vrai désaccord (deezerId retiré, rapport correct), bonus partiel
+activé (2 → 2,5 jetons confirmé) et désactivé (aucun jeton, comme avant).
+139/139 tests, exécutés deux fois.

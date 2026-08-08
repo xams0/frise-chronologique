@@ -209,6 +209,87 @@ async function main() {
     try { fs.unlinkSync(tributeSongsPath); } catch (e) {}
   }
 
+  // ---- the on-demand /api/songs/audit endpoint: no false positives on a
+  // genuinely correct catalog, and mismatches actually get cleared ----
+  const auditOkPath = path.join(__dirname, 'songs.audit-ok-test.json');
+  fs.writeFileSync(auditOkPath, JSON.stringify([
+    { title: 'Thriller', artist: 'Michael Jackson', deezerId: 111, verifiedAt: Date.now() },
+  ]));
+  const auditOkServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 6), FAKE_DEEZER: '1', SONGS_FILE_OVERRIDE: auditOkPath } });
+  auditOkServer.stdout.on('data', () => {}); auditOkServer.stderr.on('data', () => {});
+  try {
+    const auditOkUrl = `http://localhost:${PORT + 6}`;
+    await waitForReady(auditOkUrl);
+    const startRes = await fetch(`${auditOkUrl}/api/songs/audit`, { method: 'POST' });
+    const startData = await startRes.json();
+    if (startData.started) ok('audit correctly starts and reports the total to check: ' + startData.total);
+    else fail('expected the audit to start, got: ' + JSON.stringify(startData));
+
+    let auditFinal = null;
+    for (let i = 0; i < 20; i++) {
+      const st = await (await fetch(`${auditOkUrl}/api/songs/audit`)).json();
+      if (!st.running) { auditFinal = st; break; }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (auditFinal && auditFinal.mismatches.length === 0) {
+      ok('audit correctly reports zero mismatches for a genuinely correct catalog');
+    } else {
+      fail('expected zero mismatches, got: ' + JSON.stringify(auditFinal));
+    }
+    const songsAfterOk = await (await fetch(`${auditOkUrl}/api/songs`)).json();
+    if (songsAfterOk[0].deezerId) ok('a correctly-matched song keeps its deezerId after the audit');
+    else fail('expected the correct deezerId to survive the audit untouched');
+
+    // starting a second audit while one might still be finishing shouldn't
+    // be possible concurrently — but by now it's done, so this call itself
+    // should succeed and start a fresh one rather than 409.
+    const secondStart = await fetch(`${auditOkUrl}/api/songs/audit`, { method: 'POST' });
+    if (secondStart.status === 200) ok('a new audit can be started once the previous one has finished');
+    else fail('expected a fresh audit start to succeed once idle, got status ' + secondStart.status);
+  } catch (e) {
+    fail('phase -0.2 (audit endpoint, correct catalog) exception: ' + e.message);
+  } finally {
+    auditOkServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(auditOkPath); } catch (e) {}
+  }
+
+  const auditBadPath = path.join(__dirname, 'songs.audit-bad-test.json');
+  fs.writeFileSync(auditBadPath, JSON.stringify([
+    { title: 'Bam, Bam, Bamy Shore', artist: 'Not The Real Artist', deezerId: 59509551, verifiedAt: Date.now() },
+  ]));
+  const auditBadServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 7), FAKE_DEEZER: '1', FAKE_DEEZER_AUDIT_MISMATCH: '1', SONGS_FILE_OVERRIDE: auditBadPath } });
+  auditBadServer.stdout.on('data', () => {}); auditBadServer.stderr.on('data', () => {});
+  try {
+    const auditBadUrl = `http://localhost:${PORT + 7}`;
+    await waitForReady(auditBadUrl);
+    await fetch(`${auditBadUrl}/api/songs/audit`, { method: 'POST' });
+
+    let auditFinal = null;
+    for (let i = 0; i < 20; i++) {
+      const st = await (await fetch(`${auditBadUrl}/api/songs/audit`)).json();
+      if (!st.running) { auditFinal = st; break; }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (auditFinal && auditFinal.mismatches.length === 1 && auditFinal.mismatches[0].gotArtist === 'Michael Jackson') {
+      ok('audit correctly detects a real mismatch and reports what Deezer actually had: ' + auditFinal.mismatches[0].gotTitle + ' — ' + auditFinal.mismatches[0].gotArtist);
+    } else {
+      fail('expected exactly one detected mismatch naming Michael Jackson, got: ' + JSON.stringify(auditFinal));
+    }
+    const songsAfterBad = await (await fetch(`${auditBadUrl}/api/songs`)).json();
+    if (!songsAfterBad[0].deezerId) {
+      ok('the bad deezerId is correctly cleared by the audit, ready to be properly re-resolved next boot');
+    } else {
+      fail('expected the mismatched deezerId to be cleared, but it is still: ' + songsAfterBad[0].deezerId);
+    }
+  } catch (e) {
+    fail('phase -0.1 (audit endpoint, real mismatch) exception: ' + e.message);
+  } finally {
+    auditBadServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(auditBadPath); } catch (e) {}
+  }
+
   // ---- Phase 0: confirm the actual fix — with zero real Deezer access (this
   // sandbox's normal state), draw-card must NEVER hand back a silent card,
   // AND the new readiness gate must still open (checked-but-all-failed still
@@ -499,6 +580,78 @@ async function main() {
       fail(`fuzzy match rejected a minor typo — real: "${realTitle}"/"${realArtist}", guessed: "${typo(realTitle)}"/"${typo(realArtist)}"`);
     }
     yara.disconnect(); zack.disconnect();
+
+    // ---- partial guess bonus: +0.5 tokens for title OR artist alone, only when enabled ----
+    const quincy = io(URL, { transports: ['websocket'] });
+    const ren3 = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(quincy, 'connect'), waitFor(ren3, 'connect')]);
+    quincy.emit('create-room', { name: 'Quincy' });
+    const quincyJoined = await waitFor(quincy, 'joined');
+    if (quincyJoined.room.partialGuessBonus === false) ok('room defaults to partialGuessBonus=false');
+    else fail('expected default partialGuessBonus=false, got ' + quincyJoined.room.partialGuessBonus);
+    ren3.emit('join-room', { code: quincyJoined.code, name: 'Ren3' });
+    await waitFor(ren3, 'joined');
+
+    let pgRefused = null;
+    ren3.once('error-msg', (msg) => { pgRefused = msg; });
+    ren3.emit('set-partial-guess-bonus', { enabled: true });
+    await new Promise(r => setTimeout(r, 400));
+    if (pgRefused) ok('non-host correctly refused when trying to enable the partial guess bonus');
+    else fail('expected non-host set-partial-guess-bonus attempt to be refused');
+
+    quincy.emit('set-partial-guess-bonus', { enabled: true });
+    const pgRoom = await waitForRoomWhere(quincy, r => r.partialGuessBonus === true);
+    ok('host successfully enabled the partial guess bonus');
+    quincy.emit('set-reveal-delay', { seconds: 30 });
+    await waitForRoomWhere(quincy, r => r.revealDelaySeconds === 30);
+    quincy.emit('start-game');
+    const pgGame = await waitForRoomWhere(quincy, r => r.phase === 'playing');
+    const pgActiveId = pgGame.turnOrder[pgGame.turnIndex];
+    const pgActiveSocket = pgActiveId === quincyJoined.playerId ? quincy : ren3;
+    const tokensBefore = pgGame.players.find(p => p.id === pgActiveId).tokens;
+
+    pgActiveSocket.emit('draw-card');
+    const pgDrawn = await waitForRoomWhere(pgActiveSocket, r => !!r.pending);
+    const pgRealTitle = pgDrawn.pending.card.title;
+    // Correct title, deliberately unrelated artist — should earn +0.5, not +1 and not 0.
+    pgActiveSocket.emit('submit-guess', { title: pgRealTitle, artist: 'Zzyzx Qwerty Not A Real Artist' });
+    const pgAfterGuess = await waitForRoomWhere(pgActiveSocket, r => r.pending && r.pending.guessBy);
+    const tokensAfter = pgAfterGuess.players.find(p => p.id === pgActiveId).tokens;
+    if (pgAfterGuess.pending.guessCorrect === false && pgAfterGuess.pending.guessPartial === true && tokensAfter === tokensBefore + 0.5) {
+      ok(`partial guess bonus correctly awarded +0.5 tokens for a title-only match (${tokensBefore} -> ${tokensAfter})`);
+    } else {
+      fail('expected +0.5 tokens for a title-only match with the bonus enabled: ' + JSON.stringify({ tokensBefore, tokensAfter, guessCorrect: pgAfterGuess.pending.guessCorrect, guessPartial: pgAfterGuess.pending.guessPartial }));
+    }
+    quincy.disconnect(); ren3.disconnect();
+
+    // Same scenario but with the setting left OFF (default) — a title-only
+    // match must earn nothing at all, not a silent partial credit.
+    const soraya = io(URL, { transports: ['websocket'] });
+    const trent = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(soraya, 'connect'), waitFor(trent, 'connect')]);
+    soraya.emit('create-room', { name: 'Soraya' });
+    const sorayaJoined = await waitFor(soraya, 'joined');
+    trent.emit('join-room', { code: sorayaJoined.code, name: 'Trent' });
+    await waitFor(trent, 'joined');
+    soraya.emit('set-reveal-delay', { seconds: 30 });
+    await waitForRoomWhere(soraya, r => r.revealDelaySeconds === 30);
+    soraya.emit('start-game');
+    const pgOffGame = await waitForRoomWhere(soraya, r => r.phase === 'playing');
+    const pgOffActiveId = pgOffGame.turnOrder[pgOffGame.turnIndex];
+    const pgOffActiveSocket = pgOffActiveId === sorayaJoined.playerId ? soraya : trent;
+    const tokensBeforeOff = pgOffGame.players.find(p => p.id === pgOffActiveId).tokens;
+
+    pgOffActiveSocket.emit('draw-card');
+    const pgOffDrawn = await waitForRoomWhere(pgOffActiveSocket, r => !!r.pending);
+    pgOffActiveSocket.emit('submit-guess', { title: pgOffDrawn.pending.card.title, artist: 'Zzyzx Qwerty Not A Real Artist' });
+    const pgOffAfterGuess = await waitForRoomWhere(pgOffActiveSocket, r => r.pending && r.pending.guessBy);
+    const tokensAfterOff = pgOffAfterGuess.players.find(p => p.id === pgOffActiveId).tokens;
+    if (tokensAfterOff === tokensBeforeOff) {
+      ok('with the partial bonus disabled (default), a title-only match correctly earns nothing');
+    } else {
+      fail('expected no token change with the bonus disabled, got: ' + JSON.stringify({ tokensBeforeOff, tokensAfterOff }));
+    }
+    soraya.disconnect(); trent.disconnect();
 
     // ---- bot flow ----
     const carol = io(URL, { transports: ['websocket'] });
