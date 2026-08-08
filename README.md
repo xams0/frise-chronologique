@@ -1005,3 +1005,23 @@ chevauchent visuellement comme sur la capture envoyée.
   flou à 4px→28px, avec une intensité de couleur qui va de 25% à 90% (au
   lieu de 35%→65%) — le mouvement de respiration devrait maintenant se
   voir clairement. Cycle légèrement accéléré (2s au lieu de 2,4s par sens).
+
+## v3.2.5 — fix d'un mauvais appariement Deezer (Al Jolson → Michael Jackson)
+
+Un joueur a signalé avoir entendu du Michael Jackson alors que la carte
+affichait "Bam, Bam, Bamy Shore" — Al Jolson. Vérifié directement le
+`deezerId` en cause (59509551) : il pointait bien vers *Speed Demon* de
+Michael Jackson (album Bad 25th Anniversary, 2012), rien à voir.
+
+Cause trouvée : "Bam Bam Bamy Shore" est une vraie chanson de 1925, mais
+je l'avais attribuée au mauvais artiste — Al Jolson ne l'a jamais
+interprétée, c'est Joséphine Baker (ou Paul Ash & His Granada Orchestra).
+Comme la recherche Deezer ne trouvait rien pour "Al Jolson Bam Bam Bamy
+Shore", elle est retombée sur un résultat complètement hors sujet.
+
+Corrigé : artiste changé pour Joséphine Baker, `deezerId` erroné retiré —
+se résoudra correctement au prochain démarrage réel (pas d'accès direct à
+Deezer depuis cet environnement de développement pour vérifier ici).
+
+Pour vérifier un `deezerId` soi-même : chercher `deezer.com track [ID]`
+ou ouvrir `https://www.deezer.com/track/[ID]` directement.
