@@ -962,3 +962,22 @@ robuste aux rafraîchissements fréquents : sa phase est maintenant
 synchronisée sur l'horloge, donc même si la zone du joueur actif est
 reconstruite plusieurs fois par seconde pendant qu'une chanson joue, le
 pulse garde une phase cohérente au lieu de repartir de zéro à chaque fois.
+
+## v3.2.2 — vraie cause du "faut taper 2 fois" sur le FAB
+
+Cause trouvée : la zone du FAB (💬 et les raccourcis 🤘🏻/🔪) était incluse
+dans le HTML principal de l'écran de jeu, qui se reconstruit entièrement
+toutes les 250ms pendant qu'une chanson joue (le minuteur de décompte). Un
+tap qui tombait pile pendant cette reconstruction pouvait être perdu — ce
+n'était pas une "attente de synchro serveur", c'est le DOM du bouton
+lui-même qui se faisait détruire et recréer sous le doigt.
+
+Corrigé en sortant le FAB du cycle de rendu principal : il vit maintenant
+dans son propre conteneur, mis à jour uniquement quand son contenu change
+réellement (menu ouvert/fermé, verrouillage anti-spam, action
+possible/impossible) — plus jamais reconstruit juste parce que le minuteur
+avance.
+
+Au passage : les raccourcis 🤘🏻/🔪 se masquent maintenant automatiquement
+quand l'éventail de réactions est ouvert, pour éviter que les deux se
+chevauchent visuellement comme sur la capture envoyée.

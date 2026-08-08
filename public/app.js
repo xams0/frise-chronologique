@@ -334,6 +334,27 @@ function spawnReaction(emoji) {
     setTimeout(() => spawnOneReaction(emoji), i * 45);
   }
 }
+
+// The reaction FAB + quick-action shortcuts live in their own persistent
+// overlay too, for the same reason as above: PLUS this content only gets
+// rebuilt when its own computed HTML actually changes (see the string
+// comparison below), not on every one of the frequent re-renders the
+// countdown ticker triggers — that churn was making taps land on a button
+// mid-teardown/rebuild, which is exactly the "sometimes needs two taps, or
+// waits a moment" symptom reported.
+let fabOverlay = null;
+let lastAppliedFabHtml = null;
+let lastComputedFabHtml = ''; // set by renderGame() as a side effect just before it returns
+function updateFabOverlay(fabHtml) {
+  if (!fabOverlay) {
+    fabOverlay = document.createElement('div');
+    fabOverlay.id = 'fab-overlay';
+    document.body.appendChild(fabOverlay);
+  }
+  if (fabHtml === lastAppliedFabHtml) return; // nothing FAB-relevant changed — skip touching the DOM at all
+  lastAppliedFabHtml = fabHtml;
+  fabOverlay.innerHTML = fabHtml;
+}
 socket.on('reaction', ({ emoji }) => spawnReaction(emoji));
 
 /* ---------- actions (thin — server owns all game logic) ---------- */
@@ -447,12 +468,13 @@ function render() {
   }
 
   let html;
-  if (state.screen === 'welcome') html = renderWelcome();
-  else if (state.screen === 'loading') html = renderLoading();
-  else if (state.screen === 'home') html = renderHome();
-  else if (state.screen === 'lobby') html = renderLobby();
-  else html = renderGame();
+  if (state.screen === 'welcome') { html = renderWelcome(); lastComputedFabHtml = ''; }
+  else if (state.screen === 'loading') { html = renderLoading(); lastComputedFabHtml = ''; }
+  else if (state.screen === 'home') { html = renderHome(); lastComputedFabHtml = ''; }
+  else if (state.screen === 'lobby') { html = renderLobby(); lastComputedFabHtml = ''; }
+  else html = renderGame(); // sets lastComputedFabHtml as a side effect
   root.innerHTML = html;
+  updateFabOverlay(lastComputedFabHtml);
 
   if (focusedId) {
     const el = document.getElementById(focusedId);
@@ -978,7 +1000,7 @@ function renderGame() {
   const pend = room.pending;
   const myself = me(room);
 
-  return `
+  const gameHtml = `
   <div class="screen game-screen">
     ${renderBgPremium()}
     ${connectionBanner()}
@@ -1007,14 +1029,20 @@ function renderGame() {
     ${renderAllTimelines(room)}
     ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
 
-    ${renderQuickActionFabs(room, pend, isActive, myself, active)}
-    ${renderReactionFab()}
-
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
     ${state.showDjPicker ? renderDjModal(room) : ''}
     ${state.cardDetail ? renderCardDetailModal() : ''}
   </div>`;
+  // The reaction FAB + quick-action shortcuts are rendered into a SEPARATE
+  // persistent overlay (see updateFabOverlay), not embedded in this string —
+  // this section of the page used to get torn down and rebuilt every 250ms
+  // by the countdown ticker while a card was pending, and a tap landing
+  // right as that happened could silently miss (the exact "sometimes needs
+  // two taps" symptom reported). Computed here as a side effect so render()
+  // can apply it separately, only touching the DOM when it actually changes.
+  lastComputedFabHtml = renderQuickActionFabs(room, pend, isActive, myself, active) + renderReactionFab();
+  return gameHtml;
 }
 
 function renderQuickActionFabs(room, pend, isActive, myself, active) {
@@ -1025,6 +1053,11 @@ function renderQuickActionFabs(room, pend, isActive, myself, active) {
   // screen, these shortcuts would otherwise sit right on top of "Valider" —
   // move them out of the way, greyed out, stacked near the top instead.
   const modalOpen = !!state.activeTimelinePlayerId;
+  // While the reaction petals are fanned out, they occupy roughly the same
+  // screen area these shortcuts normally sit in (to the left of 💬) — hide
+  // them entirely rather than have both visually collide.
+  const reactionMenuOpen = state.reactionMenuOpen && reactionLockedUntil <= Date.now();
+  if (reactionMenuOpen && !modalOpen) return '';
   return `
   <div class="quick-fab-stack ${modalOpen ? 'muted' : ''}">
     ${canPlace ? `<button class="quick-fab" data-act="open-placement" title="Placer la carte" ${modalOpen ? 'disabled' : ''}>🤘🏻</button>` : ''}
@@ -1491,8 +1524,6 @@ function renderRulesModal() {
 
 /* ---------- event delegation ---------- */
 function attachHandlers() {
-  const root = document.getElementById('root');
-
   const bind = (id, key, transform) => {
     const el = document.getElementById(id);
     if (el) el.oninput = e => { state[key] = transform ? transform(e.target.value) : e.target.value; };
@@ -1512,7 +1543,11 @@ function attachHandlers() {
   const maxCustomEl = document.getElementById('inp-max-custom');
   if (maxCustomEl) maxCustomEl.oninput = e => { state.maxPlayersInput = e.target.value; };
 
-  root.querySelectorAll('[data-act]').forEach(elm => {
+  // Query the whole document, not just #root: the reaction FAB / quick-action
+  // shortcuts now live in a separate #fab-overlay appended to <body> (see
+  // updateFabOverlay), specifically so they're insulated from #root's
+  // frequent innerHTML rebuilds during the countdown ticker.
+  document.querySelectorAll('[data-act]').forEach(elm => {
     // .onclick assignment, NOT addEventListener: assignment always REPLACES
     // the previous handler, so no matter how many times attachHandlers()
     // runs against the same element, there is only ever one handler bound.
