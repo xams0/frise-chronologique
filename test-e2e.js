@@ -181,6 +181,34 @@ async function main() {
     try { fs.unlinkSync(mismatchSongsPath); } catch (e) {}
   }
 
+  // ---- the specific weakness the OLD matcher had: "expected" being a
+  // substring of "got" (e.g. a tribute/cover act) must NOT count as a match ----
+  const tributeSongsPath = path.join(__dirname, 'songs.tribute-test.json');
+  fs.writeFileSync(tributeSongsPath, JSON.stringify([
+    { title: 'Thriller', artist: 'Michael Jackson' },
+  ]));
+  const tributeServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 5), FAKE_DEEZER: '1', FAKE_DEEZER_TRIBUTE: '1', SONGS_FILE_OVERRIDE: tributeSongsPath } });
+  tributeServer.stdout.on('data', () => {});
+  tributeServer.stderr.on('data', () => {});
+  try {
+    const tributeUrl = `http://localhost:${PORT + 5}`;
+    await waitForReady(tributeUrl);
+    const songsRes = await fetch(`${tributeUrl}/api/songs`);
+    const songsData = await songsRes.json();
+    const song = songsData[0];
+    if (!song.deezerId) {
+      ok('a tribute-band-style near-match ("Michael Jackson Tribute Band" for "Michael Jackson") is correctly rejected — the old substring-containment rule would have wrongly accepted this');
+    } else {
+      fail('expected the tribute-band match to be rejected, but got a deezerId: ' + JSON.stringify(song));
+    }
+  } catch (e) {
+    fail('phase -0.3 (tribute-band false-positive check) exception: ' + e.message);
+  } finally {
+    tributeServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(tributeSongsPath); } catch (e) {}
+  }
+
   // ---- Phase 0: confirm the actual fix — with zero real Deezer access (this
   // sandbox's normal state), draw-card must NEVER hand back a silent card,
   // AND the new readiness gate must still open (checked-but-all-failed still

@@ -188,18 +188,24 @@ async function deezerFetchJson(url, retries = 4) {
 // real pacing delays or depending on this sandbox's network being blocked.
 const FAKE_DEEZER_FAIL = process.env.FAKE_DEEZER_FAIL === '1';
 const FAKE_DEEZER_MISMATCH = process.env.FAKE_DEEZER_MISMATCH === '1';
+const FAKE_DEEZER_TRIBUTE = process.env.FAKE_DEEZER_TRIBUTE === '1';
 
-async function deezerSearch(query) {
-  // The fake result's title/artist both echo the full query back — this
-  // guarantees it passes the closeEnough() match check below (the query is
-  // literally "${artist} ${title}", so it contains both as substrings),
-  // without the fake mode needing to know which part was which.
+async function deezerSearch(artist, title) {
+  const query = `${artist} ${title}`;
+  // The fake result's title/artist exactly echo what was asked for — this
+  // is what makes it pass the new, stricter match check below by design
+  // (see pickBestDeezerMatch). FAKE_DEEZER_MISMATCH deliberately breaks
+  // this to test that a genuinely wrong result gets rejected instead.
   if (FAKE_DEEZER) {
     if (FAKE_DEEZER_FAIL) return [];
     // Test-only seam simulating the exact real-world bug a player reported:
     // Deezer returning a completely unrelated track for a bad/obscure query.
     if (FAKE_DEEZER_MISMATCH) return [{ id: 'fake-mismatch-id', title: 'Speed Demon', artist: { name: 'Michael Jackson' } }];
-    return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12), title: query, artist: { name: query } }];
+    // Test-only seam for the specific weakness the OLD (closeEnough-based)
+    // matcher had: "expected" being a substring of "got" used to count as a
+    // match, which would wrongly accept a tribute/cover act as the real one.
+    if (FAKE_DEEZER_TRIBUTE) return [{ id: 'fake-tribute-id', title, artist: { name: artist + ' Tribute Band' } }];
+    return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12), title, artist: { name: artist } }];
   }
   const data = await deezerFetchJson(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
   return data.data || [];
@@ -251,7 +257,7 @@ async function ensureDeezerIds() {
     const batch = todo.slice(i, i + BATCH);
     await Promise.all(batch.map(async (song) => {
       try {
-        const results = await deezerSearch(`${song.artist} ${song.title}`);
+        const results = await deezerSearch(song.artist, song.title);
         const match = pickBestDeezerMatch(results, song.title, song.artist);
         if (match) {
           song.deezerId = match.id;
@@ -289,20 +295,38 @@ let readyState = { ready: false, checked: 0, total: 0, ok: 0 };
 // that a track quietly pulled from Deezer's catalog gets caught eventually.
 const DEEZER_VERIFY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// Picks the best Deezer search result that's ACTUALLY a plausible match for
-// the intended title/artist, using the same fuzzy-tolerance logic already
-// used to grade players' guesses — rather than blindly trusting whichever
-// result Deezer's search ranked first. This is what would have caught the
-// real bug a player reported: "Bam, Bam, Bamy Shore" (misattributed to the
-// wrong artist at the time) resolved to Michael Jackson's "Speed Demon",
-// since nothing sane matched the bad query and the first result was just
-// noise. Returns null if nothing in the results is a good enough match.
+// A dedicated matcher for validating Deezer search results — deliberately
+// NOT the same closeEnough() used to grade player guesses. That function's
+// "one string contains the other" rule is exactly right for tolerating a
+// player's typo, but wrong here: it would happily accept an artist like
+// "Michael Jackson Tribute Band" as a match for "Michael Jackson", since
+// the expected name is a substring of the wrong one. A silent wrong match
+// is the actual failure mode this exists to prevent, so artist identity is
+// checked with a tight edit-distance ratio instead of open containment.
+// Titles legitimately vary more (remasters, live takes, feat. credits) —
+// those are stripped explicitly first, then compared with a little more
+// (but still bounded) tolerance.
+function stripTitleNoise(s) {
+  return (s || '')
+    .replace(/\((?:feat|ft)\.?[^)]*\)/gi, '')
+    .replace(/\((?:remaster(?:ed)?|live|radio edit|mono|stereo|single version|album version|explicit|clean)[^)]*\)/gi, '')
+    .replace(/-\s*(?:remaster(?:ed)?(?:\s*\d{4})?|live|radio edit|mono|stereo)\s*$/gi, '')
+    .trim();
+}
+function closeByRatio(expected, got, maxDistRatio) {
+  const a = normalize(expected), b = normalize(got);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const maxDist = Math.max(1, Math.round(Math.max(a.length, b.length) * maxDistRatio));
+  return levenshtein(a, b) <= maxDist;
+}
 function pickBestDeezerMatch(results, expectedTitle, expectedArtist) {
-  const nt = normalize(expectedTitle), na = normalize(expectedArtist);
   return results.find(r => {
-    const gotTitle = normalize(r.title || '');
-    const gotArtist = normalize((r.artist && r.artist.name) || '');
-    return closeEnough(nt, gotTitle) && closeEnough(na, gotArtist);
+    const gotTitle = r.title || '';
+    const gotArtist = (r.artist && r.artist.name) || '';
+    const artistOk = closeByRatio(expectedArtist, gotArtist, 0.10);
+    const titleOk = closeByRatio(stripTitleNoise(expectedTitle), stripTitleNoise(gotTitle), 0.15);
+    return artistOk && titleOk;
   }) || null;
 }
 
@@ -322,7 +346,7 @@ async function verifyAndPrepareCatalog() {
     const batch = todo.slice(i, i + BATCH);
     await Promise.all(batch.map(async (song) => {
       try {
-        const results = await deezerSearch(`${song.artist} ${song.title}`);
+        const results = await deezerSearch(song.artist, song.title);
         const match = pickBestDeezerMatch(results, song.title, song.artist);
         if (match) {
           song.deezerId = match.id;
@@ -593,13 +617,14 @@ app.post('/api/songs', async (req, res) => {
   if (dup) return res.status(400).json({ error: 'Cette chanson est déjà dans la bibliothèque.' });
   let deezerId = null;
   try {
-    const results = await deezerSearch(`${a} ${t}`);
-    if (results.length) deezerId = results[0].id;
+    const results = await deezerSearch(a, t);
+    const match = pickBestDeezerMatch(results, t, a);
+    if (match) deezerId = match.id;
   } catch (e) {
     return res.status(502).json({ error: "Impossible de joindre Deezer pour l'instant, réessaie." });
   }
   if (!deezerId) return res.status(400).json({ error: 'Introuvable sur Deezer — vérifie l\'orthographe du titre et de l\'artiste.' });
-  catalog.push({ title: t, artist: a, year: y, deezerId });
+  catalog.push({ title: t, artist: a, year: y, deezerId, verifiedAt: Date.now() });
   saveCatalog();
   res.json(catalog);
 });

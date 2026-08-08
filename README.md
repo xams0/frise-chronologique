@@ -1047,3 +1047,21 @@ C'est exactement le garde-fou qui aurait empêché le bug "Bam Bam Bamy
 Shore" → Michael Jackson — testé directement avec un scénario qui
 reproduit ce cas précis, confirmé qu'aucun `deezerId` erroné n'est
 assigné.
+
+## v3.3.1 — vraie critique reçue, corrigée : mauvais outil de comparaison
+
+Remarque justifiée : la v3.3.0 réutilisait `closeEnough()` (la tolérance
+aux fautes de frappe des joueurs) pour valider les résultats Deezer — mais
+ce n'est pas le bon outil. Sa règle "une chaîne contenue dans l'autre =
+ça compte" est parfaite pour un joueur qui tape "bohemian rhap" au lieu de
+"Bohemian Rhapsody", mais elle aurait accepté à tort un artiste "Michael
+Jackson Tribute Band" comme correspondance valide pour "Michael Jackson"
+— exactement le genre d'erreur silencieuse que ce garde-fou est censé
+empêcher.
+
+Remplacé par un comparateur dédié, plus strict : identité de l'artiste
+vérifiée par distance d'édition serrée (pas de correspondance par simple
+inclusion), variations de titre légitimes (remasters, live, feat.)
+explicitement reconnues et ignorées plutôt que tolérées en vrac. Testé
+directement avec le scénario "tribute band" — confirmé rejeté, alors que
+l'ancienne logique l'aurait accepté à tort.
