@@ -78,7 +78,8 @@
   .field input{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;color:var(--text);font-size:17px;outline:none;}
   .field input:focus{border-color:var(--pink);}
   .color-swatch-row{display:flex;flex-wrap:wrap;gap:10px;}
-  .color-swatch{width:36px;height:36px;border-radius:50%;border:3px solid transparent;padding:0;}
+  .color-swatch{width:36px;height:36px;border-radius:50%;border:3px solid transparent;padding:0;color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .color-swatch.taken{opacity:0.3;cursor:not-allowed;}
   .color-swatch.selected{border-color:#fff;box-shadow:0 0 0 2px var(--bg);}
   .field input.code{text-transform:uppercase;letter-spacing:0.3em;font-family:'IBM Plex Mono',monospace;text-align:center;font-size:22px;}
 

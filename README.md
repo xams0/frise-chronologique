@@ -923,3 +923,24 @@ couleur neutre fixe. 123-124/124 tests, exécutés deux fois.
   reprend maintenant vraiment sa couleur, et chaque frise (active ou non)
   a désormais une fine bande colorée à gauche, pour que la couleur de
   chacun reste visible tout du long, pas seulement pendant son tour.
+
+## v3.2.0 — couleur du pseudo + détection des couleurs identiques
+
+- **Dans le salon, le nom du joueur prend directement sa couleur** au lieu
+  d'une petite pastille séparée.
+- **Erreur avec popup si deux joueurs choisissent la même couleur** — les
+  couleurs indisponibles sont marquées d'un ✕ directement sur les
+  pastilles du sélecteur.
+- **Vrai bug trouvé et corrigé en cours de route** : un blocage strict sur
+  toute collision de couleur cassait des rejoints tout à fait normaux — la
+  plupart des joueurs n'ouvrent jamais le sélecteur 🎨 et reçoivent une
+  couleur par défaut/aléatoire côté client, qui peut coïncider par pur
+  hasard avec une couleur déjà prise. Un indicateur `colorExplicit`
+  distingue maintenant "l'utilisateur a vraiment choisi cette couleur" de
+  "c'est juste la couleur par défaut" — le serveur ne bloque que dans le
+  premier cas ; sinon il réattribue silencieusement une couleur libre.
+
+Testé de bout en bout dans les trois cas : choix délibéré en conflit
+(rejeté avec la liste), choix délibéré libre (accepté), collision non
+délibérée (résolue silencieusement). 126-127 tests, exécutés trois fois
+d'affilée pour confirmer la stabilité après le fix.

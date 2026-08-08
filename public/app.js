@@ -85,6 +85,16 @@ function loadLastColor() {
   } catch (e) {}
   return PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)]; // random default, as requested
 }
+// Distinguishes "the person genuinely picked/saved this color at some point"
+// from "this is just today's random fallback" — used so the server only
+// hard-rejects a taken color when it was an actual deliberate choice,
+// rather than blocking a join over a coincidental random default.
+function hasSavedColor() {
+  try {
+    const saved = localStorage.getItem(PLAYER_COLOR_KEY);
+    return !!(saved && PLAYER_COLORS.includes(saved));
+  } catch (e) { return false; }
+}
 
 /* ---------- one-time welcome/rules screen ---------- */
 function hasSeenWelcome() {
@@ -98,7 +108,7 @@ function markWelcomeSeen() {
 const state = {
   screen: hasSeenWelcome() ? 'loading' : 'welcome', // welcome | loading | home | lobby | game
   mode: 'create',            // create | join
-  nameInput: loadLastName(), codeInput: '', error: '', busy: false, playerColor: loadLastColor(), showColorPicker: false,
+  nameInput: loadLastName(), codeInput: '', error: '', busy: false, playerColor: loadLastColor(), showColorPicker: false, colorConflict: null, colorExplicit: hasSavedColor(),
   playerId: null, playerName: null, code: null, room: null,
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
@@ -270,6 +280,13 @@ socket.on('error-msg', (msg) => {
   setError(msg);
 });
 
+socket.on('color-taken', ({ takenColors }) => {
+  state.busy = false;
+  state.colorConflict = takenColors;
+  state.showColorPicker = true; // reopen the picker, with the taken swatches marked, so they can pick another
+  render();
+});
+
 socket.on('connect', () => {
   state.connected = true;
   if (hasConnectedOnce && state.code && state.playerName) {
@@ -332,7 +349,7 @@ function joinRoom() {
   if (!name) return setError('Entre ton prénom.');
   if (code.length < 4) return setError('Entre le code du salon (4 caractères).');
   state.busy = true; render();
-  socket.emit('join-room', { code, name, color: state.playerColor });
+  socket.emit('join-room', { code, name, color: state.playerColor, colorExplicit: state.colorExplicit });
 }
 function leaveToHome() {
   if (state.code) socket.emit('leave-room');
@@ -670,12 +687,17 @@ function renderHome() {
 }
 
 function renderColorPickerModal() {
+  const taken = state.colorConflict || [];
   return `
   <div class="modal-bg" data-act="close-color-picker">
     <div class="modal" onclick="event.stopPropagation()">
       <h2>Ta couleur</h2>
+      ${taken.length ? `<p class="subtitle" style="margin-top:6px;color:var(--pink);">Cette couleur est déjà prise dans ce salon. Couleurs indisponibles marquées d'une ✕ — choisis-en une autre.</p>` : ''}
       <div class="color-swatch-row" style="margin-top:12px;">
-        ${PLAYER_COLORS.map(c => `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''}" data-act="pick-color" data-color="${c}" style="background:${c};"></button>`).join('')}
+        ${PLAYER_COLORS.map(c => {
+          const isTaken = taken.includes(c);
+          return `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''} ${isTaken ? 'taken' : ''}" ${isTaken ? '' : `data-act="pick-color" data-color="${c}"`} style="background:${c};" ${isTaken ? 'title="Déjà prise" disabled' : ''}>${isTaken ? '✕' : ''}</button>`;
+        }).join('')}
       </div>
       <button class="btn btn-gold" style="margin-top:18px;" data-act="close-color-picker">Fermer</button>
     </div>
@@ -734,8 +756,7 @@ function renderLobby() {
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="dot" style="background:${p.isBot || p.ready ? 'var(--teal)' : 'var(--red)'};"></div>
-            <span class="player-dot" style="background:${p.color || '#8B93A6'};" title="Sa couleur"></span>
-            <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
+            <div class="name" style="color:${p.color || '#8B93A6'};">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
           </div>
           ${isHost && p.id !== room.hostId && !p.isBot ? `<button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="kick-player" data-pid="${p.id}">🚫</button>` : ''}
         </div>`).join('')}
@@ -1511,16 +1532,16 @@ function attachHandlers() {
       else if (act === 'mode-join') { state.mode = 'join'; render(); if (state.publicRooms === null) loadPublicRooms(); }
       else if (act === 'visibility-private') { state.roomVisibility = 'private'; render(); }
       else if (act === 'visibility-public') { state.roomVisibility = 'public'; render(); }
-      else if (act === 'pick-color') { state.playerColor = elm.getAttribute('data-color'); saveLastColor(state.playerColor); render(); }
+      else if (act === 'pick-color') { state.playerColor = elm.getAttribute('data-color'); state.colorExplicit = true; saveLastColor(state.playerColor); state.colorConflict = null; render(); }
       else if (act === 'open-color-picker') { state.showColorPicker = true; render(); }
-      else if (act === 'close-color-picker') { state.showColorPicker = false; render(); }
+      else if (act === 'close-color-picker') { state.showColorPicker = false; state.colorConflict = null; render(); }
       else if (act === 'refresh-public-rooms') loadPublicRooms();
       else if (act === 'join-public-room') {
         const name = state.nameInput.trim();
         if (!name) { setError('Entre ton prénom d\'abord.'); return; }
         state.codeInput = elm.getAttribute('data-code');
         state.busy = true; render();
-        socket.emit('join-room', { code: state.codeInput, name, color: state.playerColor });
+        socket.emit('join-room', { code: state.codeInput, name, color: state.playerColor, colorExplicit: state.colorExplicit });
       }
       else if (act === 'create-room') createRoom();
       else if (act === 'join-room') joinRoom();

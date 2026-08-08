@@ -1366,7 +1366,60 @@ async function main() {
     const botPlayer = withBot.players.find(p => p.isBot);
     if (botPlayer.color === '#8B93A6') ok('bots get a fixed neutral color, not a random palette one');
     else fail('expected the bot to have the fixed neutral color, got ' + botPlayer.color);
-    wynn.disconnect(); xico.disconnect();
+
+    // A third player trying to join with a color already used by Wynn must
+    // be rejected with the list of taken colors, not silently reassigned.
+    const yasmin = io(URL, { transports: ['websocket'] });
+    await waitFor(yasmin, 'connect');
+    let colorTakenPayload = null;
+    yasmin.once('color-taken', (payload) => { colorTakenPayload = payload; });
+    yasmin.emit('join-room', { code: wynnJoined.code, name: 'Yara', color: '#3FD9C4', colorExplicit: true }); // same as Wynn's, deliberately chosen
+    await new Promise(r => setTimeout(r, 500));
+    if (colorTakenPayload && colorTakenPayload.takenColors.includes('#3FD9C4')) {
+      ok('joining with an already-used color is correctly rejected, listing the taken colors: ' + colorTakenPayload.takenColors.join(', '));
+    } else {
+      fail('expected a color-taken event listing #3FD9C4, got: ' + JSON.stringify(colorTakenPayload));
+    }
+    // Pick a color guaranteed free right now (Xico's was randomly assigned
+    // from an invalid input earlier, so it can't be hardcoded here without
+    // risking a coincidental — but legitimate — flake).
+    const currentlyTaken = withBot.players.map(p => p.color);
+    const guaranteedFree = PLAYER_COLORS.find(c => !currentlyTaken.includes(c));
+    yasmin.emit('join-room', { code: wynnJoined.code, name: 'Yara', color: guaranteedFree, colorExplicit: true });
+    const yasminJoined = await waitFor(yasmin, 'joined');
+    if (yasminJoined.room.players.find(p => p.name === 'Yara')?.color === guaranteedFree) {
+      ok('joining again with a free, deliberately-chosen color succeeds normally');
+    } else {
+      fail('expected Yara to join successfully with a free color');
+    }
+    wynn.disconnect(); xico.disconnect(); yasmin.disconnect();
+
+    // ---- the actual bug found while testing: an IMPLICIT (non-deliberate)
+    // color collision must silently auto-resolve to a free color instead of
+    // being rejected — otherwise ordinary joins (nobody opened the picker)
+    // would randomly fail whenever their default color happened to coincide. ----
+    const ophir = io(URL, { transports: ['websocket'] });
+    const petra = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(ophir, 'connect'), waitFor(petra, 'connect')]);
+    ophir.emit('create-room', { name: 'Ophir', color: '#FF8A4F' });
+    const ophirJoined = await waitFor(ophir, 'joined');
+    let implicitRejected = false;
+    petra.once('color-taken', () => { implicitRejected = true; });
+    // deliberately the SAME color as Ophir, but colorExplicit is omitted —
+    // simulating an ordinary join where nobody touched the 🎨 picker
+    petra.emit('join-room', { code: ophirJoined.code, name: 'Petra', color: '#FF8A4F' });
+    const petraJoined = await waitFor(petra, 'joined', 3000);
+    if (!implicitRejected && petraJoined) {
+      const petraPlayer = petraJoined.room.players.find(p => p.name === 'Petra');
+      if (petraPlayer.color && petraPlayer.color !== '#FF8A4F') {
+        ok('an implicit (non-deliberate) color collision silently auto-resolved to a different free color instead of being rejected: ' + petraPlayer.color);
+      } else {
+        fail('expected Petra to get a DIFFERENT free color, got: ' + JSON.stringify(petraPlayer));
+      }
+    } else {
+      fail('an implicit color collision should never be rejected — this is the exact bug the fix addresses');
+    }
+    ophir.disconnect(); petra.disconnect();
 
     alice.disconnect(); bob.disconnect(); carol.disconnect();
     ok('ALL TESTS COMPLETED');

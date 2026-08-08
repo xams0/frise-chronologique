@@ -732,7 +732,7 @@ io.on('connection', (socket) => {
     broadcast(code);
   });
 
-  socket.on('join-room', ({ code, name, color }) => {
+  socket.on('join-room', ({ code, name, color, colorExplicit }) => {
     if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
     code = (code || '').trim().toUpperCase();
     name = (name || '').trim().slice(0, 20);
@@ -753,8 +753,24 @@ io.on('connection', (socket) => {
     if (room.maxPlayers && room.players.length >= room.maxPlayers) {
       return socket.emit('error-msg', `Ce salon est complet (maximum ${room.maxPlayers} joueurs).`);
     }
+    const sanitizedColor = sanitizePlayerColor(color);
+    const takenColors = room.players.filter(p => !p.isBot).map(p => p.color);
+    let finalColor = sanitizedColor;
+    if (takenColors.includes(sanitizedColor)) {
+      if (colorExplicit) {
+        // The person deliberately picked this exact color via the picker —
+        // respect that choice enough to actually tell them it's taken,
+        // rather than silently swapping it out from under them.
+        return socket.emit('color-taken', { takenColors });
+      }
+      // Otherwise this was just whatever default/random color the client
+      // happened to have loaded — silently give them any other free one
+      // instead of blocking a join over a coincidence they never chose.
+      const free = PLAYER_COLORS.filter(c => !takenColors.includes(c));
+      finalColor = free.length ? free[Math.floor(Math.random() * free.length)] : sanitizedColor;
+    }
     const playerId = genId();
-    room.players.push({ id: playerId, name, color: sanitizePlayerColor(color), tokens: START_TOKENS, timeline: [], ready: false });
+    room.players.push({ id: playerId, name, color: finalColor, tokens: START_TOKENS, timeline: [], ready: false });
     room.log.push({ ts: nowStr(), text: `${name} a rejoint le salon.` });
     saveRooms();
     socket.join(code);
