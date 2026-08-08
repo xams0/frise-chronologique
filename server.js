@@ -187,9 +187,20 @@ async function deezerFetchJson(url, retries = 4) {
 // playable songs" path deterministically and fast, without waiting through
 // real pacing delays or depending on this sandbox's network being blocked.
 const FAKE_DEEZER_FAIL = process.env.FAKE_DEEZER_FAIL === '1';
+const FAKE_DEEZER_MISMATCH = process.env.FAKE_DEEZER_MISMATCH === '1';
 
 async function deezerSearch(query) {
-  if (FAKE_DEEZER) return FAKE_DEEZER_FAIL ? [] : [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12) }];
+  // The fake result's title/artist both echo the full query back — this
+  // guarantees it passes the closeEnough() match check below (the query is
+  // literally "${artist} ${title}", so it contains both as substrings),
+  // without the fake mode needing to know which part was which.
+  if (FAKE_DEEZER) {
+    if (FAKE_DEEZER_FAIL) return [];
+    // Test-only seam simulating the exact real-world bug a player reported:
+    // Deezer returning a completely unrelated track for a bad/obscure query.
+    if (FAKE_DEEZER_MISMATCH) return [{ id: 'fake-mismatch-id', title: 'Speed Demon', artist: { name: 'Michael Jackson' } }];
+    return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12), title: query, artist: { name: query } }];
+  }
   const data = await deezerFetchJson(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
   return data.data || [];
 }
@@ -241,11 +252,14 @@ async function ensureDeezerIds() {
     await Promise.all(batch.map(async (song) => {
       try {
         const results = await deezerSearch(`${song.artist} ${song.title}`);
-        if (results.length) {
-          song.deezerId = results[0].id;
+        const match = pickBestDeezerMatch(results, song.title, song.artist);
+        if (match) {
+          song.deezerId = match.id;
           song.verifiedAt = Date.now();
           changed = true;
           console.log(`Deezer ✓ ${song.artist} – ${song.title} -> id ${song.deezerId}`);
+        } else if (results.length) {
+          console.warn(`Deezer: aucun résultat fiable pour ${song.artist} – ${song.title} (reçu: ${results.slice(0, 3).map(r => `${r.artist && r.artist.name} - ${r.title}`).join(' | ')})`);
         } else {
           console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
         }
@@ -275,6 +289,23 @@ let readyState = { ready: false, checked: 0, total: 0, ok: 0 };
 // that a track quietly pulled from Deezer's catalog gets caught eventually.
 const DEEZER_VERIFY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+// Picks the best Deezer search result that's ACTUALLY a plausible match for
+// the intended title/artist, using the same fuzzy-tolerance logic already
+// used to grade players' guesses — rather than blindly trusting whichever
+// result Deezer's search ranked first. This is what would have caught the
+// real bug a player reported: "Bam, Bam, Bamy Shore" (misattributed to the
+// wrong artist at the time) resolved to Michael Jackson's "Speed Demon",
+// since nothing sane matched the bad query and the first result was just
+// noise. Returns null if nothing in the results is a good enough match.
+function pickBestDeezerMatch(results, expectedTitle, expectedArtist) {
+  const nt = normalize(expectedTitle), na = normalize(expectedArtist);
+  return results.find(r => {
+    const gotTitle = normalize(r.title || '');
+    const gotArtist = normalize((r.artist && r.artist.name) || '');
+    return closeEnough(nt, gotTitle) && closeEnough(na, gotArtist);
+  }) || null;
+}
+
 async function verifyAndPrepareCatalog() {
   readyState = { ready: false, checked: 0, total: catalog.length, ok: 0 };
   const now = Date.now();
@@ -292,13 +323,18 @@ async function verifyAndPrepareCatalog() {
     await Promise.all(batch.map(async (song) => {
       try {
         const results = await deezerSearch(`${song.artist} ${song.title}`);
-        if (results.length) {
-          song.deezerId = results[0].id;
+        const match = pickBestDeezerMatch(results, song.title, song.artist);
+        if (match) {
+          song.deezerId = match.id;
           song.verifiedAt = now;
           catalogChanged = true;
           readyState.ok++;
         } else {
-          console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
+          if (results.length) {
+            console.warn(`Deezer: aucun résultat fiable pour ${song.artist} – ${song.title} (reçu: ${results.slice(0, 3).map(r => `${r.artist && r.artist.name} - ${r.title}`).join(' | ')})`);
+          } else {
+            console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
+          }
           // Deliberately don't touch an existing (now-stale) deezerId here —
           // a transient miss shouldn't nuke a song that was working fine.
           // Not bumping verifiedAt means it'll simply be retried next boot.

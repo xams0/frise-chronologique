@@ -1025,3 +1025,25 @@ Deezer depuis cet environnement de développement pour vérifier ici).
 
 Pour vérifier un `deezerId` soi-même : chercher `deezer.com track [ID]`
 ou ouvrir `https://www.deezer.com/track/[ID]` directement.
+
+## v3.3.0 — validation automatique des résultats Deezer
+
+Bonne question posée : "le serveur au démarrage ne pourrait pas comparer
+le JSON avec Deezer et corriger si erreur ?" — implémenté, mais de façon
+ciblée pour ne pas annuler le gain de vitesse de la v2.7 (qui repose
+justement sur le fait de NE PAS re-vérifier les entrées déjà résolues à
+chaque démarrage).
+
+Ce qui change : au moment précis où une recherche a réellement lieu
+(nouvelle chanson jamais résolue, ou chanson périmée après 30 jours), le
+serveur ne fait plus confiance aveuglément au premier résultat Deezer — il
+vérifie que le titre ET l'artiste renvoyés ressemblent vraiment à ce qui
+était attendu, avec la même tolérance aux petites différences déjà
+utilisée pour noter les réponses des joueurs. Si aucun résultat ne
+correspond, la chanson reste simplement non résolue (exclue du jeu) plutôt
+que de récupérer un `deezerId` complètement hors sujet.
+
+C'est exactement le garde-fou qui aurait empêché le bug "Bam Bam Bamy
+Shore" → Michael Jackson — testé directement avec un scénario qui
+reproduit ce cas précis, confirmé qu'aucun `deezerId` erroné n'est
+assigné.

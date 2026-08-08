@@ -150,6 +150,37 @@ async function main() {
     try { fs.unlinkSync(ttlSongsPath); } catch (e) {}
   }
 
+  // ---- fuzzy-match validation: a Deezer result that doesn't actually match
+  // the intended title/artist must be rejected, not blindly accepted. This
+  // is the real bug a player reported — a misattributed catalog entry
+  // ("Bam, Bam, Bamy Shore" credited to the wrong artist) resolved to a
+  // completely unrelated Michael Jackson track. ----
+  const mismatchSongsPath = path.join(__dirname, 'songs.mismatch-test.json');
+  fs.writeFileSync(mismatchSongsPath, JSON.stringify([
+    { title: 'Bam, Bam, Bamy Shore', artist: 'Not The Real Artist' },
+  ]));
+  const mismatchServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 4), FAKE_DEEZER: '1', FAKE_DEEZER_MISMATCH: '1', SONGS_FILE_OVERRIDE: mismatchSongsPath } });
+  mismatchServer.stdout.on('data', () => {});
+  mismatchServer.stderr.on('data', () => {});
+  try {
+    const mismatchUrl = `http://localhost:${PORT + 4}`;
+    await waitForReady(mismatchUrl);
+    const songsRes = await fetch(`${mismatchUrl}/api/songs`);
+    const songsData = await songsRes.json();
+    const song = songsData[0];
+    if (!song.deezerId) {
+      ok('an unrelated Deezer result (title/artist not matching) is correctly rejected — no bad deezerId assigned');
+    } else {
+      fail('expected the mismatched result to be rejected, but got a deezerId: ' + JSON.stringify(song));
+    }
+  } catch (e) {
+    fail('phase -0.4 (fuzzy-match validation) exception: ' + e.message);
+  } finally {
+    mismatchServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(mismatchSongsPath); } catch (e) {}
+  }
+
   // ---- Phase 0: confirm the actual fix — with zero real Deezer access (this
   // sandbox's normal state), draw-card must NEVER hand back a silent card,
   // AND the new readiness gate must still open (checked-but-all-failed still
