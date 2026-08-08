@@ -98,7 +98,7 @@ function markWelcomeSeen() {
 const state = {
   screen: hasSeenWelcome() ? 'loading' : 'welcome', // welcome | loading | home | lobby | game
   mode: 'create',            // create | join
-  nameInput: loadLastName(), codeInput: '', error: '', busy: false, playerColor: loadLastColor(),
+  nameInput: loadLastName(), codeInput: '', error: '', busy: false, playerColor: loadLastColor(), showColorPicker: false,
   playerId: null, playerName: null, code: null, room: null,
   guessTitle: '', guessArtist: '',
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
@@ -637,13 +637,9 @@ function renderHome() {
     <div class="stack">
       <div class="field">
         <label>Ton prénom</label>
-        <input id="inp-name" type="text" placeholder="Ex. Léa" value="${escapeHtml(state.nameInput)}" maxlength="20"/>
-      </div>
-
-      <div class="field">
-        <label>Ta couleur</label>
-        <div class="color-swatch-row">
-          ${PLAYER_COLORS.map(c => `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''}" data-act="pick-color" data-color="${c}" style="background:${c};"></button>`).join('')}
+        <div class="row" style="align-items:center;">
+          <input id="inp-name" type="text" placeholder="Ex. Léa" value="${escapeHtml(state.nameInput)}" maxlength="20" style="flex:1;"/>
+          <button type="button" class="iconbtn" style="background:${state.playerColor};border-color:${state.playerColor};flex-shrink:0;" data-act="open-color-picker" title="Choisir sa couleur">🎨</button>
         </div>
       </div>
 
@@ -669,6 +665,20 @@ function renderHome() {
     </div>
 
     ${state.mode === 'join' ? renderPublicRoomsList() : ''}
+    ${state.showColorPicker ? renderColorPickerModal() : ''}
+  </div>`;
+}
+
+function renderColorPickerModal() {
+  return `
+  <div class="modal-bg" data-act="close-color-picker">
+    <div class="modal" onclick="event.stopPropagation()">
+      <h2>Ta couleur</h2>
+      <div class="color-swatch-row" style="margin-top:12px;">
+        ${PLAYER_COLORS.map(c => `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''}" data-act="pick-color" data-color="${c}" style="background:${c};"></button>`).join('')}
+      </div>
+      <button class="btn btn-gold" style="margin-top:18px;" data-act="close-color-picker">Fermer</button>
+    </div>
   </div>`;
 }
 
@@ -724,6 +734,7 @@ function renderLobby() {
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="dot" style="background:${p.isBot || p.ready ? 'var(--teal)' : 'var(--red)'};"></div>
+            <span class="player-dot" style="background:${p.color || '#8B93A6'};" title="Sa couleur"></span>
             <div class="name">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
           </div>
           ${isHost && p.id !== room.hostId && !p.isBot ? `<button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="kick-player" data-pid="${p.id}">🚫</button>` : ''}
@@ -989,10 +1000,14 @@ function renderQuickActionFabs(room, pend, isActive, myself, active) {
   const canPlace = pend && pend.stage === 'listening' && isActive && !active.isBot;
   const canChallenge = pend && pend.stage === 'placed' && !pend.challenge && myself && myself.tokens >= 1 && (active.isBot || pend.activePlayerId !== state.playerId);
   if (!canPlace && !canChallenge) return '';
+  // While a modal (placement/challenge picker) covers the bottom of the
+  // screen, these shortcuts would otherwise sit right on top of "Valider" —
+  // move them out of the way, greyed out, stacked near the top instead.
+  const modalOpen = !!state.activeTimelinePlayerId;
   return `
-  <div class="quick-fab-stack">
-    ${canPlace ? `<button class="quick-fab" data-act="open-placement" title="Placer la carte">🤘🏻</button>` : ''}
-    ${canChallenge ? `<button class="quick-fab quick-fab-challenge" data-act="open-challenge" title="Défier">🔪</button>` : ''}
+  <div class="quick-fab-stack ${modalOpen ? 'muted' : ''}">
+    ${canPlace ? `<button class="quick-fab" data-act="open-placement" title="Placer la carte" ${modalOpen ? 'disabled' : ''}>🤘🏻</button>` : ''}
+    ${canChallenge ? `<button class="quick-fab quick-fab-challenge" data-act="open-challenge" title="Défier" ${modalOpen ? 'disabled' : ''}>🔪</button>` : ''}
   </div>`;
 }
 
@@ -1253,7 +1268,7 @@ function renderAllTimelines(room) {
     const playerMissed = missed.filter(m => m.playerId === p.id).slice(-5).reverse();
     const dotColor = p.color || '#8B93A6';
     return `
-    <div class="card-section compact ${isTurn ? 'turn-active' : 'turn-inactive'}" id="timeline-${p.id}" style="${isTurn ? `--player-glow:${dotColor};` : ''}">
+    <div class="card-section compact ${isTurn ? 'turn-active' : 'turn-inactive'}" id="timeline-${p.id}" style="--player-glow:${dotColor};border-left:3px solid ${dotColor};">
       <div class="timeline-owner">
         <span><span class="player-dot" style="background:${dotColor};"></span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
         <span class="mono" style="color:var(--gold)">${p.tokens} 🪙</span>
@@ -1304,11 +1319,12 @@ function renderPlacementModal(room) {
   const excludeGap = isChallenge && room.pending.placement ? room.pending.placement.gapIndex : -1;
 
   let slots = '';
+  const plusStyle = isChallenge ? `style="border-color:${target.color || '#8B93A6'};color:${target.color || '#8B93A6'};box-shadow:0 0 8px 1px ${target.color || '#8B93A6'}66;"` : '';
   for (let i = 0; i <= sorted.length; i++) {
     const disabled = i === excludeGap;
     const selected = state.selectedGap === i;
     if (selected) slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">Ici</div></div></div>`;
-    else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''}>+</button></div>`;
+    else slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${disabled ? 'disabled' : ''} ${plusStyle}>+</button></div>`;
     if (i < sorted.length) slots += `<div class="ticket ${sorted[i].stolenFrom ? 'ticket-stolen-permanent' : ''}"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div>${sorted[i].stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(sorted[i].stolenFrom)}</div>` : ''}</div></div>`;
   }
 
@@ -1496,6 +1512,8 @@ function attachHandlers() {
       else if (act === 'visibility-private') { state.roomVisibility = 'private'; render(); }
       else if (act === 'visibility-public') { state.roomVisibility = 'public'; render(); }
       else if (act === 'pick-color') { state.playerColor = elm.getAttribute('data-color'); saveLastColor(state.playerColor); render(); }
+      else if (act === 'open-color-picker') { state.showColorPicker = true; render(); }
+      else if (act === 'close-color-picker') { state.showColorPicker = false; render(); }
       else if (act === 'refresh-public-rooms') loadPublicRooms();
       else if (act === 'join-public-room') {
         const name = state.nameInput.trim();

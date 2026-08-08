@@ -98,7 +98,8 @@
   @keyframes playNudge{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(242,184,75,0.5);}50%{transform:scale(1.04);box-shadow:0 0 0 8px rgba(242,184,75,0);}}
 
   .reaction-fab-wrap{position:fixed;bottom:22px;right:18px;z-index:150;}
-  .quick-fab-stack{position:fixed;bottom:22px;right:82px;z-index:150;display:flex;flex-direction:column-reverse;gap:10px;}
+  .quick-fab-stack{position:fixed;bottom:22px;right:82px;z-index:150;display:flex;flex-direction:column-reverse;gap:10px;transition:all 0.2s;}
+  .quick-fab-stack.muted{bottom:auto;top:70px;right:14px;flex-direction:column;filter:grayscale(1);opacity:0.45;z-index:60;}
   .quick-fab{width:46px;height:46px;border-radius:50%;background:var(--surface);border:1px solid var(--line);color:var(--text);font-size:20px;box-shadow:0 6px 16px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;}
   .quick-fab:active{transform:scale(0.94);}
   .quick-fab-challenge{background:var(--pink);border-color:var(--pink);}
@@ -162,7 +163,13 @@
 
   .card-section{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px;}
   .card-section.compact{padding:10px 12px;margin-bottom:8px;}
-  .card-section.turn-active{background:rgba(255,79,129,0.10);border-color:var(--player-glow, var(--pink));box-shadow:0 0 14px 1px color-mix(in srgb, var(--player-glow, var(--pink)) 55%, transparent);animation:turnGlow 2.4s ease-in-out infinite alternate;}
+  /* Active player's zone: background genuinely tinted with THEIR color (was
+     hard-coded pink before), a soft pulse glow, plus a thin ring of light
+     that continuously travels around the border via a rotating conic-gradient
+     on a pseudo-element — broadly compatible (no @property needed). */
+  .card-section.turn-active{position:relative;background:color-mix(in srgb, var(--player-glow, var(--pink)) 12%, var(--surface));border-color:var(--player-glow, var(--pink));box-shadow:0 0 14px 1px color-mix(in srgb, var(--player-glow, var(--pink)) 55%, transparent);animation:turnGlow 2.4s ease-in-out infinite alternate;overflow:visible;}
+  .card-section.turn-active::before{content:'';position:absolute;inset:-3px;border-radius:19px;padding:2px;background:conic-gradient(from 0deg, transparent 0%, var(--player-glow, var(--pink)) 12%, transparent 26%);-webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:spinBorder 2.6s linear infinite;pointer-events:none;}
+  @keyframes spinBorder{to{transform:rotate(360deg);}}
   @keyframes turnGlow{
     0%{box-shadow:0 0 8px 0 color-mix(in srgb, var(--player-glow, var(--pink)) 35%, transparent);}
     100%{box-shadow:0 0 18px 2px color-mix(in srgb, var(--player-glow, var(--pink)) 65%, transparent);}

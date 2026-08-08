@@ -901,3 +901,25 @@ d'attribution de mon côté pour celles-là contrairement aux françaises.
 Testé de bout en bout : couleur explicite conservée, couleur invalide
 automatiquement remplacée par une couleur valide de la palette, bot avec
 couleur neutre fixe. 123-124/124 tests, exécutés deux fois.
+
+## v3.1.0 — 6 ajustements suite aux captures d'écran
+
+- **Sélecteur de couleur derrière un bouton 🎨** à côté du champ Pseudo
+  (au lieu de la rangée de pastilles en permanence à l'écran).
+- **Couleur visible dans le salon d'attente** — une pastille colorée à côté
+  du nom de chaque joueur, en plus de l'indicateur de statut prêt.
+- **Les "+" de placement se colorent avec la couleur de l'adversaire et
+  brillent** quand on défie sa carte.
+- **Vrai bug corrigé** : les raccourcis 🔪/🤘🏻 se superposaient au bouton
+  "Valider" des fenêtres de placement/défi (confirmé sur les deux
+  captures). Ils passent maintenant en gris et remontent en haut de
+  l'écran, en colonne, dès qu'une fenêtre est ouverte.
+- **Animation de bordure enrichie** : en plus du halo pulsant existant,
+  un fin trait de lumière tourne maintenant en continu autour du contour
+  du joueur actif.
+- **Réponse à la question sur les couleurs pendant la partie** : vérifié
+  le code — seul le contour du joueur actif utilisait sa couleur, le fond
+  était codé en dur en rose peu importe le joueur. Corrigé : le fond
+  reprend maintenant vraiment sa couleur, et chaque frise (active ou non)
+  a désormais une fine bande colorée à gauche, pour que la couleur de
+  chacun reste visible tout du long, pas seulement pendant son tour.
