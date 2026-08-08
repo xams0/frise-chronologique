@@ -812,3 +812,26 @@ Tout le reste des ajouts de v2.6-v2.6.3 (FAB emoji, effet burst, anti-spam,
 pioche automatique par défaut, fermeture des salons bot-seul, artiste dans
 la bannière, réinitialisation des champs de saisie, fix `addEventListener`)
 reste en place, ce sont des sujets distincts de cette histoire de scroll.
+
+## v2.7 — deezerId pré-résolus, démarrage quasi instantané
+
+- **1016 des 1032 chansons ont maintenant leur `deezerId` intégré directement
+  dans `songs.json`**, avec une date `verifiedAt`. Au démarrage du serveur,
+  toute chanson vérifiée il y a **moins de 30 jours** est acceptée telle
+  quelle, sans appel à Deezer — le tout premier démarrage après ce
+  déploiement devrait être quasi instantané au lieu de ~35-50 secondes.
+- **Rafraîchissement automatique à 30 jours** : passé ce délai, une chanson
+  est re-vérifiée auprès de Deezer normalement (et son `deezerId` mis à jour
+  si elle a bougé). Si Deezer ne retourne rien pour une chanson déjà connue,
+  son ancien `deezerId` est conservé plutôt que supprimé (mieux vaut un id
+  peut-être un peu daté que plus d'id du tout), et elle sera retentée au
+  prochain démarrage.
+- **16 chansons restent sans correspondance** (essentiellement des
+  enregistrements très anciens de 1902-1930 et quelques titres français) —
+  comme avant, elles sont simplement exclues du pool jouable, sans
+  bloquer le reste.
+- Deux tests existants (le "scan lent" et le "Deezer complètement
+  injoignable") utilisent maintenant une copie de catalogue "à froid"
+  (sans deezerId pré-rempli) pour continuer à tester ces scénarios
+  correctement malgré le catalogue désormais pré-résolu — sinon ils ne
+  testaient plus rien de pertinent.

@@ -11,7 +11,7 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const APP_VERSION = require('./package.json').version;
 const DATA_DIR = __dirname;
-const SONGS_FILE = path.join(DATA_DIR, 'songs.json');
+const SONGS_FILE = process.env.SONGS_FILE_OVERRIDE || path.join(DATA_DIR, 'songs.json');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
 
 const CARDS_TO_WIN = 10;
@@ -236,6 +236,7 @@ async function ensureDeezerIds() {
         const results = await deezerSearch(`${song.artist} ${song.title}`);
         if (results.length) {
           song.deezerId = results[0].id;
+          song.verifiedAt = Date.now();
           changed = true;
           console.log(`Deezer ✓ ${song.artist} – ${song.title} -> id ${song.deezerId}`);
         } else {
@@ -262,11 +263,19 @@ async function ensureDeezerIds() {
 // this up doesn't reopen the "silent unplayable card" bug from before.
 let readyState = { ready: false, checked: 0, total: 0, ok: 0 };
 
+// A resolved deezerId is trusted for this long before we bother re-checking
+// it against Deezer — long enough that most boots are instant, short enough
+// that a track quietly pulled from Deezer's catalog gets caught eventually.
+const DEEZER_VERIFY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 async function verifyAndPrepareCatalog() {
   readyState = { ready: false, checked: 0, total: catalog.length, ok: 0 };
-  const todo = catalog.filter(s => !s.deezerId);
-  // Songs that already have a resolved id (e.g. this process never restarted,
-  // or a pre-resolved catalog was committed) don't need any Deezer call at all.
+  const now = Date.now();
+  const isFresh = (s) => s.deezerId && s.verifiedAt && (now - s.verifiedAt) < DEEZER_VERIFY_TTL_MS;
+  const todo = catalog.filter(s => !isFresh(s));
+  // Songs with a fresh, already-resolved id (baked into the committed
+  // catalog, or resolved earlier this process's lifetime) skip Deezer
+  // entirely — this is what makes most boots effectively instant.
   readyState.checked = catalog.length - todo.length;
   readyState.ok = catalog.length - todo.length;
   let catalogChanged = false;
@@ -278,13 +287,19 @@ async function verifyAndPrepareCatalog() {
         const results = await deezerSearch(`${song.artist} ${song.title}`);
         if (results.length) {
           song.deezerId = results[0].id;
+          song.verifiedAt = now;
           catalogChanged = true;
           readyState.ok++;
         } else {
           console.warn(`Deezer: aucun résultat pour ${song.artist} – ${song.title}`);
+          // Deliberately don't touch an existing (now-stale) deezerId here —
+          // a transient miss shouldn't nuke a song that was working fine.
+          // Not bumping verifiedAt means it'll simply be retried next boot.
+          if (song.deezerId) readyState.ok++;
         }
       } catch (e) {
         console.warn(`Deezer: recherche échouée pour ${song.artist} – ${song.title}:`, e.message);
+        if (song.deezerId) readyState.ok++;
       } finally {
         readyState.checked++;
       }

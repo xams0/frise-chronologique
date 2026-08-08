@@ -77,8 +77,14 @@ function waitForReady(baseUrl, timeoutMs = 40000) {
 async function main() {
   // ---- Phase -1: with REAL (unfaked) Deezer calls — blocked in this sandbox,
   // so verification takes a while — confirm create-room is actually refused
-  // WHILE the scan is still in progress, not just "before the client polled". ----
-  const slowServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 2) } });
+  // WHILE the scan is still in progress, not just "before the client polled".
+  // Uses a COLD catalog copy (no baked-in deezerId/verifiedAt): with the real
+  // catalog now mostly pre-resolved, this would otherwise finish in well
+  // under 1200ms and never actually exercise the "still verifying" window. ----
+  const coldSongsPathSlow = path.join(__dirname, 'songs.cold-test-slow.json');
+  const coldCatalogSlow = ORIGINAL_SONGS.map(s => { const c = { ...s }; delete c.deezerId; delete c.verifiedAt; return c; });
+  fs.writeFileSync(coldSongsPathSlow, JSON.stringify(coldCatalogSlow));
+  const slowServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 2), SONGS_FILE_OVERRIDE: coldSongsPathSlow } });
   slowServer.stdout.on('data', () => {});
   slowServer.stderr.on('data', () => {});
   try {
@@ -103,13 +109,56 @@ async function main() {
   } finally {
     slowServer.kill();
     await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(coldSongsPathSlow); } catch (e) {}
+  }
+
+  // ---- Phase -0.5: the 30-day trust window — a fresh baked-in deezerId is
+  // skipped (never re-checked), a stale one gets re-verified against Deezer. ----
+  const ttlSongsPath = path.join(__dirname, 'songs.ttl-test.json');
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const ttlCatalog = [
+    { title: 'Fresh Song', artist: 'Fresh Artist', year: 2020, deezerId: 'placeholder-should-stay', verifiedAt: Date.now() - 1 * DAY_MS },
+    { title: 'Stale Song', artist: 'Stale Artist', year: 2020, deezerId: 'placeholder-should-be-replaced', verifiedAt: Date.now() - 31 * DAY_MS },
+  ];
+  fs.writeFileSync(ttlSongsPath, JSON.stringify(ttlCatalog));
+  const ttlServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 3), FAKE_DEEZER: '1', SONGS_FILE_OVERRIDE: ttlSongsPath } });
+  ttlServer.stdout.on('data', () => {});
+  ttlServer.stderr.on('data', () => {});
+  try {
+    const ttlUrl = `http://localhost:${PORT + 3}`;
+    await waitForReady(ttlUrl);
+    const songsRes = await fetch(`${ttlUrl}/api/songs`);
+    const songsData = await songsRes.json();
+    const freshSong = songsData.find(s => s.title === 'Fresh Song');
+    const staleSong = songsData.find(s => s.title === 'Stale Song');
+    if (freshSong && freshSong.deezerId === 'placeholder-should-stay') {
+      ok('a deezerId verified within 30 days is correctly trusted and left untouched');
+    } else {
+      fail('expected the fresh (< 30 days) deezerId to be left alone, got: ' + JSON.stringify(freshSong));
+    }
+    if (staleSong && staleSong.deezerId !== 'placeholder-should-be-replaced' && staleSong.deezerId) {
+      ok('a deezerId older than 30 days is correctly re-verified against Deezer and replaced');
+    } else {
+      fail('expected the stale (> 30 days) deezerId to be re-resolved, got: ' + JSON.stringify(staleSong));
+    }
+  } catch (e) {
+    fail('phase -0.5 (30-day TTL) exception: ' + e.message);
+  } finally {
+    ttlServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(ttlSongsPath); } catch (e) {}
   }
 
   // ---- Phase 0: confirm the actual fix — with zero real Deezer access (this
   // sandbox's normal state), draw-card must NEVER hand back a silent card,
   // AND the new readiness gate must still open (checked-but-all-failed still
-  // counts as "done checking") while correctly reporting zero playable songs. ----
-  const noAudioServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 1), FAKE_DEEZER: '1', FAKE_DEEZER_FAIL: '1' } });
+  // counts as "done checking") while correctly reporting zero playable songs.
+  // Uses a COLD catalog copy (no baked-in deezerId/verifiedAt) so the 30-day
+  // trust cache doesn't short-circuit this specific "Deezer is down" scenario. ----
+  const coldSongsPath = path.join(__dirname, 'songs.cold-test.json');
+  const coldCatalog = ORIGINAL_SONGS.map(s => { const c = { ...s }; delete c.deezerId; delete c.verifiedAt; return c; });
+  fs.writeFileSync(coldSongsPath, JSON.stringify(coldCatalog));
+  const noAudioServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 1), FAKE_DEEZER: '1', FAKE_DEEZER_FAIL: '1', SONGS_FILE_OVERRIDE: coldSongsPath } });
   let noAudioLog = '';
   noAudioServer.stdout.on('data', d => { noAudioLog += d; });
   noAudioServer.stderr.on('data', d => { noAudioLog += d; });
@@ -141,6 +190,7 @@ async function main() {
   } finally {
     noAudioServer.kill();
     await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(coldSongsPath); } catch (e) {}
   }
 
   // ---- Phase 1: full gameplay, with FAKE_DEEZER=1 so every song has a
