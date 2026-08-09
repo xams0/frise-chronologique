@@ -1147,3 +1147,25 @@ Testé de bout en bout : vote de révélation à 3 joueurs (un seul clic ne
 suffit pas, tous ensemble déclenchent), tentatives multiples (échec puis
 réussite paie le jeton complet, une 3e tentative déjà réussie ne repaie
 pas). 144/144 tests, exécutés deux fois.
+
+## v3.7.0 — popup de résultat entre les tours
+
+Remplace l'ancienne bannière inline (fermeture manuelle par "OK", ou
+minuteur fixe de 3,5s sans rapport avec le rythme réel de la partie) par
+une vraie popup superposée, avec un cycle de vie entièrement piloté par
+l'état du jeu :
+
+- **Apparaît** exactement au moment où une carte est révélée
+- **Disparaît** automatiquement dès que le joueur suivant a une carte en
+  attente (piochée manuellement ou par le minuteur auto) — donc jamais
+  besoin de cliquer pour la fermer, et jamais de blocage si quelqu'un
+  pioche vite : la popup n'intercepte aucun clic (elle est purement
+  visuelle), donc piocher à travers la fait disparaître naturellement.
+- **Affiche** le nom du joueur dans sa couleur, une pastille de sa
+  couleur, le titre/artiste/année de la dernière chanson jouée, et le
+  statut (bien placée / mal placée / volée — et par qui, dans sa couleur
+  à lui aussi).
+
+Testé : `lastResult` inclut désormais bien la couleur du joueur actif
+(et du voleur le cas échéant) pour que la popup puisse les afficher.
+146/146 tests, exécutés deux fois.

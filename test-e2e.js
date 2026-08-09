@@ -542,6 +542,11 @@ async function main() {
     const tookMs = Date.now() - startWait;
     if (erResolved.pending === null && tookMs < 3000) ok(`non-active player successfully triggered an early reveal, bypassing the 30s delay (resolved in ${tookMs}ms)`);
     else fail('non-active player early-reveal did not resolve promptly');
+    if (erResolved.lastResult && erResolved.lastResult.activeColor) {
+      ok('lastResult correctly includes the active player\'s color for the result popup: ' + erResolved.lastResult.activeColor);
+    } else {
+      fail('expected lastResult.activeColor to be set, got: ' + JSON.stringify(erResolved.lastResult));
+    }
     wendy.disconnect(); xander.disconnect();
 
     // ---- with MORE than one non-active player, everyone must click "ready"

@@ -114,7 +114,7 @@ const state = {
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
-  seenResultAt: 0, ytMuted: true,
+  ytMuted: true,
   brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false,
   healthReport: null, healthChecking: false, auditReport: null, auditRunning: false,
   ready: null,
@@ -279,8 +279,7 @@ socket.on('joined', ({ playerId, code, room }) => {
   saveLastName(name);
   render();
 });
-const RESULT_NOTICE_MS = 3500; // how long the reveal-outcome notice (and the matching card highlight) stays up before auto-clearing
-let lastNotifiedResultTs = null;
+const RESULT_NOTICE_MS = 3500; // how long the timeline card's won/stolen glow highlight stays up before fading — the result popup itself has its own state-driven lifecycle now (see renderResultPopup)
 
 socket.on('room', (room) => {
   // Robust fallback: if we're no longer in the player list for whatever
@@ -292,13 +291,6 @@ socket.on('room', (room) => {
     Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: 'Tu ne fais plus partie de ce salon (exclu·e, ou le salon a été fermé).' });
     render();
     return;
-  }
-  if (room.lastResult && room.lastResult.ts !== lastNotifiedResultTs) {
-    lastNotifiedResultTs = room.lastResult.ts;
-    const ts = room.lastResult.ts;
-    setTimeout(() => {
-      if (state.seenResultAt !== ts) { state.seenResultAt = ts; render(); }
-    }, RESULT_NOTICE_MS);
   }
   state.room = room;
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
@@ -1111,7 +1103,7 @@ function renderGame() {
     </div>
 
     ${renderAllTimelines(room)}
-    ${room.lastResult && room.lastResult.ts !== state.seenResultAt ? renderResultBanner(room.lastResult) : ''}
+    ${room.lastResult && !pend ? renderResultPopup(room, room.lastResult) : ''}
 
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
@@ -1372,22 +1364,36 @@ function renderRevealInfoTimer(room, pend, activePl) {
 let lastAnimatedResultTs = null; // prevents the reveal-outcome banner from replaying its flash animation on every unrelated re-render
 let lastAnimatedGuessKey = null; // same idea for the title/artist guess feedback
 
-function renderResultBanner(r) {
-  const tintCls = r.kind === 'wrong' ? 'result-tint-wrong' : 'result-tint-correct';
+// Full overlay popup shown between turns — appears the instant a reveal
+// resolves and disappears on its own the moment the next player actually
+// has a card pending (whether they drew manually or auto-draw kicked in),
+// with no manual dismissal needed. Replaces the old inline banner (which
+// required a manual "OK" tap, or a fixed 3.5s timer unrelated to the
+// actual pace of the next turn) with a lifecycle tied directly to game
+// state instead.
+function renderResultPopup(room, r) {
   const isFirstRender = lastAnimatedResultTs !== r.ts;
   if (isFirstRender) lastAnimatedResultTs = r.ts;
+  const kindCls = r.kind === 'wrong' ? 'result-tint-wrong' : 'result-tint-correct';
   const flashCls = isFirstRender ? (r.kind === 'wrong' ? 'flash-wrong' : 'flash-correct') : '';
-  let text;
-  if (r.kind === 'wrong') text = `❌ "${escapeHtml(r.title)}" de ${escapeHtml(r.artist)} (${r.year}) — mal placée, défaussée.`;
-  else if (r.kind === 'stolen') text = `🎯 "${escapeHtml(r.title)}" de ${escapeHtml(r.artist)} (${r.year}) — ${escapeHtml(r.activeName)} s'est trompé, ${escapeHtml(r.extraName)} récupère la carte !`;
-  else text = `✅ "${escapeHtml(r.title)}" de ${escapeHtml(r.artist)} (${r.year}) — bien placée par ${escapeHtml(r.activeName)} !`;
+  const activeColor = r.activeColor || '#8B93A6';
+  let statusLine;
+  if (r.kind === 'wrong') statusLine = `❌ Mal placée — carte défaussée.`;
+  else if (r.kind === 'stolen') statusLine = `🎯 ${escapeHtml(r.activeName)} s'est trompé — <span style="color:${r.extraColor || '#8B93A6'};font-weight:700;">${escapeHtml(r.extraName)}</span> vole la carte !`;
+  else statusLine = `✅ Bien placée !`;
   const penalty = r.hardcorePenalty
     ? `<div style="margin-top:6px;font-size:12.5px;color:var(--pink);font-weight:700;">🩸 Hardcore : ${escapeHtml(r.hardcorePenalty.playerName)} perd aussi "${escapeHtml(r.hardcorePenalty.title)}" (${r.hardcorePenalty.year}) de sa frise !</div>`
     : '';
-  return `<div class="result-banner ${tintCls} ${flashCls}">
-    ${r.cover ? `<img src="${escapeHtml(r.cover)}" alt="" style="width:44px;height:44px;border-radius:8px;flex-shrink:0;object-fit:cover;"/>` : ''}
-    <div style="flex:1;">${text}${penalty}</div>
-    <button class="btn btn-ghost btn-sm" data-act="dismiss-result" data-ts="${r.ts}">OK</button>
+  return `
+  <div class="result-popup-bg">
+    <div class="result-popup ${kindCls} ${flashCls}">
+      ${r.cover ? `<img src="${escapeHtml(r.cover)}" alt="" class="result-popup-cover"/>` : ''}
+      <div class="result-popup-player"><span class="player-dot" style="background:${activeColor};"></span><b style="color:${activeColor};">${escapeHtml(r.activeName)}</b></div>
+      <div class="result-popup-title">"${escapeHtml(r.title)}"</div>
+      <div class="result-popup-artist">${escapeHtml(r.artist)} · ${r.year}</div>
+      <div class="result-popup-status">${statusLine}</div>
+      ${penalty}
+    </div>
   </div>`;
 }
 
@@ -1847,7 +1853,6 @@ function attachHandlers() {
       else if (act === 'reset-filters') resetFilters();
       else if (act === 'pick-dj') setDj(elm.getAttribute('data-pid'));
       else if (act === 'bot-play') botPlayTurn();
-      else if (act === 'dismiss-result') { state.seenResultAt = parseInt(elm.getAttribute('data-ts'), 10); render(); }
       else if (act === 'play-preview') playPreviewManually();
       else if (act === 'draw-card') drawCard();
       else if (act === 'free-card') freeCardWithTokens();

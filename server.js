@@ -582,7 +582,7 @@ function resolveReveal(room) {
     active.timeline = insertSorted(active.timeline, pend.card);
     winner = active;
     room.log.push({ ts: nowStr(), text: `✅ Correct ! "${pend.card.title}" (${pend.card.year}) rejoint la frise de ${active.name}.` });
-    room.lastResult = { ts: Date.now(), kind: 'correct', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
+    room.lastResult = { ts: Date.now(), kind: 'correct', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, activeColor: active.color, cover: pend.card.cover || null };
   } else if (pend.challenge) {
     const challenger = room.players.find(pl => pl.id === pend.challenge.playerId);
     const challengeCorrect = gapCorrect(activeYears, pend.challenge.gapIndex, pend.card.year);
@@ -592,18 +592,18 @@ function resolveReveal(room) {
       challenger.timeline = insertSorted(challenger.timeline, { ...pend.card, stolenFrom: active.name });
       winner = challenger;
       room.log.push({ ts: nowStr(), text: `🎯 ${active.name} s'est trompé, mais ${challenger.name} avait raison — la carte "${pend.card.title}" (${pend.card.year}) file dans sa frise !` });
-      room.lastResult = { ts: Date.now(), kind: 'stolen', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, extraName: challenger.name, cover: pend.card.cover || null };
+      room.lastResult = { ts: Date.now(), kind: 'stolen', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, activeColor: active.color, extraName: challenger.name, extraColor: challenger.color, cover: pend.card.cover || null };
     } else {
       room.discard.push(pend.card);
       room.log.push({ ts: nowStr(), text: `❌ Mauvais placement des deux côtés — "${pend.card.title}" (${pend.card.year}) est défaussée.` });
-      room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
+      room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, activeColor: active.color, cover: pend.card.cover || null };
     }
   } else {
     room.discard.push(pend.card);
     if (!room.missedCards) room.missedCards = [];
     room.missedCards.push({ playerId: active.id, title: pend.card.title, artist: pend.card.artist, year: pend.card.year, ts: Date.now() });
     room.log.push({ ts: nowStr(), text: `❌ Raté — "${pend.card.title}" (${pend.card.year}) était mal placée et est défaussée.` });
-    room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, cover: pend.card.cover || null };
+    room.lastResult = { ts: Date.now(), kind: 'wrong', title: pend.card.title, artist: pend.card.artist, year: pend.card.year, activeName: active.name, activeColor: active.color, cover: pend.card.cover || null };
   }
 
   // Hardcore mode: getting it wrong doesn't just cost the drawn card — it
