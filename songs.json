@@ -6355,7 +6355,9 @@
     "artist": "Joséphine Baker",
     "year": 1925,
     "genre": "Tin Pan Alley",
-    "country": "USA"
+    "country": "USA",
+    "deezerId": 1591677222,
+    "verifiedAt": 1786248639653
   },
   {
     "title": "Baby Face",
@@ -7532,7 +7534,9 @@
     "artist": "Véronique Sanson",
     "year": 1972,
     "genre": "Chanson",
-    "country": "France"
+    "country": "France",
+    "deezerId": 4074560561,
+    "verifiedAt": 1786248639653
   },
   {
     "title": "L'aventurier",
@@ -7548,7 +7552,9 @@
     "artist": "Sinsemilia",
     "year": 2010,
     "genre": "Variété",
-    "country": "France"
+    "country": "France",
+    "deezerId": 1096654652,
+    "verifiedAt": 1786248639653
   },
   {
     "title": "Basique",
@@ -7573,7 +7579,9 @@
     "artist": "Fabienne Thibeault",
     "year": 1978,
     "genre": "Rock opera",
-    "country": "France"
+    "country": "France",
+    "deezerId": 789203152,
+    "verifiedAt": 1786248639653
   },
   {
     "title": "Wuthering Heights",
@@ -8388,7 +8396,9 @@
     "artist": "Gilbert Montagné",
     "year": 1985,
     "genre": "Chanson",
-    "country": "France"
+    "country": "France",
+    "deezerId": 1142341,
+    "verifiedAt": 1786248639653
   },
   {
     "title": "Elle a fait un bébé toute seule",

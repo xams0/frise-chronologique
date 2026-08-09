@@ -1085,3 +1085,13 @@ Testé de bout en bout : audit sans désaccord (deezerId conservé), audit
 avec un vrai désaccord (deezerId retiré, rapport correct), bonus partiel
 activé (2 → 2,5 jetons confirmé) et désactivé (aucun jeton, comme avant).
 139/139 tests, exécutés deux fois.
+
+## v3.4.1 — mise à jour des deezerId (1015 → 1020 résolus)
+
+Nouvel export intégré. Bonne nouvelle : les 5 chansons corrigées en v3.2.5
+et v2.7.1 (Bam Bam Bamy Shore, et les 4 attributions françaises) se sont
+toutes résolues correctement cette fois — passées par le comparateur
+strict de la v3.3.1, donc fiables. 1032/1032 chansons du catalogue local
+retrouvées dans l'export, aucune perte. Reste 12 chansons non résolues
+(essentiellement des enregistrements de 1902-1930 et "Vois sur ton
+chemin"), inchangé et sans signe de problème d'attribution cette fois.
