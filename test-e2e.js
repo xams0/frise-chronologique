@@ -544,6 +544,53 @@ async function main() {
     else fail('non-active player early-reveal did not resolve promptly');
     wendy.disconnect(); xander.disconnect();
 
+    // ---- with MORE than one non-active player, everyone must click "ready"
+    // before it actually reveals — one alone is no longer enough ----
+    const vera = io(URL, { transports: ['websocket'] });
+    const wren = io(URL, { transports: ['websocket'] });
+    const ximena = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(vera, 'connect'), waitFor(wren, 'connect'), waitFor(ximena, 'connect')]);
+    vera.emit('create-room', { name: 'Vera' });
+    const veraJoined = await waitFor(vera, 'joined');
+    wren.emit('join-room', { code: veraJoined.code, name: 'Walt' });
+    await waitFor(wren, 'joined');
+    ximena.emit('join-room', { code: veraJoined.code, name: 'Xena' });
+    await waitFor(ximena, 'joined');
+    vera.emit('set-reveal-delay', { seconds: 30 });
+    await waitForRoomWhere(vera, r => r.revealDelaySeconds === 30);
+    vera.emit('start-game');
+    const voteGame = await waitForRoomWhere(vera, r => r.phase === 'playing');
+    const voteActiveId = voteGame.turnOrder[voteGame.turnIndex];
+    const bySocket = { [veraJoined.playerId]: vera };
+    const wrenJoined2 = voteGame.players.find(p => p.name === 'Walt');
+    const ximenaJoined2 = voteGame.players.find(p => p.name === 'Xena');
+    bySocket[wrenJoined2.id] = wren;
+    bySocket[ximenaJoined2.id] = ximena;
+    const voteActiveSocket = bySocket[voteActiveId];
+    const voters = voteGame.players.filter(p => p.id !== voteActiveId).map(p => bySocket[p.id]);
+
+    voteActiveSocket.emit('draw-card');
+    await waitForRoomWhere(voteActiveSocket, r => !!r.pending);
+    voteActiveSocket.emit('place-card', { gapIndex: 0 });
+    await waitForRoomWhere(voteActiveSocket, r => r.pending && r.pending.stage === 'placed');
+
+    voters[0].emit('reveal');
+    const afterOneVote = await waitForRoomWhere(voters[0], r => r.pending && r.pending.readyToReveal && r.pending.readyToReveal.length === 1);
+    if (afterOneVote.pending !== null) {
+      ok('with 2 eligible voters, a single "ready" click does NOT reveal alone anymore');
+    } else {
+      fail('expected the reveal to still be pending after only one of two voters clicked ready');
+    }
+
+    voters[1].emit('reveal');
+    const afterBothVotes = await waitForRoomWhere(voters[1], r => r.pending === null && r.lastResult, 3000);
+    if (afterBothVotes.pending === null) {
+      ok('once EVERY eligible voter has clicked ready, the reveal fires immediately without waiting for the timer');
+    } else {
+      fail('expected the reveal to resolve once all voters were ready');
+    }
+    vera.disconnect(); wren.disconnect(); ximena.disconnect();
+
     // ---- fuzzy guess matching (small typos should still count) ----
     const yara = io(URL, { transports: ['websocket'] });
     const zack = io(URL, { transports: ['websocket'] });
@@ -581,6 +628,47 @@ async function main() {
     }
     yara.disconnect(); zack.disconnect();
 
+    // ---- multiple guess attempts allowed: a wrong guess doesn't lock out a
+    // correct retry, and a correct retry after a wrong one still earns the
+    // token (no more one-shot limit) ----
+    const ulla = io(URL, { transports: ['websocket'] });
+    const vince = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(ulla, 'connect'), waitFor(vince, 'connect')]);
+    ulla.emit('create-room', { name: 'Uma' });
+    const ullaJoined = await waitFor(ulla, 'joined');
+    vince.emit('join-room', { code: ullaJoined.code, name: 'Vince' });
+    await waitFor(vince, 'joined');
+    ulla.emit('start-game');
+    const maGame = await waitForRoomWhere(ulla, r => r.phase === 'playing');
+    const maActiveId = maGame.turnOrder[maGame.turnIndex];
+    const maActive = maActiveId === ullaJoined.playerId ? ulla : vince;
+    const maTokensBefore = maGame.players.find(p => p.id === maActiveId).tokens;
+
+    maActive.emit('draw-card');
+    const maDrawn = await waitForRoomWhere(maActive, r => !!r.pending);
+    maActive.emit('submit-guess', { title: 'Totally Wrong Title Xyz', artist: 'Totally Wrong Artist Xyz' });
+    const maAfterWrong = await waitForRoomWhere(maActive, r => r.pending && r.pending.guessBy);
+    if (!maAfterWrong.pending.guessCorrect) ok('a wrong first guess attempt is correctly marked as not (yet) correct');
+    else fail('expected the deliberately wrong guess to not be marked correct');
+
+    maActive.emit('submit-guess', { title: maDrawn.pending.card.title, artist: maDrawn.pending.card.artist });
+    const maAfterCorrect = await waitForRoomWhere(maActive, r => r.pending && r.pending.guessCorrect === true);
+    const maTokensAfter = maAfterCorrect.players.find(p => p.id === maActiveId).tokens;
+    if (maTokensAfter === maTokensBefore + 1) {
+      ok('a correct guess on a SECOND attempt (after a wrong first one) is accepted and earns the full token — no more one-attempt limit');
+    } else {
+      fail(`expected +1 token after a correct retry, got ${maTokensBefore} -> ${maTokensAfter}`);
+    }
+
+    // A third attempt (already fully correct) must not pay out again.
+    let brokenExtraPayout = false;
+    maActive.once('room', (r) => { if (r.players.find(p => p.id === maActiveId).tokens !== maTokensAfter) brokenExtraPayout = true; });
+    maActive.emit('submit-guess', { title: maDrawn.pending.card.title, artist: maDrawn.pending.card.artist });
+    await new Promise(r => setTimeout(r, 500));
+    if (!brokenExtraPayout) ok('a third, already-fully-correct attempt does not pay out a token again (no double-dipping)');
+    else fail('expected no additional token payout on a redundant correct re-submission');
+    ulla.disconnect(); vince.disconnect();
+
     // ---- partial guess bonus: +0.5 tokens for title OR artist alone, only when enabled ----
     const quincy = io(URL, { transports: ['websocket'] });
     const ren3 = io(URL, { transports: ['websocket'] });
@@ -617,7 +705,7 @@ async function main() {
     pgActiveSocket.emit('submit-guess', { title: pgRealTitle, artist: 'Zzyzx Qwerty Not A Real Artist' });
     const pgAfterGuess = await waitForRoomWhere(pgActiveSocket, r => r.pending && r.pending.guessBy);
     const tokensAfter = pgAfterGuess.players.find(p => p.id === pgActiveId).tokens;
-    if (pgAfterGuess.pending.guessCorrect === false && pgAfterGuess.pending.guessPartial === true && tokensAfter === tokensBefore + 0.5) {
+    if (!pgAfterGuess.pending.guessCorrect && pgAfterGuess.pending.guessPartial === true && tokensAfter === tokensBefore + 0.5) {
       ok(`partial guess bonus correctly awarded +0.5 tokens for a title-only match (${tokensBefore} -> ${tokensAfter})`);
     } else {
       fail('expected +0.5 tokens for a title-only match with the bonus enabled: ' + JSON.stringify({ tokensBefore, tokensAfter, guessCorrect: pgAfterGuess.pending.guessCorrect, guessPartial: pgAfterGuess.pending.guessPartial }));

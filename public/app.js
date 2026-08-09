@@ -415,7 +415,15 @@ function skipCard() { socket.emit('skip-card'); }
 function freeCardWithTokens() { socket.emit('free-card'); }
 function openPlacementPicker() { state.activeTimelinePlayerId = state.playerId; state.selectedGap = null; render(); }
 function openChallengePicker() { state.activeTimelinePlayerId = 'CHALLENGE'; state.selectedGap = null; render(); }
-function submitGuess() { socket.emit('submit-guess', { title: state.guessTitle, artist: state.guessArtist }); state.guessTitle = ''; state.guessArtist = ''; render(); }
+function submitGuess() {
+  socket.emit('submit-guess', { title: state.guessTitle, artist: state.guessArtist });
+  // Deliberately NOT clearing the inputs here anymore: multiple attempts are
+  // now allowed, so wiping a near-correct guess right after submitting would
+  // force retyping it from scratch. They stay as-is until a new card is
+  // drawn (see the drawnAt-keyed reset above), letting the person just
+  // tweak a typo and resubmit instead.
+  render();
+}
 function reveal() { socket.emit('reveal'); }
 function playAgain() { socket.emit('play-again'); state.screen = 'lobby'; state.showFinalTimelines = false; render(); }
 function setDj(playerId) { socket.emit('set-dj', { playerId }); state.showDjPicker = false; render(); }
@@ -499,6 +507,22 @@ function render() {
   }
 
   let html;
+
+  // FLIP setup for the "climb to top" animation: capture each timeline
+  // zone's current screen position BEFORE the DOM gets rebuilt, but only
+  // when the pinned-to-top player is actually about to change — no point
+  // paying for layout reads on every render.
+  let flipBefore = null;
+  const onGameScreen = state.screen !== 'welcome' && state.screen !== 'loading' && state.screen !== 'home' && state.screen !== 'lobby';
+  if (onGameScreen && state.room) {
+    const oldPinnedId = displayActiveId;
+    updateDisplayActiveId(state.room);
+    if (oldPinnedId !== displayActiveId) {
+      flipBefore = {};
+      document.querySelectorAll('[id^="timeline-"]').forEach(el => { flipBefore[el.id] = el.getBoundingClientRect().top; });
+    }
+  }
+
   if (state.screen === 'welcome') { html = renderWelcome(); lastComputedFabHtml = ''; }
   else if (state.screen === 'loading') { html = renderLoading(); lastComputedFabHtml = ''; }
   else if (state.screen === 'home') { html = renderHome(); lastComputedFabHtml = ''; }
@@ -506,6 +530,26 @@ function render() {
   else html = renderGame(); // sets lastComputedFabHtml as a side effect
   root.innerHTML = html;
   updateFabOverlay(lastComputedFabHtml);
+
+  // Play the "climb to top" animation: the zone that just moved snaps back
+  // (via an inverted transform) to where it visually WAS, then transitions
+  // to translateY(0) — i.e. its new, correct position — on the next frame.
+  if (flipBefore) {
+    requestAnimationFrame(() => {
+      document.querySelectorAll('[id^="timeline-"]').forEach(el => {
+        const oldTop = flipBefore[el.id];
+        if (oldTop === undefined) return; // a new element (e.g. a player who just joined) — nothing to animate from
+        const delta = oldTop - el.getBoundingClientRect().top;
+        if (Math.abs(delta) < 1) return;
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${delta}px)`;
+        requestAnimationFrame(() => {
+          el.style.transition = 'transform 0.5s cubic-bezier(0.4,0,0.2,1)';
+          el.style.transform = '';
+        });
+      });
+    });
+  }
 
   if (focusedId) {
     const el = document.getElementById(focusedId);
@@ -1110,9 +1154,14 @@ function renderReactionFab() {
   const angles = [90, 120, 150, 180]; // degrees, 0=right 90=up 180=left — sweeps up-and-left from the FAB
   const radius = 78; // 100 still felt big — shrinking further while keeping enough gap to avoid mis-taps
   const locked = reactionLockedUntil > Date.now();
+  // Same issue the quick-action shortcuts had: while a modal (placement/
+  // challenge picker) is open, this FAB's z-index put it right on top of
+  // "Valider" at the bottom of the screen. Apply the same "muted, moved
+  // out of the way" treatment here too instead of just the shortcuts.
+  const modalOpen = !!state.activeTimelinePlayerId;
   return `
   ${state.reactionMenuOpen && !locked ? `<div class="reaction-backdrop" data-act="toggle-reaction-menu"></div>` : ''}
-  <div class="reaction-fab-wrap">
+  <div class="reaction-fab-wrap ${modalOpen ? 'muted' : ''}">
     <div class="reaction-petals ${state.reactionMenuOpen && !locked ? 'open' : ''}">
       ${emojis.map((e, i) => {
         const rad = angles[i] * Math.PI / 180;
@@ -1121,7 +1170,7 @@ function renderReactionFab() {
         return `<button class="reaction-petal" data-act="send-reaction" data-emoji="${e}" style="--tx:${tx}px;--ty:${ty}px;">${e}</button>`;
       }).join('')}
     </div>
-    <button class="reaction-fab ${locked ? 'locked' : ''}" data-act="toggle-reaction-menu">${locked ? '🚫' : '💬'}</button>
+    <button class="reaction-fab ${locked ? 'locked' : ''}" data-act="toggle-reaction-menu" ${modalOpen ? 'disabled' : ''}>${locked ? '🚫' : '💬'}</button>
   </div>`;
 }
 
@@ -1150,7 +1199,10 @@ function renderTurnAction(room, pend, isActive, myself) {
   }
 
   const isActivePlayerTurn = pend.activePlayerId === state.playerId;
-  const guessDone = !!pend.guessBy;
+  // Fully correct = no more reason to keep guessing. Anything short of that
+  // (nothing yet, or partial-only) keeps the form up so more attempts can
+  // be made — there's no attempt limit anymore.
+  const guessFullyDone = pend.guessCorrect === true;
   let html = '';
 
   // "Tous ensemble": audio plays on the DJ's device only (or the tester's, for
@@ -1183,20 +1235,27 @@ function renderTurnAction(room, pend, isActive, myself) {
   }
 
   if (pend.stage === 'placed' || pend.stage === 'listening') {
-    if (isActivePlayerTurn && !guessDone) {
+    if (isActivePlayerTurn && !guessFullyDone) {
       html += `
       <div class="guess-box">
         <input id="inp-title" placeholder="Titre ?" value="${escapeHtml(state.guessTitle)}"/>
         <input id="inp-artist" placeholder="Artiste ?" value="${escapeHtml(state.guessArtist)}"/>
       </div>
-      <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre + artiste (+1 🪙)${room.partialGuessBonus ? ' — ou un seul des deux (+0,5 🪙)' : ''}</button>`;
+      <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre ${room.partialGuessBonus ? 'ou' : 'et'} artiste</button>`;
     }
-    if (guessDone && pend.guessBy !== 'bot-na') {
-      const guessKey = pend.placedAt + '-' + pend.guessBy;
+    if (pend.guessBy && pend.guessBy !== 'bot-na') {
+      // Re-flashes whenever the BEST result reached changes (wrong -> partial
+      // -> full), not just once per turn — since retries can improve on a
+      // previous miss now.
+      const level = pend.guessCorrect ? 'full' : pend.guessPartial ? 'partial' : 'attempt';
+      const guessKey = pend.placedAt + '-' + pend.guessBy + '-' + level;
       const isFirstGuessRender = lastAnimatedGuessKey !== guessKey;
       if (isFirstGuessRender) lastAnimatedGuessKey = guessKey;
-      const guessFlashCls = isFirstGuessRender ? (pend.guessCorrect ? 'flash-correct' : 'flash-wrong') : '';
-      html += `<div class="guess-ok ${guessFlashCls}">${pend.guessCorrect ? '✔ Titre et artiste trouvés — jeton gagné.' : '✘ Pas trouvé cette fois.'}</div>`;
+      const guessFlashCls = isFirstGuessRender ? (level === 'attempt' ? 'flash-wrong' : 'flash-correct') : '';
+      const label = pend.guessCorrect ? '✔ Titre et artiste trouvés — jeton gagné.'
+        : pend.guessPartial ? '🟡 Un des deux trouvé — jeton partiel gagné, essaie encore pour le reste !'
+        : '✘ Pas trouvé cette fois — réessaie.';
+      html += `<div class="guess-ok ${guessFlashCls}">${label}</div>`;
     }
   }
 
@@ -1279,7 +1338,17 @@ function renderPendingParticipants(room, pend) {
     html += renderRevealInfoTimer(room, pend, activePl);
     if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier (1 🪙)</button>`;
     if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">🚨 ${escapeHtml(challenger.name)} a défié ${escapeHtml(activePl.name)}.</p>`;
-    html += `<button class="btn btn-gold btn-sm" data-act="reveal">✅ Ça a l'air bon, révéler maintenant</button>`;
+    // Clicking this no longer reveals alone — it marks the person ready.
+    // Once everyone else (excluding the active player) has done the same,
+    // the reveal fires right away instead of waiting out the timer.
+    const readyList = pend.readyToReveal || [];
+    const eligibleVoters = room.players.filter(p => !p.isBot && p.id !== activePl.id);
+    const readyCount = eligibleVoters.filter(p => readyList.includes(p.id)).length;
+    const iAmReady = readyList.includes(state.playerId);
+    const remaining = eligibleVoters.length - readyCount;
+    html += iAmReady
+      ? `<button class="btn btn-gold btn-sm" disabled>✅ En attente des autres (${readyCount}/${eligibleVoters.length})</button>`
+      : `<button class="btn btn-gold btn-sm" data-act="reveal">✅ Ça a l'air bon${eligibleVoters.length > 1 ? ` — encore ${remaining}/${eligibleVoters.length} joueur${remaining > 1 ? 's' : ''} pour révéler` : ', révéler maintenant'}</button>`;
   }
   html += '</div>';
   return html;
@@ -1333,6 +1402,27 @@ function buildRibbonItems(sortedCards, markers) {
   return items;
 }
 
+// Tracks which player's zone is currently pinned to the TOP of the list —
+// deliberately lags behind the true active player for a moment. Without
+// this, the instant a turn passes, the just-finished player's zone would
+// jump away immediately during "Piocher et écouter", right when they most
+// want to see where their card landed, and before the next player has even
+// drawn — nothing to prepare for yet. It only catches up (triggering the
+// climb animation below) once the new active player actually has a pending
+// card, whether they drew manually or the auto-draw timer did it for them.
+let displayActiveId = null;
+function updateDisplayActiveId(room) {
+  const trueActiveId = room.turnOrder && room.turnOrder.length ? room.turnOrder[room.turnIndex % room.turnOrder.length] : null;
+  if (displayActiveId === null || !room.players.some(p => p.id === displayActiveId)) {
+    displayActiveId = trueActiveId; // first render, or the pinned player left — just sync
+    return;
+  }
+  if (displayActiveId === trueActiveId) return;
+  if (room.pending && room.pending.activePlayerId === trueActiveId) {
+    displayActiveId = trueActiveId;
+  }
+}
+
 function renderAllTimelines(room) {
   const pend = room.pending;
   const activeId = room.turnOrder && room.turnOrder.length ? room.turnOrder[room.turnIndex % room.turnOrder.length] : null;
@@ -1341,11 +1431,12 @@ function renderAllTimelines(room) {
   const showWonHighlight = lr && lr.kind !== 'wrong' && (Date.now() - lr.ts) < RESULT_NOTICE_MS;
   const wonPlayerName = showWonHighlight ? (lr.kind === 'stolen' ? lr.extraName : lr.activeName) : null;
 
-  // The active player's zone always renders first, so it's never buried
-  // below a wall of other players' timelines when there are many of them.
+  // The pinned (not necessarily the true-active) player's zone always
+  // renders first, so it's never buried below a wall of other players'
+  // timelines when there are many of them.
   const orderedPlayers = room.players.slice().sort((a, b) => {
-    if (a.id === activeId) return -1;
-    if (b.id === activeId) return 1;
+    if (a.id === displayActiveId) return -1;
+    if (b.id === displayActiveId) return 1;
     return 0;
   });
 
@@ -1773,8 +1864,17 @@ function attachHandlers() {
         const gap = state.selectedGap;
         const isChallenge = state.activeTimelinePlayerId === 'CHALLENGE';
         state.selectedGap = null; state.activeTimelinePlayerId = null;
-        if (isChallenge) socket.emit('submit-challenge', { gapIndex: gap });
-        else socket.emit('place-card', { gapIndex: gap });
+        if (isChallenge) {
+          socket.emit('submit-challenge', { gapIndex: gap });
+        } else {
+          // Placing the card also sends whatever title/artist guess is
+          // currently typed, so the person doesn't need two separate taps
+          // (Valider titre/artiste, then Placer la carte) — one confirms both.
+          if (state.guessTitle.trim() || state.guessArtist.trim()) {
+            socket.emit('submit-guess', { title: state.guessTitle, artist: state.guessArtist });
+          }
+          socket.emit('place-card', { gapIndex: gap });
+        }
         render();
       }
     };

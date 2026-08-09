@@ -151,7 +151,9 @@
   {
     "title": "Waiting for the Robert E. Lee",
     "artist": "Al Jolson",
-    "year": 1912
+    "year": 1912,
+    "deezerId": 114755582,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Danny Boy",
@@ -360,7 +362,9 @@
   {
     "title": "Whispering",
     "artist": "Paul Whiteman",
-    "year": 1920
+    "year": 1920,
+    "deezerId": 248892,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Ain't We Got Fun",
@@ -392,7 +396,9 @@
   {
     "title": "Wabash Blues",
     "artist": "Isham Jones",
-    "year": 1921
+    "year": 1921,
+    "deezerId": 64771430,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Toot Toot Tootsie",
@@ -472,7 +478,9 @@
   {
     "title": "Yes Sir, That's My Baby",
     "artist": "Gene Austin",
-    "year": 1925
+    "year": 1925,
+    "deezerId": 2841031102,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Five Foot Two, Eyes of Blue",
@@ -509,7 +517,9 @@
   {
     "title": "When the Red, Red Robin Comes Bob-Bob-Bobbin' Along",
     "artist": "Al Jolson",
-    "year": 1926
+    "year": 1926,
+    "deezerId": 12077309,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Ol' Man River",
@@ -544,12 +554,16 @@
   {
     "title": "Ain't She Sweet",
     "artist": "Ben Bernie",
-    "year": 1927
+    "year": 1927,
+    "deezerId": 88110351,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "My Blue Heaven",
     "artist": "Gene Austin",
-    "year": 1927
+    "year": 1927,
+    "deezerId": 88535669,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Mack the Knife (Die Moritat)",
@@ -817,7 +831,9 @@
   {
     "title": "Crossroad Blues",
     "artist": "Robert Johnson",
-    "year": 1936
+    "year": 1936,
+    "deezerId": 851722,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "Bei Mir Bist Du Schön",
@@ -831,12 +847,16 @@
   {
     "title": "Sing, Sing, Sing",
     "artist": "Benny Goodman",
-    "year": 1937
+    "year": 1937,
+    "deezerId": 459421912,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "One O'Clock Jump",
     "artist": "Count Basie",
-    "year": 1937
+    "year": 1937,
+    "deezerId": 3080654471,
+    "verifiedAt": 1786281265242
   },
   {
     "title": "A-Tisket, A-Tasket",

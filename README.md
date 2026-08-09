@@ -1116,3 +1116,34 @@ sur Deezer — la résolution/validation se fera au prochain démarrage réel
 via le garde-fou de la v3.3.1.
 
 139/139 tests, exécutés deux fois.
+
+## v3.6.0 — 6 améliorations de lisibilité + mise à jour deezerId (1030 résolus)
+
+- **Bouton "Valider titre ou/et artiste"** simplifié, sans le nombre de
+  jetons — le texte s'adapte selon que le bonus partiel est activé.
+- **La zone du joueur qui vient de jouer reste en haut** pendant que le
+  suivant pioche/écoute — la couleur/glow "actif" passe bien tout de suite
+  au bon joueur, mais la POSITION dans la liste ne bouge qu'une fois que
+  le nouveau joueur a effectivement une carte en attente (piochée
+  manuellement ou par le minuteur auto). À ce moment-là, une vraie
+  animation de glissement (technique FLIP) fait "grimper" sa zone en haut.
+- **Tentatives illimitées pour titre/artiste** — plus de blocage après un
+  premier essai raté. Le système de jetons est cumulatif mais plafonné
+  (une réussite complète après un essai partiel ne complète que la
+  différence, jamais de double paiement).
+- **"Placer la carte" envoie aussi Titre/Artiste** si quelque chose est
+  tapé — un seul clic sur "Valider" dans la fenêtre de placement suffit.
+- **💬 ne recouvre plus "Valider"** pendant le placement/défi — même
+  traitement que les raccourcis 🔪/🤘🏻 déjà corrigés (grisé, déplacé).
+- **Révélation groupée** : tous les joueurs (sauf l'actif) doivent
+  cliquer "Ça a l'air bon" — le bouton affiche "encore X/Y joueurs", et
+  la révélation se déclenche dès que tout le monde a voté, sans attendre
+  la fin du minuteur.
+
+Catalogue mis à jour avec le dernier export (1030/1332 chansons
+résolues sur Deezer).
+
+Testé de bout en bout : vote de révélation à 3 joueurs (un seul clic ne
+suffit pas, tous ensemble déclenchent), tentatives multiples (échec puis
+réussite paie le jeton complet, une 3e tentative déjà réussie ne repaie
+pas). 144/144 tests, exécutés deux fois.

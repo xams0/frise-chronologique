@@ -1196,20 +1196,33 @@ io.on('connection', (socket) => {
 
   socket.on('submit-guess', withRoom((room, { title, artist }) => {
     const playerId = socket.data.playerId;
-    if (!room.pending || room.pending.guessBy || room.pending.activePlayerId !== playerId) return;
+    if (!room.pending || room.pending.activePlayerId !== playerId) return;
+    // Multiple attempts are allowed now (no more one-shot lock) — but reward
+    // is cumulative-and-capped, tracked via guessTokensAwarded, so retrying
+    // can only ever top UP what's already been earned this turn, never
+    // double-pay for the same title/artist find. guessCorrect/guessPartial
+    // reflect the BEST result achieved so far, not just the latest attempt,
+    // so a worse retry never erases feedback already shown.
     const detail = matchGuessDetail(title, artist, room.pending.card);
-    room.pending.guessCorrect = detail.bothOk;
-    room.pending.guessBy = playerId;
     const p = me(room, playerId);
+    room.pending.guessBy = playerId;
+    const awarded = room.pending.guessTokensAwarded || 0;
     if (detail.bothOk) {
-      p.tokens = Math.min(MAX_TOKENS, p.tokens + 1);
-      room.log.push({ ts: nowStr(), text: `${p.name} trouve le titre et l'artiste — +1 jeton !` });
+      room.pending.guessCorrect = true;
+      if (awarded < 1) {
+        p.tokens = Math.min(MAX_TOKENS, p.tokens + (1 - awarded));
+        room.pending.guessTokensAwarded = 1;
+        room.log.push({ ts: nowStr(), text: `${p.name} trouve le titre et l'artiste — +1 jeton !` });
+      }
     } else if (room.partialGuessBonus && (detail.titleOk || detail.artistOk)) {
-      p.tokens = Math.min(MAX_TOKENS, p.tokens + 0.5);
-      const found = detail.titleOk ? 'le titre' : 'l\'artiste';
       room.pending.guessPartial = true;
-      room.log.push({ ts: nowStr(), text: `${p.name} trouve ${found} — +0,5 jeton !` });
-    } else {
+      if (awarded < 0.5) {
+        p.tokens = Math.min(MAX_TOKENS, p.tokens + 0.5);
+        room.pending.guessTokensAwarded = 0.5;
+        const found = detail.titleOk ? 'le titre' : 'l\'artiste';
+        room.log.push({ ts: nowStr(), text: `${p.name} trouve ${found} — +0,5 jeton !` });
+      }
+    } else if (awarded === 0) {
       room.log.push({ ts: nowStr(), text: `${p.name} n'a pas trouvé le titre/artiste.` });
     }
   }));
@@ -1234,8 +1247,22 @@ io.on('connection', (socket) => {
       if (elapsed < delayMs) {
         return socket.emit('error-msg', `Attends encore ${Math.ceil((delayMs - elapsed) / 1000)}s avant de pouvoir révéler — ça laisse une chance de défier.`);
       }
+      return resolveReveal(room);
     }
-    resolveReveal(room);
+
+    // A non-active human clicking "Ça a l'air bon" no longer reveals alone —
+    // it marks them ready. Once every OTHER human (excluding the active
+    // player, who has their own separate button/timer) has done the same,
+    // the reveal fires immediately, without waiting out the rest of the
+    // timer. Bot-active turns are unaffected — "Révéler pour le Bot" keeps
+    // its existing single-click-after-timer behavior, since there's no
+    // real active player's own decision being waited on there.
+    if (active.isBot) return resolveReveal(room);
+    if (!room.pending.readyToReveal) room.pending.readyToReveal = [];
+    if (!room.pending.readyToReveal.includes(playerId)) room.pending.readyToReveal.push(playerId);
+    const eligibleVoters = room.players.filter(p => !p.isBot && p.id !== active.id).map(p => p.id);
+    const allReady = eligibleVoters.length > 0 && eligibleVoters.every(id => room.pending.readyToReveal.includes(id));
+    if (allReady) resolveReveal(room);
   }));
 
   socket.on('play-again', withRoom((room) => {
