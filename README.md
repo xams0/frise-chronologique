@@ -1095,3 +1095,24 @@ strict de la v3.3.1, donc fiables. 1032/1032 chansons du catalogue local
 retrouvées dans l'export, aucune perte. Reste 12 chansons non résolues
 (essentiellement des enregistrements de 1902-1930 et "Vois sur ton
 chemin"), inchangé et sans signe de problème d'attribution cette fois.
+
+## v3.5.0 — catalogue étendu à 1332 chansons
+
++300 chansons (1032 → 1332), title/artist/year seulement — plus de
+genre/country générés pour les nouveaux ajouts, comme convenu. Point
+d'honnêteté sur la démarche : un premier brouillon a été jeté à la
+poubelle en cours de route parce qu'il contenait des titres inventés
+("(Reprise)", "(Second Reprise)") pour gonfler artificiellement le
+chiffre — repéré et corrigé avant fusion, remplacé par de vraies
+chansons distinctes.
+
+Bonne diversité de genres pour combler les trous du catalogue existant :
+country, metal/hard rock, reggae/ska, punk/new wave, hip-hop deep cuts,
+latino/reggaeton, K-pop, électro/dance, indie, chanson française,
+R&B/soul, grunge, disco/funk, blues/gospel, comédies musicales,
+Eurovision, afrobeats. 0 doublon interne, 0 entrée incomplète, années
+1902-2025. Comme toujours, ce lot n'a pas été vérifié individuellement
+sur Deezer — la résolution/validation se fera au prochain démarrage réel
+via le garde-fou de la v3.3.1.
+
+139/139 tests, exécutés deux fois.
