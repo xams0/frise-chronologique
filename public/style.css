@@ -33,15 +33,22 @@
   .result-banner.result-tint-correct{background:rgba(63,217,196,0.12);border-color:var(--teal);}
   .result-banner.result-tint-wrong{background:rgba(255,107,94,0.12);border-color:var(--red);}
   .result-popup-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:120;padding:20px;pointer-events:none;}
-  .result-popup{background:var(--surface);border-radius:20px;padding:22px 24px;max-width:340px;width:100%;text-align:center;border:1.5px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,0.5);}
-  .result-popup.result-tint-correct{border-color:var(--teal);}
-  .result-popup.result-tint-wrong{border-color:var(--red);}
+  .result-popup{position:relative;background:var(--surface);border-radius:20px;padding:22px 24px 46px;max-width:340px;width:100%;text-align:center;border:1.5px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,0.5);pointer-events:auto;}
   .result-popup-cover{width:64px;height:64px;border-radius:12px;object-fit:cover;margin:0 auto 12px;display:block;}
   .result-popup-player{font-size:17px;margin-bottom:8px;}
   .result-popup-player .player-dot{width:11px;height:11px;}
   .result-popup-title{font-size:19px;font-weight:800;color:var(--text);}
   .result-popup-artist{font-size:14px;color:var(--text-dim);margin-top:2px;margin-bottom:12px;}
   .result-popup-status{font-size:15px;font-weight:700;}
+  .result-popup-close{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);color:var(--text-dim);font-size:15px;display:flex;align-items:center;justify-content:center;}
+  /* Dedicated flash for the popup — deliberately does NOT touch background
+     (unlike flash-correct/flash-wrong above, made for the old inline
+     banner): animating background toward transparent here would briefly
+     let the dark overlay behind the popup show through the card itself —
+     exactly the "background suddenly appears" glitch that was reported. */
+  @keyframes popupFlashPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,0.35), 0 12px 40px rgba(0,0,0,0.5);transform:scale(1.03);}100%{box-shadow:0 0 0 14px rgba(255,255,255,0), 0 12px 40px rgba(0,0,0,0.5);transform:scale(1);}}
+  .popup-flash-correct{animation:popupFlashPulse 0.7s ease;}
+  .popup-flash-wrong{animation:shakeRed 0.5s ease;}
 
   /* ---- layout shells ---- */
   .screen{flex:1;display:flex;flex-direction:column;padding:22px 18px 90px;max-width:520px;margin:0 auto;width:100%;}

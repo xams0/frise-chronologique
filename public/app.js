@@ -114,7 +114,7 @@ const state = {
   showRules: false, showDjPicker: false, showLibrary: false, showImport: false,
   activeTimelinePlayerId: null, selectedGap: null,
   catalog: null, newSong: { title: '', artist: '', year: '' }, libError: '', libBusy: false, importError: '',
-  ytMuted: true,
+  ytMuted: true, dismissedResultTs: null,
   brackets: null, showOptions: false, optionsTab: 'modes', showRecap: false, reactionMenuOpen: false,
   healthReport: null, healthChecking: false, auditReport: null, auditRunning: false,
   ready: null,
@@ -1103,7 +1103,7 @@ function renderGame() {
     </div>
 
     ${renderAllTimelines(room)}
-    ${room.lastResult && !pend ? renderResultPopup(room, room.lastResult) : ''}
+    ${room.lastResult && !pend && room.lastResult.ts !== state.dismissedResultTs ? renderResultPopup(room, room.lastResult) : ''}
 
     ${state.activeTimelinePlayerId ? renderPlacementModal(room) : ''}
     ${state.showRules ? renderRulesModal() : ''}
@@ -1374,8 +1374,13 @@ let lastAnimatedGuessKey = null; // same idea for the title/artist guess feedbac
 function renderResultPopup(room, r) {
   const isFirstRender = lastAnimatedResultTs !== r.ts;
   if (isFirstRender) lastAnimatedResultTs = r.ts;
-  const kindCls = r.kind === 'wrong' ? 'result-tint-wrong' : 'result-tint-correct';
-  const flashCls = isFirstRender ? (r.kind === 'wrong' ? 'flash-wrong' : 'flash-correct') : '';
+  // Dedicated flash classes for the popup — NOT the old flash-correct/
+  // flash-wrong (those animate background toward transparent at the end,
+  // which briefly let the dark overlay behind the popup show through the
+  // card — exactly the "background suddenly appears" glitch reported).
+  // These never touch background, only box-shadow/transform, so the
+  // popup's solid background is never interrupted.
+  const flashCls = isFirstRender ? (r.kind === 'wrong' ? 'popup-flash-wrong' : 'popup-flash-correct') : '';
   const activeColor = r.activeColor || '#8B93A6';
   let statusLine;
   if (r.kind === 'wrong') statusLine = `❌ Mal placée — carte défaussée.`;
@@ -1386,13 +1391,14 @@ function renderResultPopup(room, r) {
     : '';
   return `
   <div class="result-popup-bg">
-    <div class="result-popup ${kindCls} ${flashCls}">
+    <div class="result-popup ${flashCls}" style="border-color:${activeColor};background:color-mix(in srgb, ${activeColor} 14%, var(--surface));">
       ${r.cover ? `<img src="${escapeHtml(r.cover)}" alt="" class="result-popup-cover"/>` : ''}
       <div class="result-popup-player"><span class="player-dot" style="background:${activeColor};"></span><b style="color:${activeColor};">${escapeHtml(r.activeName)}</b></div>
       <div class="result-popup-title">"${escapeHtml(r.title)}"</div>
       <div class="result-popup-artist">${escapeHtml(r.artist)} · ${r.year}</div>
       <div class="result-popup-status">${statusLine}</div>
       ${penalty}
+      <button class="result-popup-close" data-act="dismiss-result-popup" data-ts="${r.ts}">✕</button>
     </div>
   </div>`;
 }
@@ -1863,6 +1869,7 @@ function attachHandlers() {
       else if (act === 'reveal') reveal();
       else if (act === 'play-again') playAgain();
       else if (act === 'toggle-final-timelines') { state.showFinalTimelines = !state.showFinalTimelines; render(); }
+      else if (act === 'dismiss-result-popup') { state.dismissedResultTs = parseInt(elm.getAttribute('data-ts'), 10); render(); }
       else if (act === 'select-gap') { state.selectedGap = parseInt(elm.getAttribute('data-gap'), 10); render(); }
       else if (act === 'confirm-gap') {
         if (state.selectedGap === null) return;

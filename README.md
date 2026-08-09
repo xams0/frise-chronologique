@@ -1169,3 +1169,21 @@ l'état du jeu :
 Testé : `lastResult` inclut désormais bien la couleur du joueur actif
 (et du voleur le cas échéant) pour que la popup puisse les afficher.
 146/146 tests, exécutés deux fois.
+
+## v3.7.1 — croix de fermeture, fix du bug de fond transparent, couleur du joueur
+
+- **Croix ✕** en bas au centre du popup pour le fermer avant la fin
+  naturelle de son cycle de vie.
+- **Bug confirmé et corrigé** : le popup réutilisait les animations
+  `flash-correct`/`flash-wrong` de l'ancienne bannière, qui animent le
+  fond de la carte vers `transparent` en fin d'animation — ça laissait
+  apparaître le fond noir semi-opaque du popup à travers la carte pendant
+  un instant. Inoffensif sur une bannière inline, mais exactement le
+  "le fond apparaît d'un coup" que tu décrivais ici. Nouvelles animations
+  dédiées qui ne touchent jamais au fond de la carte.
+- **Le popup reprend maintenant la couleur du joueur** (bordure + fond
+  légèrement teinté), en plus du nom déjà coloré — le statut
+  (bien placée / mal placée / volée) reste communiqué par le texte et les
+  emojis plutôt que par la couleur, pour ne pas perdre cette info.
+
+146/146 tests, exécutés deux fois.
