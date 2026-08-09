@@ -1187,3 +1187,17 @@ Testé : `lastResult` inclut désormais bien la couleur du joueur actif
   emojis plutôt que par la couleur, pour ne pas perdre cette info.
 
 146/146 tests, exécutés deux fois.
+
+## v3.7.2 — champ Titre/Artiste grisé une fois trouvé
+
+Dès que le titre ou l'artiste est trouvé individuellement (fonctionne
+même sans le bonus partiel activé, c'est purement informatif), le champ
+correspondant devient grisé (opacité réduite, bordure/texte teal) et
+n'est plus cliquable ni modifiable — l'autre champ reste actif s'il
+n'est pas encore trouvé. Suivi côté serveur indépendamment pour chaque
+champ (`guessTitleOk`/`guessArtistOk`), donc trouver l'un n'efface jamais
+la marque de l'autre déjà trouvé.
+
+Testé : trouver seulement le titre ne marque que guessTitleOk, trouver
+ensuite l'artiste marque bien les deux indépendamment. 147/147 tests,
+exécutés deux fois.

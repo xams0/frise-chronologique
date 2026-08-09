@@ -1206,6 +1206,12 @@ io.on('connection', (socket) => {
     const detail = matchGuessDetail(title, artist, room.pending.card);
     const p = me(room, playerId);
     room.pending.guessBy = playerId;
+    // Sticky per-field tracking (which specific field has been correctly
+    // identified) — kept independent of the partialGuessBonus setting,
+    // since this drives UI feedback (greying out a found field), not the
+    // token reward itself.
+    if (detail.titleOk) room.pending.guessTitleOk = true;
+    if (detail.artistOk) room.pending.guessArtistOk = true;
     const awarded = room.pending.guessTokensAwarded || 0;
     if (detail.bothOk) {
       room.pending.guessCorrect = true;

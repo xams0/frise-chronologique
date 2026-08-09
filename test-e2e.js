@@ -674,6 +674,39 @@ async function main() {
     else fail('expected no additional token payout on a redundant correct re-submission');
     ulla.disconnect(); vince.disconnect();
 
+    // ---- per-field tracking (guessTitleOk/guessArtistOk): finding only the
+    // title should mark just that field, not the artist one too, and vice
+    // versa — this drives the client greying out just the found input ----
+    const otto = io(URL, { transports: ['websocket'] });
+    const penny = io(URL, { transports: ['websocket'] });
+    await Promise.all([waitFor(otto, 'connect'), waitFor(penny, 'connect')]);
+    otto.emit('create-room', { name: 'Otto' });
+    const ottoJoined = await waitFor(otto, 'joined');
+    penny.emit('join-room', { code: ottoJoined.code, name: 'Penny' });
+    await waitFor(penny, 'joined');
+    otto.emit('start-game');
+    const pfGame = await waitForRoomWhere(otto, r => r.phase === 'playing');
+    const pfActiveId = pfGame.turnOrder[pfGame.turnIndex];
+    const pfActive = pfActiveId === ottoJoined.playerId ? otto : penny;
+
+    pfActive.emit('draw-card');
+    const pfDrawn = await waitForRoomWhere(pfActive, r => !!r.pending);
+    pfActive.emit('submit-guess', { title: pfDrawn.pending.card.title, artist: 'Totally Wrong Artist Xyz' });
+    const pfAfterTitle = await waitForRoomWhere(pfActive, r => r.pending && r.pending.guessTitleOk);
+    if (pfAfterTitle.pending.guessTitleOk === true && !pfAfterTitle.pending.guessArtistOk) {
+      ok('finding only the title correctly marks guessTitleOk without also marking guessArtistOk');
+    } else {
+      fail('expected only guessTitleOk to be set, got: ' + JSON.stringify({ guessTitleOk: pfAfterTitle.pending.guessTitleOk, guessArtistOk: pfAfterTitle.pending.guessArtistOk }));
+    }
+    pfActive.emit('submit-guess', { title: 'Totally Wrong Title Xyz', artist: pfDrawn.pending.card.artist });
+    const pfAfterBoth = await waitForRoomWhere(pfActive, r => r.pending && r.pending.guessArtistOk);
+    if (pfAfterBoth.pending.guessTitleOk === true && pfAfterBoth.pending.guessArtistOk === true) {
+      ok('finding the artist afterwards keeps the earlier title find marked too — both fields end up correctly tracked independently');
+    } else {
+      fail('expected both guessTitleOk and guessArtistOk to be true, got: ' + JSON.stringify({ guessTitleOk: pfAfterBoth.pending.guessTitleOk, guessArtistOk: pfAfterBoth.pending.guessArtistOk }));
+    }
+    otto.disconnect(); penny.disconnect();
+
     // ---- partial guess bonus: +0.5 tokens for title OR artist alone, only when enabled ----
     const quincy = io(URL, { transports: ['websocket'] });
     const ren3 = io(URL, { transports: ['websocket'] });

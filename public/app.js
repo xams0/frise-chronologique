@@ -1230,8 +1230,8 @@ function renderTurnAction(room, pend, isActive, myself) {
     if (isActivePlayerTurn && !guessFullyDone) {
       html += `
       <div class="guess-box">
-        <input id="inp-title" placeholder="Titre ?" value="${escapeHtml(state.guessTitle)}"/>
-        <input id="inp-artist" placeholder="Artiste ?" value="${escapeHtml(state.guessArtist)}"/>
+        <input id="inp-title" placeholder="Titre ?" value="${escapeHtml(state.guessTitle)}" ${pend.guessTitleOk ? 'disabled class="guess-found"' : ''}/>
+        <input id="inp-artist" placeholder="Artiste ?" value="${escapeHtml(state.guessArtist)}" ${pend.guessArtistOk ? 'disabled class="guess-found"' : ''}/>
       </div>
       <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre ${room.partialGuessBonus ? 'ou' : 'et'} artiste</button>`;
     }
