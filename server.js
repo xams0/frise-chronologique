@@ -223,6 +223,19 @@ async function deezerTrack(id) {
   if (FAKE_DEEZER) {
     if (FAKE_DEEZER_FAIL) return { preview: null };
     if (FAKE_DEEZER_AUDIT_MISMATCH) return { preview: 'https://example.invalid/fake-preview-' + id + '.mp3', album: { cover_medium: 'https://example.invalid/fake-cover.jpg' }, title: 'Speed Demon', artist: { name: 'Michael Jackson' } };
+    // Same real-world false-rejection pattern as FAKE_DEEZER_MINOR_VARIANT
+    // above, but for the AUDIT path specifically (deezerTrack, not
+    // deezerSearch) — this is the exact path that had its own stale,
+    // unfixed comparison logic even after the search path was corrected.
+    if (FAKE_DEEZER_MINOR_VARIANT) {
+      const known = catalog.find(s => String(s.deezerId) === String(id));
+      return {
+        preview: 'https://example.invalid/fake-preview-' + id + '.mp3',
+        album: { cover_medium: 'https://example.invalid/fake-cover.jpg' },
+        title: known ? known.title + ' (2011 Remaster)' : 'Unknown',
+        artist: { name: known ? known.artist.replace(/^The\s+/i, '') : 'Unknown' },
+      };
+    }
     // Echoes back whatever the catalog currently expects for this id, so a
     // routine audit run (nothing actually wrong) correctly reports zero
     // mismatches in tests.
@@ -416,9 +429,16 @@ async function runDeezerAudit() {
         const track = await deezerTrack(song.deezerId);
         const gotTitle = track.title || '';
         const gotArtist = (track.artist && track.artist.name) || '';
-        const artistOk = closeByRatio(song.artist, gotArtist, 0.10);
-        const titleOk = closeByRatio(stripTitleNoise(song.title), stripTitleNoise(gotTitle), 0.15);
-        if (!artistOk || !titleOk) {
+        // Reuse the EXACT SAME matcher used when resolving new songs
+        // (pickBestDeezerMatch), instead of a separately hand-rolled
+        // comparison here — the previous version of this audit function had
+        // its own older, stricter logic that never got the v3.8.0 fixes
+        // applied to it, so it kept re-flagging (and re-clearing) hundreds
+        // of perfectly good matches the search path had just fixed. Passing
+        // the single fetched track as a one-element "results" array makes
+        // the two paths structurally impossible to drift apart again.
+        const isGood = pickBestDeezerMatch([track], song.title, song.artist) !== null;
+        if (!isGood) {
           deezerAuditState.mismatches.push({ expectedTitle: song.title, expectedArtist: song.artist, gotTitle, gotArtist, deezerId: song.deezerId });
           // Clear the bad id rather than leave it in place — the normal
           // resolution flow will search for a better match on the next

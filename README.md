@@ -1243,3 +1243,26 @@ différents) retiré aussi.
 148/148 tests, exécutés deux fois, y compris un nouveau test confirmant
 directement l'acceptation des cas réels observés (préfixe "The" +
 remaster) et la persistance du rejet du cas "tribute band".
+
+## v3.8.1 — vraie régression trouvée : l'audit annulait la correction de la v3.8.0
+
+Un second audit lancé après le déploiement de la v3.8.0 a encore trouvé
+154 "désaccords" — et en creusant, exactement les mêmes cas déjà corrigés
+(préfixe "The" manquant, tags de remaster) ressortaient à nouveau.
+
+Cause : `runDeezerAudit()` (déclenché par le bouton "🔎 Vérifier les
+associations") avait sa **propre logique de comparaison séparée**,
+jamais mise à jour lors de la refonte de la v3.8.0 — elle utilisait
+encore l'ancien seuil strict (10%/15%, pas de gestion du "The", pas de
+comparaison bidirectionnelle). Résultat : chaque exécution de l'audit
+re-cassait le travail que la recherche venait de corriger, dans une
+vraie boucle contre-productive.
+
+Corrigé en faisant que l'audit **réutilise directement** la même
+fonction `pickBestDeezerMatch` que la résolution de nouvelles chansons,
+plutôt que deux implémentations séparées qui peuvent diverger sans que
+personne ne s'en aperçoive. Testé spécifiquement sur le chemin de
+l'audit (pas seulement la recherche) avec le cas exact qui posait
+problème — confirmé qu'il n'est plus re-signalé.
+
+150/150 tests, exécutés deux fois.

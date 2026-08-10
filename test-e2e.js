@@ -281,6 +281,40 @@ async function main() {
     try { fs.unlinkSync(auditOkPath); } catch (e) {}
   }
 
+  // ---- the actual regression found: the audit path had its own stale
+  // comparison logic that never got the v3.8.0 fixes, so it kept
+  // re-flagging (and re-clearing) good matches with a missing "The" or a
+  // remaster tag — exactly the patterns a real audit report showed being
+  // wrongly undone every time someone ran the audit button ----
+  const auditVariantPath = path.join(__dirname, 'songs.audit-variant-test.json');
+  fs.writeFileSync(auditVariantPath, JSON.stringify([
+    { title: 'ABC', artist: 'The Jackson 5', deezerId: 222, verifiedAt: Date.now() },
+  ]));
+  const auditVariantServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 9), FAKE_DEEZER: '1', FAKE_DEEZER_MINOR_VARIANT: '1', SONGS_FILE_OVERRIDE: auditVariantPath } });
+  auditVariantServer.stdout.on('data', () => {}); auditVariantServer.stderr.on('data', () => {});
+  try {
+    const auditVariantUrl = `http://localhost:${PORT + 9}`;
+    await waitForReady(auditVariantUrl);
+    await fetch(`${auditVariantUrl}/api/songs/audit`, { method: 'POST' });
+    let auditFinal = null;
+    for (let i = 0; i < 20; i++) {
+      const st = await (await fetch(`${auditVariantUrl}/api/songs/audit`)).json();
+      if (!st.running) { auditFinal = st; break; }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    if (auditFinal && auditFinal.mismatches.length === 0) {
+      ok('the audit path (not just the search path) now correctly accepts a missing "The" + remaster tag as the same match — the regression is fixed');
+    } else {
+      fail('expected the audit to accept the minor-variant match, but it flagged it again: ' + JSON.stringify(auditFinal));
+    }
+  } catch (e) {
+    fail('phase -0.15 (audit path minor-variant regression check) exception: ' + e.message);
+  } finally {
+    auditVariantServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(auditVariantPath); } catch (e) {}
+  }
+
   const auditBadPath = path.join(__dirname, 'songs.audit-bad-test.json');
   fs.writeFileSync(auditBadPath, JSON.stringify([
     { title: 'Bam, Bam, Bamy Shore', artist: 'Not The Real Artist', deezerId: 59509551, verifiedAt: Date.now() },
