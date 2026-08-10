@@ -1201,3 +1201,45 @@ la marque de l'autre déjà trouvé.
 Testé : trouver seulement le titre ne marque que guessTitleOk, trouver
 ensuite l'artiste marque bien les deux indépendamment. 147/147 tests,
 exécutés deux fois.
+
+## v3.8.0 — le comparateur Deezer était bien trop strict, corrigé en profondeur
+
+Le rapport d'audit envoyé par l'utilisateur (~200 "désaccords") a révélé
+que le comparateur strict de la v3.3.1 rejetait à tort l'écrasante
+majorité des VRAIS bons appariements — pas juste les cas d'artistes
+composés déjà corrigés en v3.3.1 :
+- Préfixe "The" manquant ("Jackson 5" vs "The Jackson 5", "Emotions" vs
+  "The Emotions")
+- Toute variante de titre non prévue dans la liste de mots-clés
+  (remasters avec année, versions "Original", mixes, éditions single,
+  crédits featuring dans le titre...) — la liste de motifs possibles est
+  infinie, une approche par mots-clés ne pouvait pas suffire
+- Crédits d'orchestre/groupe accolés ("Ted Lewis" vs "Ted Lewis & His
+  Orchestra")
+
+Corrigé en profondeur :
+- **Titre** : tout le contenu entre parenthèses/crochets est retiré des
+  deux côtés avant comparaison (au lieu d'une liste de mots-clés
+  spécifiques) — bien plus robuste, et les titres qui incluent
+  légitimement une parenthèse dans leur vrai nom ("(I Can't Get No)
+  Satisfaction") continuent de bien matcher puisque le même retrait
+  s'applique aux deux côtés.
+- **Artiste** : préfixe "The" ignoré, et comparaison désormais
+  bidirectionnelle sur les crédits composés — un crédit simple d'un
+  côté peut matcher une partie d'un crédit composé de l'autre côté,
+  peu importe lequel des deux est composé.
+
+Les garde-fous anti-faux-positif (rejet d'un "tribute band", rejet d'un
+résultat complètement hors sujet) restent intacts et testés — la
+correction élargit la tolérance sans rouvrir la faille d'origine.
+
+Au passage, 2 vraies erreurs de catalogue trouvées grâce à ce rapport et
+corrigées : "Manu Chao" n'est pas un titre de chanson (corrigé en "Me
+Gustas Tú", son vrai tube de 2001), et "Shape of You (Piano)" n'est
+probablement pas une sortie officielle d'Ed Sheeran (retirée). Un
+doublon involontaire ("Islands in the Stream" en double avec des crédits
+différents) retiré aussi.
+
+148/148 tests, exécutés deux fois, y compris un nouveau test confirmant
+directement l'acceptation des cas réels observés (préfixe "The" +
+remaster) et la persistance du rejet du cas "tribute band".

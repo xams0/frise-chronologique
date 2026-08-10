@@ -879,7 +879,9 @@
   {
     "title": "Flat Foot Floogie",
     "artist": "Slim Gaillard",
-    "year": 1938
+    "year": 1938,
+    "deezerId": 407029512,
+    "verifiedAt": 1786355435700
   },
   {
     "title": "Over the Rainbow",
@@ -938,7 +940,9 @@
   {
     "title": "And the Angels Sing",
     "artist": "Benny Goodman",
-    "year": 1939
+    "year": 1939,
+    "deezerId": 3395103,
+    "verifiedAt": 1786355435700
   },
   {
     "title": "Fools Rush In",
@@ -5075,11 +5079,6 @@
     "year": 1983
   },
   {
-    "title": "Islands in the Stream",
-    "artist": "Kenny Rogers and Dolly Parton",
-    "year": 1983
-  },
-  {
     "title": "Buffalo Soldier",
     "artist": "Bob Marley & The Wailers",
     "year": 1983
@@ -7366,13 +7365,11 @@
     "verifiedAt": 1786181452100
   },
   {
-    "title": "Manu Chao",
+    "title": "Me Gustas Tú",
     "artist": "Manu Chao",
     "year": 2001,
     "genre": "World",
-    "country": "France",
-    "deezerId": 71608366,
-    "verifiedAt": 1786181452100
+    "country": "France"
   },
   {
     "title": "Le Vent Nous Portera",
@@ -9367,15 +9364,6 @@
     "genre": "Country",
     "country": "USA",
     "deezerId": 141160791,
-    "verifiedAt": 1786181452100
-  },
-  {
-    "title": "Shape of You (Piano)",
-    "artist": "Ed Sheeran",
-    "year": 2017,
-    "genre": "Pop",
-    "country": "UK",
-    "deezerId": 2282107777,
     "verifiedAt": 1786181452100
   },
   {

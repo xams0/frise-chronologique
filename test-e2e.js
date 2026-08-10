@@ -209,6 +209,33 @@ async function main() {
     try { fs.unlinkSync(tributeSongsPath); } catch (e) {}
   }
 
+  // ---- the real-world false-rejection patterns a live audit surfaced:
+  // missing "The" prefix, and a remaster tag in parentheses — both should
+  // now be ACCEPTED, where the earlier (pre-fix) matcher rejected them ----
+  const variantSongsPath = path.join(__dirname, 'songs.variant-test.json');
+  fs.writeFileSync(variantSongsPath, JSON.stringify([
+    { title: 'ABC', artist: 'The Jackson 5' },
+  ]));
+  const variantServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 8), FAKE_DEEZER: '1', FAKE_DEEZER_MINOR_VARIANT: '1', SONGS_FILE_OVERRIDE: variantSongsPath } });
+  variantServer.stdout.on('data', () => {}); variantServer.stderr.on('data', () => {});
+  try {
+    const variantUrl = `http://localhost:${PORT + 8}`;
+    await waitForReady(variantUrl);
+    const songsRes = await fetch(`${variantUrl}/api/songs`);
+    const songsData = await songsRes.json();
+    if (songsData[0].deezerId) {
+      ok('a missing leading "The" + a remaster tag in parentheses no longer causes a false rejection — correctly accepted as the same song');
+    } else {
+      fail('expected the minor-variant match ("The Jackson 5" -> "Jackson 5", title + remaster tag) to be accepted, but it was rejected');
+    }
+  } catch (e) {
+    fail('phase -0.25 (minor-variant acceptance) exception: ' + e.message);
+  } finally {
+    variantServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(variantSongsPath); } catch (e) {}
+  }
+
   // ---- the on-demand /api/songs/audit endpoint: no false positives on a
   // genuinely correct catalog, and mismatches actually get cleared ----
   const auditOkPath = path.join(__dirname, 'songs.audit-ok-test.json');

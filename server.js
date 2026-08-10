@@ -192,6 +192,7 @@ async function deezerFetchJson(url, retries = 4) {
 const FAKE_DEEZER_FAIL = process.env.FAKE_DEEZER_FAIL === '1';
 const FAKE_DEEZER_MISMATCH = process.env.FAKE_DEEZER_MISMATCH === '1';
 const FAKE_DEEZER_TRIBUTE = process.env.FAKE_DEEZER_TRIBUTE === '1';
+const FAKE_DEEZER_MINOR_VARIANT = process.env.FAKE_DEEZER_MINOR_VARIANT === '1';
 const FAKE_DEEZER_AUDIT_MISMATCH = process.env.FAKE_DEEZER_AUDIT_MISMATCH === '1';
 
 async function deezerSearch(artist, title) {
@@ -209,6 +210,10 @@ async function deezerSearch(artist, title) {
     // matcher had: "expected" being a substring of "got" used to count as a
     // match, which would wrongly accept a tribute/cover act as the real one.
     if (FAKE_DEEZER_TRIBUTE) return [{ id: 'fake-tribute-id', title, artist: { name: artist + ' Tribute Band' } }];
+    // Test-only seam for the real-world false-rejection patterns an actual
+    // audit surfaced: a missing leading "The", and a remaster/version tag
+    // in parentheses — both should now be ACCEPTED as good matches.
+    if (FAKE_DEEZER_MINOR_VARIANT) return [{ id: 'fake-variant-id', title: title + ' (2011 Remaster)', artist: { name: artist.replace(/^The\s+/i, '') } }];
     return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12), title, artist: { name: artist } }];
   }
   const data = await deezerFetchJson(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
@@ -323,27 +328,70 @@ const DEEZER_VERIFY_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 // Titles legitimately vary more (remasters, live takes, feat. credits) —
 // those are stripped explicitly first, then compared with a little more
 // (but still bounded) tolerance.
+// Real audit results against the live Deezer catalog showed the previous
+// version of this logic was rejecting the vast majority of GOOD matches —
+// not just compound-artist credits, but things like a missing leading
+// "The", or any remaster/live/soundtrack/mix qualifier not in the original
+// hand-picked keyword list (there are far too many such qualifiers to
+// enumerate). Stripping ALL parenthetical/bracketed content, rather than
+// only specific keywords, is far more robust — song titles that legitimately
+// include a leading parenthetical as part of their real name (e.g. "(I
+// Can't Get No) Satisfaction") still match fine, since the SAME stripping
+// is applied to both sides before comparing.
 function stripTitleNoise(s) {
   return (s || '')
-    .replace(/\((?:feat|ft)\.?[^)]*\)/gi, '')
-    .replace(/\((?:remaster(?:ed)?|live|radio edit|mono|stereo|single version|album version|explicit|clean)[^)]*\)/gi, '')
-    .replace(/-\s*(?:remaster(?:ed)?(?:\s*\d{4})?|live|radio edit|mono|stereo)\s*$/gi, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
-function closeByRatio(expected, got, maxDistRatio) {
+function stripLeadingThe(s) {
+  return (s || '').replace(/^\s*the\s+/i, '').trim();
+}
+function closeByRatio(expected, got, maxDistRatio, minFloor = 2) {
   const a = normalize(expected), b = normalize(got);
   if (!a || !b) return false;
   if (a === b) return true;
-  const maxDist = Math.max(1, Math.round(Math.max(a.length, b.length) * maxDistRatio));
+  // A pure percentage falls apart on short strings: 15% of "SOS" or
+  // "Common People" is only 0-2 characters, rejecting perfectly legitimate
+  // matches over something as small as one extra punctuation mark. A
+  // minimum absolute floor fixes that without loosening things for long
+  // strings, where the percentage already dominates.
+  const maxDist = Math.max(minFloor, Math.round(Math.max(a.length, b.length) * maxDistRatio));
   return levenshtein(a, b) <= maxDist;
+}
+// Splits a compound artist credit ("X & Y", "X and Y", "X featuring Y", "X
+// feat. Y", "X ft. Y", "X with Y", "X, Y") into its individual names.
+function splitArtists(s) {
+  return (s || '')
+    .split(/\s*(?:,|&|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b|\band\b|\bwith\b|\bx\b)\s*/gi)
+    .map(x => stripLeadingThe(x.trim()))
+    .filter(Boolean);
+}
+// Checked bidirectionally and against split parts on BOTH sides: a catalog
+// entry crediting just "Ted Lewis" should match Deezer's "Ted Lewis & His
+// Orchestra" (split THEIR side, compare the primary part), and a catalog
+// entry crediting "Kenny Rogers and Dolly Parton" should match Deezer
+// crediting just "Dolly Parton" (split OUR side instead). Neither direction
+// alone covered every real case seen in an actual audit run.
+function artistCloseEnough(expected, got) {
+  const e0 = stripLeadingThe(expected), g0 = stripLeadingThe(got);
+  if (closeByRatio(e0, g0, 0.16)) return true;
+  const expParts = splitArtists(e0);
+  const gotParts = splitArtists(g0);
+  for (const e of expParts) {
+    if (closeByRatio(e, g0, 0.16)) return true;
+    for (const g of gotParts) if (closeByRatio(e, g, 0.16)) return true;
+  }
+  for (const g of gotParts) if (closeByRatio(e0, g, 0.16)) return true;
+  return false;
 }
 function pickBestDeezerMatch(results, expectedTitle, expectedArtist) {
   return results.find(r => {
     const gotTitle = r.title || '';
     const gotArtist = (r.artist && r.artist.name) || '';
-    const artistOk = closeByRatio(expectedArtist, gotArtist, 0.10);
-    const titleOk = closeByRatio(stripTitleNoise(expectedTitle), stripTitleNoise(gotTitle), 0.15);
-    return artistOk && titleOk;
+    return artistCloseEnough(expectedArtist, gotArtist)
+      && closeByRatio(stripTitleNoise(expectedTitle), stripTitleNoise(gotTitle), 0.20);
   }) || null;
 }
 
