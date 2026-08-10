@@ -1266,3 +1266,33 @@ l'audit (pas seulement la recherche) avec le cas exact qui posait
 problème — confirmé qu'il n'est plus re-signalé.
 
 150/150 tests, exécutés deux fois.
+
+## v3.8.2 — nouveau round d'audit, 154 → 48 désaccords, deux motifs de plus corrigés
+
+La correction de la v3.8.1 (audit réutilisant enfin la vraie logique de
+comparaison) a fait chuter le nombre de désaccords de 154 à 48 sur le
+round d'audit suivant — signe que la vraie régression était bien réglée.
+En passant en revue cette liste réduite, deux nouveaux motifs légitimes
+identifiés :
+
+- **Titre en préfixe d'un titre Deezer plus long, sans parenthèses** :
+  ex. "J'ai Deux Amours" contenu dans "J'ai 2 amours: J'ai deux amours",
+  ou "Some Enchanted Evening" en fin d'un long titre d'enregistrement de
+  comédie musicale avec un préfixe séparé par deux-points. Le retrait de
+  parenthèses ne suffisait pas puisque ce n'était pas entre parenthèses.
+  Ajout d'une vérification par inclusion en complément de la distance
+  d'édition, réservée aux titres (plus sûre que pour les artistes, avec
+  une longueur minimale pour éviter les faux positifs sur des titres
+  très courts).
+- **Surnom entre guillemets inséré dans le nom d'artiste** : ex. `Cliff
+  "Ukulele Ike" Edwards` au lieu de `Cliff Edwards`. Retiré avant
+  comparaison.
+
+La majorité des 48 restants sont désormais de vrais mauvais matches,
+correctement rejetés (reprises par un autre artiste, karaoké,
+bibliothèques d'effets sonores, chansons complètement différentes) —
+pas besoin de les forcer.
+
+151/151 tests (légère variation naturelle du nombre de vérifications
+d'un run à l'autre, zéro échec confirmé sur les deux), test dédié pour
+les deux nouveaux motifs.

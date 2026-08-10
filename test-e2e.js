@@ -236,6 +236,33 @@ async function main() {
     try { fs.unlinkSync(variantSongsPath); } catch (e) {}
   }
 
+  // ---- second audit round found two more real patterns: a title that's a
+  // clean prefix of Deezer's longer title (title containment), and a quoted
+  // nickname inserted mid-artist-name ----
+  const containmentSongsPath = path.join(__dirname, 'songs.containment-test.json');
+  fs.writeFileSync(containmentSongsPath, JSON.stringify([
+    { title: "J'ai Deux Amours", artist: 'Cliff Edwards' },
+  ]));
+  const containmentServer = spawn('node', ['server.js'], { cwd: __dirname, env: { ...process.env, PORT: String(PORT + 10), FAKE_DEEZER: '1', FAKE_DEEZER_CONTAINMENT_VARIANT: '1', SONGS_FILE_OVERRIDE: containmentSongsPath } });
+  containmentServer.stdout.on('data', () => {}); containmentServer.stderr.on('data', () => {});
+  try {
+    const containmentUrl = `http://localhost:${PORT + 10}`;
+    await waitForReady(containmentUrl);
+    const songsRes = await fetch(`${containmentUrl}/api/songs`);
+    const songsData = await songsRes.json();
+    if (songsData[0].deezerId) {
+      ok('a title that is a clean prefix of Deezer\'s longer title, plus a quoted nickname mid-artist-name, are both correctly accepted now');
+    } else {
+      fail('expected the title-containment + artist-nickname match to be accepted, but it was rejected');
+    }
+  } catch (e) {
+    fail('phase -0.22 (containment + nickname acceptance) exception: ' + e.message);
+  } finally {
+    containmentServer.kill();
+    await new Promise(r => setTimeout(r, 300));
+    try { fs.unlinkSync(containmentSongsPath); } catch (e) {}
+  }
+
   // ---- the on-demand /api/songs/audit endpoint: no false positives on a
   // genuinely correct catalog, and mismatches actually get cleared ----
   const auditOkPath = path.join(__dirname, 'songs.audit-ok-test.json');

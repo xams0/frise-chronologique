@@ -193,6 +193,7 @@ const FAKE_DEEZER_FAIL = process.env.FAKE_DEEZER_FAIL === '1';
 const FAKE_DEEZER_MISMATCH = process.env.FAKE_DEEZER_MISMATCH === '1';
 const FAKE_DEEZER_TRIBUTE = process.env.FAKE_DEEZER_TRIBUTE === '1';
 const FAKE_DEEZER_MINOR_VARIANT = process.env.FAKE_DEEZER_MINOR_VARIANT === '1';
+const FAKE_DEEZER_CONTAINMENT_VARIANT = process.env.FAKE_DEEZER_CONTAINMENT_VARIANT === '1';
 const FAKE_DEEZER_AUDIT_MISMATCH = process.env.FAKE_DEEZER_AUDIT_MISMATCH === '1';
 
 async function deezerSearch(artist, title) {
@@ -214,6 +215,11 @@ async function deezerSearch(artist, title) {
     // audit surfaced: a missing leading "The", and a remaster/version tag
     // in parentheses — both should now be ACCEPTED as good matches.
     if (FAKE_DEEZER_MINOR_VARIANT) return [{ id: 'fake-variant-id', title: title + ' (2011 Remaster)', artist: { name: artist.replace(/^The\s+/i, '') } }];
+    // Test-only seam for the two additional real-world patterns found in a
+    // second audit round: a title that's a clean PREFIX of Deezer's longer
+    // official title (not just noise in parens), and a quoted nickname
+    // inserted mid-artist-name.
+    if (FAKE_DEEZER_CONTAINMENT_VARIANT) return [{ id: 'fake-containment-id', title: title + ': ' + title, artist: { name: artist.split(' ')[0] + ' "Nickname" ' + artist.split(' ').slice(1).join(' ') } }];
     return [{ id: 'fake-' + Buffer.from(query).toString('hex').slice(0, 12), title, artist: { name: artist } }];
   }
   const data = await deezerFetchJson(`https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=5`);
@@ -387,8 +393,13 @@ function splitArtists(s) {
 // entry crediting "Kenny Rogers and Dolly Parton" should match Deezer
 // crediting just "Dolly Parton" (split OUR side instead). Neither direction
 // alone covered every real case seen in an actual audit run.
+function stripArtistNoise(s) {
+  // Removes a quoted nickname inserted mid-name (e.g. Cliff "Ukulele Ike"
+  // Edwards) — real Deezer data, not a hypothetical.
+  return (s || '').replace(/["“][^"”]*["”]/g, ' ').replace(/\s{2,}/g, ' ').trim();
+}
 function artistCloseEnough(expected, got) {
-  const e0 = stripLeadingThe(expected), g0 = stripLeadingThe(got);
+  const e0 = stripLeadingThe(stripArtistNoise(expected)), g0 = stripLeadingThe(stripArtistNoise(got));
   if (closeByRatio(e0, g0, 0.16)) return true;
   const expParts = splitArtists(e0);
   const gotParts = splitArtists(g0);
@@ -399,12 +410,26 @@ function artistCloseEnough(expected, got) {
   for (const g of gotParts) if (closeByRatio(e0, g, 0.16)) return true;
   return false;
 }
+// Beyond edit-distance, one title fully containing the other as a clean
+// substring is also accepted — a strong signal it's the same song under a
+// longer/shorter official title (e.g. "J'ai Deux Amours" inside "J'ai 2
+// amours: J'ai deux amours", or "Some Enchanted Evening" inside a longer
+// cast-recording title with a colon-separated prefix that stripTitleNoise's
+// parens-only stripping doesn't catch). Guarded by a minimum length so this
+// never trivially matches on very short titles.
+function titleCloseEnough(expected, got) {
+  const strippedExp = stripTitleNoise(expected);
+  const strippedGot = stripTitleNoise(got);
+  if (closeByRatio(strippedExp, strippedGot, 0.20)) return true;
+  const a = normalize(strippedExp), b = normalize(strippedGot);
+  if (a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))) return true;
+  return false;
+}
 function pickBestDeezerMatch(results, expectedTitle, expectedArtist) {
   return results.find(r => {
     const gotTitle = r.title || '';
     const gotArtist = (r.artist && r.artist.name) || '';
-    return artistCloseEnough(expectedArtist, gotArtist)
-      && closeByRatio(stripTitleNoise(expectedTitle), stripTitleNoise(gotTitle), 0.20);
+    return artistCloseEnough(expectedArtist, gotArtist) && titleCloseEnough(expectedTitle, gotTitle);
   }) || null;
 }
 
