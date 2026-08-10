@@ -1296,3 +1296,30 @@ pas besoin de les forcer.
 151/151 tests (légère variation naturelle du nombre de vérifications
 d'un run à l'autre, zéro échec confirmé sur les deux), test dédié pour
 les deux nouveaux motifs.
+
+## v3.8.3 — 3e round d'audit (48 → 35) : renommages de groupes, doublons de catalogue
+
+Nouveau motif identifié, cette fois pas algorithmique : des groupes ayant
+**officiellement changé de nom**, que Deezer ne référence que sous le
+nouveau nom — aucune comparaison de texte ne peut deviner ce genre de
+lien. Corrigé directement dans le catalogue :
+- Dixie Chicks → The Chicks (Wide Open Spaces, Goodbye Earl)
+- Lady Antebellum → Lady A (Need You Now)
+- Maître Gims → GIMS (Bella)
+
+Trouvé aussi 3 vrais doublons de catalogue : une entrée "artiste seul"
+qui restait bloquée à chaque audit, alors qu'une entrée "crédit complet"
+existait déjà juste à côté et fonctionnait très bien (Piece of My Heart,
+Endless Love, Danza Kuduro) — l'entrée redondante et cassée a été
+retirée à chaque fois. Un doublon accidentel créé par ma propre
+correction ("Sous le vent") repéré et nettoyé dans la foulée.
+
+Retiré aussi "Forget You" de CeeLo Green : Deezer n'a que le titre
+explicite ("Fuck You"), pas adapté à un jeu familial — plutôt que de
+forcer la correspondance, l'entrée est simplement retirée.
+
+Petite amélioration algorithmique en complément : "Ms."/"Mr."/"Dr." sont
+maintenant traités comme "The" (préfixe honorifique optionnel ignoré à
+la comparaison) — corrige par exemple "Ms. Lauryn Hill" vs "Lauryn Hill".
+
+150/150 tests, exécutés deux fois, 0 doublon interne confirmé.

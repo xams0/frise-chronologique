@@ -365,7 +365,10 @@ function stripTitleNoise(s) {
     .trim();
 }
 function stripLeadingThe(s) {
-  return (s || '').replace(/^\s*the\s+/i, '').trim();
+  // "Ms."/"Mr."/"Dr." are the same pattern as a leading "The" — an official
+  // professional-title prefix Deezer sometimes includes and sometimes
+  // doesn't (e.g. "Lauryn Hill" vs "Ms. Lauryn Hill").
+  return (s || '').replace(/^\s*(the|ms\.?|mr\.?|dr\.?)\s+/i, '').trim();
 }
 function closeByRatio(expected, got, maxDistRatio, minFloor = 2) {
   const a = normalize(expected), b = normalize(got);

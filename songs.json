@@ -2752,13 +2752,6 @@
     "verifiedAt": 1786181452100
   },
   {
-    "title": "Piece of My Heart",
-    "artist": "Janis Joplin",
-    "year": 1968,
-    "deezerId": 15613151,
-    "verifiedAt": 1786181452100
-  },
-  {
     "title": "Comment te dire adieu",
     "artist": "Françoise Hardy",
     "year": 1968,
@@ -4663,15 +4656,6 @@
     "genre": "Pop",
     "country": "Australia",
     "deezerId": 3872261161,
-    "verifiedAt": 1786181452100
-  },
-  {
-    "title": "Endless Love",
-    "artist": "Diana Ross",
-    "year": 1981,
-    "genre": "Pop",
-    "country": "USA",
-    "deezerId": 906584,
     "verifiedAt": 1786181452100
   },
   {
@@ -6967,12 +6951,10 @@
   },
   {
     "title": "Wide Open Spaces",
-    "artist": "Dixie Chicks",
+    "artist": "The Chicks",
     "year": 1998,
     "genre": "Country",
-    "country": "USA",
-    "deezerId": 544954,
-    "verifiedAt": 1786181452100
+    "country": "USA"
   },
   {
     "title": "Where the Green Grass Grows",
@@ -7117,12 +7099,10 @@
   },
   {
     "title": "Goodbye Earl",
-    "artist": "Dixie Chicks",
+    "artist": "The Chicks",
     "year": 1999,
     "genre": "Country",
-    "country": "USA",
-    "deezerId": 7511335,
-    "verifiedAt": 1786181452100
+    "country": "USA"
   },
   {
     "title": "Smooth",
@@ -7382,12 +7362,10 @@
   },
   {
     "title": "Sous le vent",
-    "artist": "Garou",
+    "artist": "Garou et Céline Dion",
     "year": 2001,
     "genre": "Variété",
-    "country": "France",
-    "deezerId": 871455,
-    "verifiedAt": 1786181452100
+    "country": "France"
   },
   {
     "title": "Clint Eastwood",
@@ -7429,11 +7407,6 @@
   {
     "title": "Get Ur Freak On",
     "artist": "Missy Elliott",
-    "year": 2001
-  },
-  {
-    "title": "Sous le Vent",
-    "artist": "Garou et Céline Dion",
     "year": 2001
   },
   {
@@ -8169,12 +8142,10 @@
   },
   {
     "title": "Need You Now",
-    "artist": "Lady Antebellum",
+    "artist": "Lady A",
     "year": 2009,
     "genre": "Country",
-    "country": "USA",
-    "deezerId": 5902858,
-    "verifiedAt": 1786181452100
+    "country": "USA"
   },
   {
     "title": "Right Round",
@@ -8300,13 +8271,6 @@
     "verifiedAt": 1786181452100
   },
   {
-    "title": "Forget You",
-    "artist": "CeeLo Green",
-    "year": 2010,
-    "deezerId": 7303269,
-    "verifiedAt": 1786181452100
-  },
-  {
     "title": "Je veux",
     "artist": "Zaz",
     "year": 2010,
@@ -8329,15 +8293,6 @@
     "genre": "Dance-pop",
     "country": "Barbados",
     "deezerId": 13529563,
-    "verifiedAt": 1786181452100
-  },
-  {
-    "title": "Danza Kuduro",
-    "artist": "Don Omar",
-    "year": 2010,
-    "genre": "Reggaeton",
-    "country": "Puerto Rico",
-    "deezerId": 1161020382,
     "verifiedAt": 1786181452100
   },
   {
@@ -9509,12 +9464,10 @@
   },
   {
     "title": "Bella",
-    "artist": "Maître Gims",
+    "artist": "GIMS",
     "year": 2018,
     "genre": "R&B",
-    "country": "France",
-    "deezerId": 72717420,
-    "verifiedAt": 1786181452100
+    "country": "France"
   },
   {
     "title": "Ye",
@@ -9844,15 +9797,6 @@
     "genre": "Pop",
     "country": "USA",
     "deezerId": 797228462,
-    "verifiedAt": 1786181452100
-  },
-  {
-    "title": "Levitating (feat. DaBaby)",
-    "artist": "Dua Lipa",
-    "year": 2020,
-    "genre": "Disco",
-    "country": "UK",
-    "deezerId": 1193136852,
     "verifiedAt": 1786181452100
   },
   {
