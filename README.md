@@ -1323,3 +1323,29 @@ maintenant traités comme "The" (préfixe honorifique optionnel ignoré à
 la comparaison) — corrige par exemple "Ms. Lauryn Hill" vs "Lauryn Hill".
 
 150/150 tests, exécutés deux fois, 0 doublon interne confirmé.
+
+## v3.9.0 — +1028 chansons proposées et résolues via Deezer (accès direct depuis Claude Code)
+
+Première fois que l'ajout de chansons se fait avec un accès réseau direct à
+`api.deezer.com` (voir §1 et §5 du document de passation) — plus besoin de la
+boucle manuelle export/import via la Bibliothèque de l'app.
+
+1028 titres candidats générés à partir d'une bonne connaissance générale de
+la musique (tubes, standards, classiques par genre et par décennie — rock,
+pop, hip-hop, R&B, disco, country, reggae, latino, K-pop, comédies
+musicales, variété et rap français...), dédupliqués contre le catalogue
+existant (title+artiste normalisés, accents/casse/ponctuation ignorés), puis
+fusionnés dans `songs.json` **sans `deezerId`** pour laisser
+`verifyAndPrepareCatalog()` faire la résolution avec le vrai comparateur de
+production — aucune logique de matching dupliquée, conformément à la leçon
+de la v3.8.1.
+
+Résultat : 951/1028 nouveaux titres résolus (92,5%), et effet de bord
+positif — la même passe a aussi rattrapé 274 anciennes entrées du catalogue
+qui restaient sans `deezerId` depuis un moment. Catalogue total : 1324 → 2352
+chansons, dont 2245 jouables (contre 1020 avant).
+
+Corrigé au passage : `socket.io-client` manquait de `package.json` alors que
+`test-e2e.js` en a besoin — sans doute un oubli, ajouté en devDependency.
+
+150/150 tests, exécutés deux fois, aucun échec.

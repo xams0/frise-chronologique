@@ -1,6 +1,6 @@
 {
   "name": "chronolozik",
-  "version": "3.8.3",
+  "version": "3.9.0",
   "private": true,
   "description": "Jeu multijoueur de devinette musicale sur frise chronologique — serveur Node/Express/Socket.io",
   "main": "server.js",
@@ -10,5 +10,8 @@
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.3"
   }
 }
