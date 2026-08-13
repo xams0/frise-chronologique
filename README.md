@@ -1389,3 +1389,23 @@ rattrapé deux vraies fautes de frappe avant commit : `placement.here` →
 navigateur non effectuée dans cette session (pas d'extension Chrome
 connectée) — recommandé avant de considérer la fonctionnalité définitivement
 close.
+
+## v4.1.0 — +180 chansons italiennes
+
+Catalogue jusqu'ici quasi exclusivement anglophone/francophone (une seule
+vraie entrée italienne avant cette version : "Volare" de Domenico Modugno)
+— logique vu que le jeu vient tout juste de gagner le support de l'italien
+(v4.0.0). 180 titres italiens ajoutés, couvrant les cantautori des années
+60-70 (Battisti, De André, Dalla, Rino Gaetano, Battiato), le pop/rock des
+années 80-90 (Vasco Rossi, Zucchero, Eros Ramazzotti, Laura Pausini, 883,
+Ligabue, Jovanotti), et la scène récente (Mahmood, Blanco, Måneskin, Sfera
+Ebbasta, Ultimo, Geolier). Même pipeline que la v3.9.0 : liste générée puis
+dédupliquée contre le catalogue existant, fusionnée sans `deezerId`,
+résolue par `verifyAndPrepareCatalog()`.
+
+144/180 résolus (80%) — taux un peu plus bas que le lot précédent,
+vraisemblablement des titres avec accents/apostrophes italiens moins bien
+couverts par la recherche Deezer. Catalogue total : 2352 → 2532 chansons,
+dont 2391 jouables.
+
+150/150 tests, exécutés deux fois, aucun échec.
