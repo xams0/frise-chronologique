@@ -4000,7 +4000,9 @@
   {
     "title": "Silly Love Songs",
     "artist": "Wings",
-    "year": 1976
+    "year": 1976,
+    "deezerId": 3856057001,
+    "verifiedAt": 1786647837865
   },
   {
     "title": "Play That Funky Music",
@@ -16129,7 +16131,9 @@
   {
     "title": "Freedom",
     "artist": "Beyonce and Kendrick Lamar",
-    "year": 2016
+    "year": 2016,
+    "deezerId": 669486582,
+    "verifiedAt": 1786647837865
   },
   {
     "title": "America Has a Problem",

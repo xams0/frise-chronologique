@@ -1349,3 +1349,43 @@ Corrigé au passage : `socket.io-client` manquait de `package.json` alors que
 `test-e2e.js` en a besoin — sans doute un oubli, ajouté en devDependency.
 
 150/150 tests, exécutés deux fois, aucun échec.
+
+## v4.0.0 — traduction complète EN/IT, sélecteur de langue avec détection auto
+
+Le jeu est maintenant jouable en français, anglais et italien. Nouveau
+fichier `public/i18n.js` : un dictionnaire `DICT` avec une entrée par clé
+(`fr`/`en`/`it` côte à côte, pas trois objets séparés) pour qu'aucune langue
+ne puisse dériver silencieusement des deux autres, une fonction `t(key,
+vars)` avec repli sur le français puis sur la clé brute, et un sélecteur de
+drapeaux 🇫🇷🇬🇧🇮🇹 rendu dans son propre overlay persistant (même principe que
+`#fab-overlay`) donc visible sur tous les écrans sans être détruit par les
+reconstructions fréquentes du `render()`. La langue est détectée
+automatiquement via `navigator.language` au premier chargement, puis
+mémorisée dans `localStorage` dès qu'elle est changée manuellement.
+
+Toutes les ~230 chaînes de `public/app.js` (écrans, modales, boutons,
+messages d'état) sont passées par `t()`. Les entrées de `room.log` côté
+serveur sont **restées en français** : elles ne sont en fait jamais
+affichées côté client (`room.history` seul est rendu, pas `room.log`) —
+inutile de les traduire.
+
+Les messages d'erreur du serveur (`socket.emit('error-msg', ...)`, réponses
+JSON `{error}` des routes REST bibliothèque) posaient un problème différent :
+le texte est généré côté serveur, qui ne connaît pas la langue du client.
+Plutôt que de dupliquer `pickBestDeezerMatch`-style la logique de formulation
+côté client, chaque emit garde son texte français existant tel quel (zéro
+régression sur les ~20 assertions de `test-e2e.js` qui vérifient ce texte
+mot pour mot) et gagne un second argument `{code, params}` — le client
+traduit via `t('err.' + code, params)` s'il reconnaît le code, et retombe
+sur le texte français brut sinon. 37 codes couvrent toutes les émissions
+(`HOST_ONLY_SETTING`, `ROOM_FULL`, `NOT_ENOUGH_SONGS`, etc.).
+
+Un script de vérification automatique (clés `t()` utilisées dans `app.js`
+comparées aux clés du `DICT`, codes serveur comparés aux clés `err.*`) a
+rattrapé deux vraies fautes de frappe avant commit : `placement.here` →
+`timeline.here`, et le bouton "copier" du code de salon oublié.
+
+150/150 tests, exécutés deux fois, aucun échec. Vérification visuelle en
+navigateur non effectuée dans cette session (pas d'extension Chrome
+connectée) — recommandé avant de considérer la fonctionnalité définitivement
+close.

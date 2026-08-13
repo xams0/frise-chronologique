@@ -770,19 +770,19 @@ app.post('/api/songs', async (req, res) => {
   const t = (title || '').trim();
   const a = (artist || '').trim();
   const y = parseInt(year, 10);
-  if (!t || !a) return res.status(400).json({ error: 'Titre et artiste obligatoires.' });
-  if (!y || y < 1900 || y > 2035) return res.status(400).json({ error: 'Année invalide.' });
+  if (!t || !a) return res.status(400).json({ error: 'Titre et artiste obligatoires.', code: 'SONG_TITLE_ARTIST_REQUIRED' });
+  if (!y || y < 1900 || y > 2035) return res.status(400).json({ error: 'Année invalide.', code: 'SONG_YEAR_INVALID' });
   const dup = catalog.some(s => normalize(s.title) === normalize(t) && normalize(s.artist) === normalize(a));
-  if (dup) return res.status(400).json({ error: 'Cette chanson est déjà dans la bibliothèque.' });
+  if (dup) return res.status(400).json({ error: 'Cette chanson est déjà dans la bibliothèque.', code: 'SONG_DUPLICATE' });
   let deezerId = null;
   try {
     const results = await deezerSearch(a, t);
     const match = pickBestDeezerMatch(results, t, a);
     if (match) deezerId = match.id;
   } catch (e) {
-    return res.status(502).json({ error: "Impossible de joindre Deezer pour l'instant, réessaie." });
+    return res.status(502).json({ error: "Impossible de joindre Deezer pour l'instant, réessaie.", code: 'SONG_DEEZER_UNREACHABLE' });
   }
-  if (!deezerId) return res.status(400).json({ error: 'Introuvable sur Deezer — vérifie l\'orthographe du titre et de l\'artiste.' });
+  if (!deezerId) return res.status(400).json({ error: 'Introuvable sur Deezer — vérifie l\'orthographe du titre et de l\'artiste.', code: 'SONG_NOT_FOUND_DEEZER' });
   catalog.push({ title: t, artist: a, year: y, deezerId, verifiedAt: Date.now() });
   saveCatalog();
   res.json(catalog);
@@ -790,7 +790,7 @@ app.post('/api/songs', async (req, res) => {
 
 app.post('/api/songs/import', async (req, res) => {
   const list = req.body;
-  if (!Array.isArray(list)) return res.status(400).json({ error: 'JSON invalide.' });
+  if (!Array.isArray(list)) return res.status(400).json({ error: 'JSON invalide.', code: 'IMPORT_INVALID_JSON' });
   let added = 0;
   for (const s of list) {
     if (!s || !s.title || !s.artist || !s.year) continue;
@@ -807,7 +807,7 @@ app.delete('/api/songs', (req, res) => {
   const { title, artist } = req.body || {};
   const before = catalog.length;
   catalog = catalog.filter(s => !(normalize(s.title) === normalize(title) && normalize(s.artist) === normalize(artist)));
-  if (catalog.length === before) return res.status(404).json({ error: 'Chanson introuvable.' });
+  if (catalog.length === before) return res.status(404).json({ error: 'Chanson introuvable.', code: 'SONG_NOT_FOUND' });
   saveCatalog();
   res.json(catalog);
 });
@@ -842,7 +842,7 @@ app.get('/api/songs/health', async (req, res) => {
 // Starts a full audit in the background (fire-and-forget) — poll
 // /api/songs/audit for progress. Refuses to start a second one concurrently.
 app.post('/api/songs/audit', (req, res) => {
-  if (deezerAuditState.running) return res.status(409).json({ error: 'Un audit est déjà en cours.' });
+  if (deezerAuditState.running) return res.status(409).json({ error: 'Un audit est déjà en cours.', code: 'AUDIT_ALREADY_RUNNING' });
   runDeezerAudit();
   res.json({ started: true, total: catalog.filter(s => s.deezerId).length });
 });
@@ -852,7 +852,7 @@ app.get('/api/songs/audit', (req, res) => res.json(deezerAuditState));
 // Shared by the host's explicit "Lancer la partie" click AND the automatic
 // start once every player has marked themselves ready.
 function tryStartGame(room) {
-  if (room.players.length < 2) return { ok: false, error: 'Il faut au moins 2 joueurs.' };
+  if (room.players.length < 2) return { ok: false, error: 'Il faut au moins 2 joueurs.', code: 'NEED_2_PLAYERS' };
   const basePool = catalog.filter(s => s.deezerId && songMatchesFilters(s, room.filters));
   const winCount = room.cardsToWin || CARDS_TO_WIN;
 
@@ -865,7 +865,7 @@ function tryStartGame(room) {
   const pool = freshPool.length >= winCount + 2 ? freshPool : basePool;
 
   if (!pool.length || pool.length < winCount + 2) {
-    return { ok: false, error: `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${winCount + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).` };
+    return { ok: false, error: `Seulement ${pool.length} chanson(s) jouables correspondent aux filtres actifs — il en faut au moins ${winCount + 2}. Élargis les filtres, ou attends que le serveur finisse d'associer le catalogue à Deezer (regarde les logs).`, code: 'NOT_ENOUGH_SONGS', params: { pool: pool.length, needed: winCount + 2 } };
   }
   let deck = shuffle(pool.map((s, i) => ({ ...s, uid: 's' + i })));
   const startingTokens = room.startTokens != null ? room.startTokens : START_TOKENS;
@@ -922,9 +922,9 @@ function scheduleAutoDraw(room) {
 io.on('connection', (socket) => {
 
   socket.on('create-room', ({ name, visibility, color }) => {
-    if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
+    if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.', { code: 'SERVER_NOT_READY' });
     name = (name || '').trim().slice(0, 20);
-    if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
+    if (!name) return socket.emit('error-msg', 'Entre ton prénom.', { code: 'ENTER_NAME' });
     let code;
     do { code = genCode(); } while (rooms[code]);
     const playerId = genId();
@@ -963,12 +963,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('join-room', ({ code, name, color, colorExplicit }) => {
-    if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.');
+    if (!readyState.ready) return socket.emit('error-msg', 'Le serveur vérifie encore la bibliothèque musicale, réessaie dans un instant.', { code: 'SERVER_NOT_READY' });
     code = (code || '').trim().toUpperCase();
     name = (name || '').trim().slice(0, 20);
     const room = rooms[code];
-    if (!room) return socket.emit('error-msg', 'Aucun salon avec ce code.');
-    if (!name) return socket.emit('error-msg', 'Entre ton prénom.');
+    if (!room) return socket.emit('error-msg', 'Aucun salon avec ce code.', { code: 'ROOM_NOT_FOUND' });
+    if (!name) return socket.emit('error-msg', 'Entre ton prénom.', { code: 'ENTER_NAME' });
     const existing = room.players.find(p => p.name.trim().toLowerCase() === name.toLowerCase());
     if (existing) {
       socket.join(code);
@@ -978,10 +978,10 @@ io.on('connection', (socket) => {
       return;
     }
     if (room.phase !== 'lobby') {
-      return socket.emit('error-msg', 'La partie a déjà commencé. Ressaisis exactement le prénom utilisé pour reprendre ta place.');
+      return socket.emit('error-msg', 'La partie a déjà commencé. Ressaisis exactement le prénom utilisé pour reprendre ta place.', { code: 'GAME_ALREADY_STARTED' });
     }
     if (room.maxPlayers && room.players.length >= room.maxPlayers) {
-      return socket.emit('error-msg', `Ce salon est complet (maximum ${room.maxPlayers} joueurs).`);
+      return socket.emit('error-msg', `Ce salon est complet (maximum ${room.maxPlayers} joueurs).`, { code: 'ROOM_FULL', params: { max: room.maxPlayers } });
     }
     const sanitizedColor = sanitizePlayerColor(color);
     const takenColors = room.players.filter(p => !p.isBot).map(p => p.color);
@@ -1014,18 +1014,18 @@ io.on('connection', (socket) => {
     return async (payload) => {
       const code = socket.data.code;
       const room = rooms[code];
-      if (!room) return socket.emit('error-msg', 'Salon introuvable.');
+      if (!room) return socket.emit('error-msg', 'Salon introuvable.', { code: 'ROOM_NOT_FOUND' });
       try { await handler(room, payload || {}); }
-      catch (e) { console.error(e); socket.emit('error-msg', 'Erreur serveur.'); }
+      catch (e) { console.error(e); socket.emit('error-msg', 'Erreur serveur.', { code: 'SERVER_ERROR' }); }
       saveRooms();
       broadcast(code);
     };
   }
 
   socket.on('start-game', withRoom((room) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut lancer la partie.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut lancer la partie.', { code: 'HOST_ONLY_START' });
     const result = tryStartGame(room);
-    if (!result.ok) socket.emit('error-msg', result.error);
+    if (!result.ok) socket.emit('error-msg', result.error, { code: result.code, params: result.params });
   }));
 
   socket.on('set-ready', withRoom((room, { ready }) => {
@@ -1044,7 +1044,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-filters', withRoom((room, { filters }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer les filtres.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer les filtres.', { code: 'HOST_ONLY_FILTERS' });
     if (room.phase !== 'lobby' || !filters) return;
     room.filters = {
       brackets: Array.isArray(filters.brackets) ? filters.brackets : []
@@ -1052,7 +1052,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-listen-mode', withRoom((room, { mode }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer le mode d\'écoute.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer le mode d\'écoute.', { code: 'HOST_ONLY_LISTEN_MODE' });
     if (room.phase !== 'lobby') return;
     if (mode !== 'together' && mode !== 'remote') return;
     room.listenMode = mode;
@@ -1065,28 +1065,28 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-reveal-delay', withRoom((room, { seconds }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     const s = parseInt(seconds, 10);
-    if (!Number.isFinite(s) || s < 3 || s > 60) return socket.emit('error-msg', 'Le délai doit être entre 3 et 60 secondes.');
+    if (!Number.isFinite(s) || s < 3 || s > 60) return socket.emit('error-msg', 'Le délai doit être entre 3 et 60 secondes.', { code: 'REVEAL_DELAY_RANGE' });
     room.revealDelaySeconds = s;
     room.log.push({ ts: nowStr(), text: `⏱️ Délai avant de pouvoir révéler réglé sur ${s} secondes.` });
   }));
 
   socket.on('set-turn-decision-seconds', withRoom((room, { seconds }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     const s = parseInt(seconds, 10);
-    if (!Number.isFinite(s) || s < 15 || s > 180) return socket.emit('error-msg', 'Le temps de décision doit être entre 15 et 180 secondes.');
+    if (!Number.isFinite(s) || s < 15 || s > 180) return socket.emit('error-msg', 'Le temps de décision doit être entre 15 et 180 secondes.', { code: 'DECISION_TIME_RANGE' });
     room.turnDecisionSeconds = s;
     room.log.push({ ts: nowStr(), text: `⏱️ Temps pour répondre à une carte réglé sur ${s} secondes.` });
   }));
 
   socket.on('set-auto-draw-seconds', withRoom((room, { seconds }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     const s = parseInt(seconds, 10);
-    if (!Number.isFinite(s) || s < 0 || s > 30) return socket.emit('error-msg', 'Le délai doit être entre 0 (désactivé) et 30 secondes.');
+    if (!Number.isFinite(s) || s < 0 || s > 30) return socket.emit('error-msg', 'Le délai doit être entre 0 (désactivé) et 30 secondes.', { code: 'AUTO_DRAW_RANGE' });
     room.autoDrawSeconds = s;
     room.log.push({ ts: nowStr(), text: s === 0 ? '⏭️ Pioche automatique désactivée.' : `⏭️ La prochaine chanson se pioche automatiquement après ${s} secondes.` });
   }));
@@ -1116,7 +1116,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('set-audio-mode', withRoom((room, { mode }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     if (mode !== 'loop' && mode !== 'once') return;
     room.audioMode = mode;
@@ -1124,7 +1124,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-visibility', withRoom((room, { visibility }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     if (visibility !== 'public' && visibility !== 'private') return;
     room.visibility = visibility;
@@ -1132,7 +1132,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-max-players', withRoom((room, { max }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     if (max === null) {
       room.maxPlayers = null;
@@ -1140,49 +1140,49 @@ io.on('connection', (socket) => {
       return;
     }
     const m = parseInt(max, 10);
-    if (!Number.isFinite(m) || m < 2 || m > 20) return socket.emit('error-msg', 'Le nombre maximum doit être entre 2 et 20.');
-    if (m < room.players.length) return socket.emit('error-msg', `Il y a déjà ${room.players.length} joueurs dans le salon — choisis un maximum plus grand.`);
+    if (!Number.isFinite(m) || m < 2 || m > 20) return socket.emit('error-msg', 'Le nombre maximum doit être entre 2 et 20.', { code: 'MAX_PLAYERS_RANGE' });
+    if (m < room.players.length) return socket.emit('error-msg', `Il y a déjà ${room.players.length} joueurs dans le salon — choisis un maximum plus grand.`, { code: 'MAX_PLAYERS_TOO_LOW', params: { count: room.players.length } });
     room.maxPlayers = m;
     room.log.push({ ts: nowStr(), text: `👥 Nombre de joueurs maximum réglé sur ${m}.` });
   }));
 
   socket.on('set-cards-to-win', withRoom((room, { count }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     const n = parseInt(count, 10);
-    if (!Number.isFinite(n) || n < 4 || n > 20) return socket.emit('error-msg', 'Le nombre de cartes pour gagner doit être entre 4 et 20.');
+    if (!Number.isFinite(n) || n < 4 || n > 20) return socket.emit('error-msg', 'Le nombre de cartes pour gagner doit être entre 4 et 20.', { code: 'CARDS_TO_WIN_RANGE' });
     room.cardsToWin = n;
     room.log.push({ ts: nowStr(), text: `🏆 Il faudra ${n} cartes pour gagner.` });
   }));
 
   socket.on('set-start-tokens', withRoom((room, { count }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     const n = parseInt(count, 10);
-    if (!Number.isFinite(n) || n < 0 || n > 10) return socket.emit('error-msg', 'Le nombre de jetons de départ doit être entre 0 et 10.');
+    if (!Number.isFinite(n) || n < 0 || n > 10) return socket.emit('error-msg', 'Le nombre de jetons de départ doit être entre 0 et 10.', { code: 'START_TOKENS_RANGE' });
     room.startTokens = n;
     room.log.push({ ts: nowStr(), text: `🪙 Jetons de départ réglés sur ${n}.` });
   }));
 
   socket.on('set-free-card-enabled', withRoom((room, { enabled }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     room.freeCardEnabled = !!enabled;
     room.log.push({ ts: nowStr(), text: room.freeCardEnabled ? '🛒 Achat direct de carte (3 jetons) activé.' : '🛒 Achat direct de carte (3 jetons) désactivé.' });
   }));
 
   socket.on('set-partial-guess-bonus', withRoom((room, { enabled }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     room.partialGuessBonus = !!enabled;
     room.log.push({ ts: nowStr(), text: room.partialGuessBonus ? '🎯 Bonus partiel (+0,5 jeton pour titre OU artiste) activé.' : '🎯 Bonus partiel désactivé.' });
   }));
 
   socket.on('set-game-mode', withRoom((room, { mode }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer ce réglage.', { code: 'HOST_ONLY_SETTING' });
     if (room.phase !== 'lobby') return;
     const preset = GAME_MODE_PRESETS[mode];
-    if (!preset) return socket.emit('error-msg', 'Mode de partie inconnu.');
+    if (!preset) return socket.emit('error-msg', 'Mode de partie inconnu.', { code: 'UNKNOWN_GAME_MODE' });
     Object.assign(room, preset);
     room.gameMode = mode;
     room.log.push({ ts: nowStr(), text: `🎮 Mode de partie : ${GAME_MODE_LABELS[mode]}.` });
@@ -1198,8 +1198,8 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('kick-player', withRoom(async (room, { playerId: targetId }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut exclure un joueur.');
-    if (targetId === room.hostId) return socket.emit('error-msg', 'L\'hôte ne peut pas s\'exclure lui-même.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut exclure un joueur.', { code: 'HOST_ONLY_KICK' });
+    if (targetId === room.hostId) return socket.emit('error-msg', 'L\'hôte ne peut pas s\'exclure lui-même.', { code: 'HOST_CANT_KICK_SELF' });
     const kicked = removePlayerFromRoom(room, targetId);
     if (!kicked) return;
     if (rooms[room.code]) room.log.push({ ts: nowStr(), text: `🚫 ${kicked.name} a été exclu(e) du salon par l'hôte.` });
@@ -1221,7 +1221,7 @@ io.on('connection', (socket) => {
     if (!active || active.id !== playerId || room.pending) return;
     clearAutoDraw(room.code);
     const drew = await performDraw(room, playerId);
-    if (!drew) return socket.emit('error-msg', 'Plus de chansons avec un aperçu audio jouable dans la pioche !');
+    if (!drew) return socket.emit('error-msg', 'Plus de chansons avec un aperçu audio jouable dans la pioche !', { code: 'DECK_EMPTY' });
   }));
 
   socket.on('skip-card', withRoom(async (room) => {
@@ -1245,9 +1245,9 @@ io.on('connection', (socket) => {
     const p = me(room, playerId);
     const active = activePlayer(room);
     if (!p || !active || active.id !== playerId || room.pending || p.tokens < 3) return;
-    if (!room.freeCardEnabled) return socket.emit('error-msg', 'L\'achat direct de carte n\'est pas activé pour cette partie.');
+    if (!room.freeCardEnabled) return socket.emit('error-msg', 'L\'achat direct de carte n\'est pas activé pour cette partie.', { code: 'FREE_CARD_DISABLED' });
     if (room.deck.length === 0) {
-      if (room.discard.length === 0) return socket.emit('error-msg', 'Plus de chansons disponibles !');
+      if (room.discard.length === 0) return socket.emit('error-msg', 'Plus de chansons disponibles !', { code: 'NO_SONGS_LEFT' });
       room.deck = shuffle(room.discard); room.discard = [];
     }
     const card = room.deck.pop();
@@ -1279,11 +1279,11 @@ io.on('connection', (socket) => {
       // the second player's attempt was silently dropped with no feedback
       // at all, leaving them thinking nothing happened.
       const first = room.players.find(pl => pl.id === room.pending.challenge.playerId);
-      return socket.emit('error-msg', `Trop tard — ${first ? first.name : 'quelqu\'un'} a défié en premier.`);
+      return socket.emit('error-msg', `Trop tard — ${first ? first.name : 'quelqu\'un'} a défié en premier.`, { code: 'CHALLENGE_TOO_LATE', params: { name: first ? first.name : null } });
     }
     if (room.pending.activePlayerId === playerId || p.tokens < 1) return;
     if (room.pending.placement && gapIndex === room.pending.placement.gapIndex) {
-      return socket.emit('error-msg', 'Choisis un autre emplacement que celui déjà posé.');
+      return socket.emit('error-msg', 'Choisis un autre emplacement que celui déjà posé.', { code: 'CHALLENGE_SAME_SPOT' });
     }
     p.tokens -= 1;
     room.pending.challenge = { playerId, gapIndex };
@@ -1347,7 +1347,7 @@ io.on('connection', (socket) => {
       const delayMs = (room.revealDelaySeconds || 15) * 1000;
       const elapsed = Date.now() - (room.pending.placedAt || 0);
       if (elapsed < delayMs) {
-        return socket.emit('error-msg', `Attends encore ${Math.ceil((delayMs - elapsed) / 1000)}s avant de pouvoir révéler — ça laisse une chance de défier.`);
+        return socket.emit('error-msg', `Attends encore ${Math.ceil((delayMs - elapsed) / 1000)}s avant de pouvoir révéler — ça laisse une chance de défier.`, { code: 'REVEAL_TOO_EARLY', params: { seconds: Math.ceil((delayMs - elapsed) / 1000) } });
       }
       return resolveReveal(room);
     }
@@ -1390,7 +1390,7 @@ io.on('connection', (socket) => {
   }));
 
   socket.on('set-dj', withRoom((room, { playerId: targetId }) => {
-    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer le DJ.');
+    if (!isHost(room, socket.data.playerId)) return socket.emit('error-msg', 'Seul l\'hôte du salon peut changer le DJ.', { code: 'HOST_ONLY_DJ' });
     const p = room.players.find(pl => pl.id === targetId);
     if (!p || p.isBot) return;
     room.djId = targetId;

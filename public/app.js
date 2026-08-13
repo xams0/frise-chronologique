@@ -185,12 +185,12 @@ async function addSongToCatalog() {
     const res = await fetch('/api/songs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await res.json();
     state.libBusy = false;
-    if (!res.ok) { state.libError = data.error || 'Erreur.'; render(); return; }
+    if (!res.ok) { state.libError = data.code ? t('err.' + data.code, data.params) : (data.error || t('errors.generic')); render(); return; }
     state.catalog = data;
     state.newSong = { title: '', artist: '', year: '' };
     state.libError = '';
     render();
-  } catch (e) { state.libBusy = false; state.libError = 'Erreur réseau.'; render(); }
+  } catch (e) { state.libBusy = false; state.libError = t('errors.network'); render(); }
 }
 async function checkCatalogHealth() {
   state.healthChecking = true; state.healthReport = null; render();
@@ -258,15 +258,15 @@ async function importCatalog() {
   if (!raw) return;
   let parsed;
   try { parsed = JSON.parse(raw.value); }
-  catch (e) { state.importError = 'JSON invalide.'; render(); return; }
+  catch (e) { state.importError = t('err.IMPORT_INVALID_JSON'); render(); return; }
   try {
     const res = await fetch('/api/songs/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsed) });
     const data = await res.json();
-    if (!res.ok) { state.importError = data.error || 'Erreur.'; render(); return; }
+    if (!res.ok) { state.importError = data.code ? t('err.' + data.code, data.params) : (data.error || t('errors.generic')); render(); return; }
     state.catalog = data.catalog;
     state.showImport = false; state.importError = '';
     render();
-  } catch (e) { state.importError = 'Erreur réseau.'; render(); }
+  } catch (e) { state.importError = t('errors.network'); render(); }
 }
 
 /* ---------- socket events ---------- */
@@ -288,7 +288,7 @@ socket.on('room', (room) => {
   // not depend on any specific removal mechanism working correctly.
   if (state.playerId && room.players && !room.players.some(p => p.id === state.playerId)) {
     clearSession();
-    Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: 'Tu ne fais plus partie de ce salon (exclu·e, ou le salon a été fermé).' });
+    Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: t('errors.notInRoom') });
     render();
     return;
   }
@@ -296,11 +296,11 @@ socket.on('room', (room) => {
   state.screen = room.phase === 'lobby' ? 'lobby' : 'game';
   render();
 });
-socket.on('error-msg', (msg) => {
+socket.on('error-msg', (msg, meta) => {
   // If we were trying to silently resume a session that no longer exists
   // server-side, don't strand the user on a dead screen — send them home.
   if (state.reconnecting) { clearSession(); Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, reconnecting: false }); }
-  setError(msg);
+  setError(meta && meta.code ? t('err.' + meta.code, meta.params) : msg);
 });
 
 socket.on('color-taken', ({ takenColors }) => {
@@ -325,10 +325,10 @@ socket.on('connect', () => {
 socket.on('disconnect', () => { state.connected = false; render(); });
 socket.on('kicked', () => {
   clearSession();
-  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: 'Tu as été exclu·e du salon par l\'hôte.' });
+  Object.assign(state, { screen: 'home', room: null, code: null, playerId: null, playerName: null, reconnecting: false, error: t('errors.kicked') });
   render();
 });
-socket.on('connect_error', () => setError('Connexion au serveur perdue — vérifie que le serveur tourne et que tu es sur le même Wi-Fi.'));
+socket.on('connect_error', () => setError(t('errors.connectionLost')));
 
 // Flying emoji reactions render OUTSIDE #root (a dedicated overlay appended
 // directly to <body>) so they aren't wiped out mid-flight by the next
@@ -383,15 +383,15 @@ socket.on('reaction', ({ emoji }) => spawnReaction(emoji));
 /* ---------- actions (thin — server owns all game logic) ---------- */
 function createRoom() {
   const name = state.nameInput.trim();
-  if (!name) return setError('Entre ton prénom.');
+  if (!name) return setError(t('errors.enterName'));
   state.busy = true; render();
   socket.emit('create-room', { name, visibility: state.roomVisibility, color: state.playerColor });
 }
 function joinRoom() {
   const name = state.nameInput.trim();
   const code = state.codeInput.trim().toUpperCase();
-  if (!name) return setError('Entre ton prénom.');
-  if (code.length < 4) return setError('Entre le code du salon (4 caractères).');
+  if (!name) return setError(t('errors.enterName'));
+  if (code.length < 4) return setError(t('errors.enterCode'));
   state.busy = true; render();
   socket.emit('join-room', { code, name, color: state.playerColor, colorExplicit: state.colorExplicit });
 }
@@ -522,6 +522,7 @@ function render() {
   else html = renderGame(); // sets lastComputedFabHtml as a side effect
   root.innerHTML = html;
   updateFabOverlay(lastComputedFabHtml);
+  renderLangSwitcher(render);
 
   // Play the "climb to top" animation: the zone that just moved snaps back
   // (via an inverted transform) to where it visually WAS, then transitions
@@ -645,16 +646,16 @@ function render() {
 
 function renderWelcome() {
   const rules = [
-    { icon: '🎧', title: 'Écoutez', text: "Un extrait de 30 secondes joue — pas de titre, pas d'artiste, juste le son." },
-    { icon: '📅', title: 'Placez', text: 'Devinez si la chanson est avant, après, ou entre celles déjà sur votre frise.' },
-    { icon: '⏱️', title: 'Défiez', text: "Les autres ont un délai pour parier qu'ils devinent mieux — et voler la carte." },
-    { icon: '🏆', title: 'Gagnez', text: `Le premier à ${CARDS_TO_WIN} chansons bien placées remporte la partie.` }
+    { icon: '🎧', title: t('welcome.rule1Title'), text: t('welcome.rule1Text') },
+    { icon: '📅', title: t('welcome.rule2Title'), text: t('welcome.rule2Text') },
+    { icon: '⏱️', title: t('welcome.rule3Title'), text: t('welcome.rule3Text') },
+    { icon: '🏆', title: t('welcome.rule4Title'), text: t('welcome.rule4Text', { count: CARDS_TO_WIN }) }
   ];
   return `
   <div class="screen center">
     ${renderBgPremium()}
     <div class="brand"><img src="/logo.png" class="brand-logo spin" alt="Chronolozik"/><h1 class="title-xl title-shine">Chronolozik</h1></div>
-    <p class="subtitle" style="margin-top:10px;">Le jeu qui teste ta mémoire musicale, entre amis.</p>
+    <p class="subtitle" style="margin-top:10px;">${t('welcome.subtitle')}</p>
 
     <div class="stack" style="margin-top:28px;text-align:left;">
       ${rules.map(r => `
@@ -667,7 +668,7 @@ function renderWelcome() {
         </div>`).join('')}
     </div>
 
-    <button class="btn btn-primary" style="margin-top:26px;" data-act="welcome-continue">C'est parti 🚀</button>
+    <button class="btn btn-primary" style="margin-top:26px;" data-act="welcome-continue">${t('welcome.continueBtn')}</button>
   </div>`;
 }
 
@@ -680,17 +681,17 @@ function renderLoading() {
   <div class="screen center">
     ${renderBgPremium()}
     <div class="brand"><img src="/logo.png" class="brand-logo spin" alt="Chronolozik"/><h1 class="title-xl title-shine">Chronolozik</h1></div>
-    <p class="subtitle" style="margin-top:10px;">Chargement, veuillez patienter.</p>
+    <p class="subtitle" style="margin-top:10px;">${t('loading.subtitle')}</p>
 
     <div style="width:100%;max-width:280px;margin-top:28px;">
       <div style="background:var(--surface2);border-radius:999px;height:14px;overflow:hidden;border:1px solid var(--line);">
         <div style="background:var(--pink);height:100%;width:${percent}%;transition:width 0.4s ease;border-radius:999px;"></div>
       </div>
       <p class="mono" style="text-align:center;margin-top:10px;font-size:15px;color:var(--gold);font-weight:700;">${percent}%</p>
-      <p class="subtitle" style="text-align:center;margin-top:2px;">${total ? `${checked} / ${total} chansons vérifiées` : 'Démarrage…'}</p>
+      <p class="subtitle" style="text-align:center;margin-top:2px;">${total ? t('loading.progress', { checked, total }) : t('loading.starting')}</p>
     </div>
 
-    <p class="footer-note" style="margin-top:24px;">Ça prend en général 1 à 2 minutes — le serveur reste volontairement lent pour respecter la limite de débit de Deezer.</p>
+    <p class="footer-note" style="margin-top:24px;">${t('loading.footerNote')}</p>
   </div>`;
 }
 
@@ -722,8 +723,8 @@ function renderSoundBars() {
 }
 
 function connectionBanner() {
-  if (state.reconnecting) return `<div class="result-banner" style="background:rgba(63,217,196,0.12);border-color:var(--teal);"><div>🔄 Reconnexion à ton salon…</div></div>`;
-  if (!state.connected) return `<div class="result-banner flash-wrong"><div>🔌 Connexion perdue — nouvelle tentative…</div></div>`;
+  if (state.reconnecting) return `<div class="result-banner" style="background:rgba(63,217,196,0.12);border-color:var(--teal);"><div>${t('conn.reconnecting')}</div></div>`;
+  if (!state.connected) return `<div class="result-banner flash-wrong"><div>${t('conn.lost')}</div></div>`;
   return '';
 }
 
@@ -736,37 +737,37 @@ function renderHome() {
     ${state.version ? `<div class="version-bubble">v${escapeHtml(state.version)}</div>` : ''}
 
     <div class="tabs" style="margin-top:26px;max-width:280px;">
-      <button class="tab ${state.mode === 'create' ? 'active' : ''}" data-act="mode-create">Créer un salon</button>
-      <button class="tab ${state.mode === 'join' ? 'active' : ''}" data-act="mode-join">Rejoindre</button>
+      <button class="tab ${state.mode === 'create' ? 'active' : ''}" data-act="mode-create">${t('home.createTab')}</button>
+      <button class="tab ${state.mode === 'join' ? 'active' : ''}" data-act="mode-join">${t('home.joinTab')}</button>
     </div>
 
     <div class="stack">
       <div class="field">
-        <label>Ton prénom</label>
+        <label>${t('home.yourName')}</label>
         <div class="row" style="align-items:center;">
-          <input id="inp-name" type="text" placeholder="Ex. Léa" value="${escapeHtml(state.nameInput)}" maxlength="20" style="flex:1;"/>
-          <button type="button" class="iconbtn" style="background:${state.playerColor};border-color:${state.playerColor};flex-shrink:0;" data-act="open-color-picker" title="Choisir sa couleur">🎨</button>
+          <input id="inp-name" type="text" placeholder="${t('home.namePlaceholder')}" value="${escapeHtml(state.nameInput)}" maxlength="20" style="flex:1;"/>
+          <button type="button" class="iconbtn" style="background:${state.playerColor};border-color:${state.playerColor};flex-shrink:0;" data-act="open-color-picker" title="${t('home.pickColorTitle')}">🎨</button>
         </div>
       </div>
 
       ${state.mode === 'create' ? `
       <div class="field">
-        <label>Visibilité du salon</label>
+        <label>${t('home.visibility')}</label>
         <div class="row">
-          <button type="button" class="btn ${state.roomVisibility === 'private' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="visibility-private">🔒 Privé</button>
-          <button type="button" class="btn ${state.roomVisibility === 'public' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="visibility-public">🌐 Public</button>
+          <button type="button" class="btn ${state.roomVisibility === 'private' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="visibility-private">${t('home.private')}</button>
+          <button type="button" class="btn ${state.roomVisibility === 'public' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="visibility-public">${t('home.public')}</button>
         </div>
-        <p class="subtitle" style="margin:8px 0 0;">${state.roomVisibility === 'public' ? 'Visible par tout le monde dans la liste des salons publics.' : 'Rejoignable seulement avec le code.'}</p>
+        <p class="subtitle" style="margin:8px 0 0;">${state.roomVisibility === 'public' ? t('home.visibilityPublicDesc') : t('home.visibilityPrivateDesc')}</p>
       </div>` : ``}
 
       ${state.mode === 'join' ? `
       <div class="field">
-        <label>Code du salon</label>
+        <label>${t('home.roomCode')}</label>
         <input id="inp-code" class="code" type="text" placeholder="AB12" value="${escapeHtml(state.codeInput)}" maxlength="4"/>
       </div>` : ``}
       ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
       <button class="btn btn-primary" data-act="${state.mode === 'create' ? 'create-room' : 'join-room'}" ${state.busy ? 'disabled' : ''}>
-        ${state.busy ? '…' : (state.mode === 'create' ? 'Créer le salon' : 'Rejoindre')}
+        ${state.busy ? '…' : (state.mode === 'create' ? t('home.createBtn') : t('home.joinBtn'))}
       </button>
     </div>
 
@@ -780,15 +781,15 @@ function renderColorPickerModal() {
   return `
   <div class="modal-bg" data-act="close-color-picker">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>Ta couleur</h2>
-      ${taken.length ? `<p class="subtitle" style="margin-top:6px;color:var(--pink);">Cette couleur est déjà prise dans ce salon. Couleurs indisponibles marquées d'une ✕ — choisis-en une autre.</p>` : ''}
+      <h2>${t('colorPicker.title')}</h2>
+      ${taken.length ? `<p class="subtitle" style="margin-top:6px;color:var(--pink);">${t('colorPicker.takenWarning')}</p>` : ''}
       <div class="color-swatch-row" style="margin-top:12px;">
         ${PLAYER_COLORS.map(c => {
           const isTaken = taken.includes(c);
-          return `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''} ${isTaken ? 'taken' : ''}" ${isTaken ? '' : `data-act="pick-color" data-color="${c}"`} style="background:${c};" ${isTaken ? 'title="Déjà prise" disabled' : ''}>${isTaken ? '✕' : ''}</button>`;
+          return `<button type="button" class="color-swatch ${state.playerColor === c ? 'selected' : ''} ${isTaken ? 'taken' : ''}" ${isTaken ? '' : `data-act="pick-color" data-color="${c}"`} style="background:${c};" ${isTaken ? `title="${t('colorPicker.taken')}" disabled` : ''}>${isTaken ? '✕' : ''}</button>`;
         }).join('')}
       </div>
-      <button class="btn btn-gold" style="margin-top:18px;" data-act="close-color-picker">Fermer</button>
+      <button class="btn btn-gold" style="margin-top:18px;" data-act="close-color-picker">${t('common.close')}</button>
     </div>
   </div>`;
 }
@@ -798,18 +799,18 @@ function renderPublicRoomsList() {
   return `
   <div class="card-section" style="margin-top:18px;text-align:left;">
     <div class="timeline-owner" style="margin-bottom:8px;">
-      <span>🌐 Salons publics</span>
+      <span>${t('publicRooms.title')}</span>
       <button class="btn btn-ghost btn-sm" style="width:auto;padding:4px 10px;" data-act="refresh-public-rooms">↻</button>
     </div>
-    ${rooms === null ? `<div class="empty">Chargement…</div>` :
-      rooms.length === 0 ? `<div class="empty">Aucun salon public ouvert pour l'instant.</div>` :
+    ${rooms === null ? `<div class="empty">${t('publicRooms.loading')}</div>` :
+      rooms.length === 0 ? `<div class="empty">${t('publicRooms.empty')}</div>` :
       rooms.map(r => `
         <div class="player-chip" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="dot"></div>
-            <div class="name">${escapeHtml(r.code)} — ${escapeHtml(r.hostName)} <span class="mono" style="color:var(--text-dim);font-size:11px;">(${r.playerCount}${r.maxPlayers ? '/' + r.maxPlayers : ''} joueur${r.playerCount > 1 ? 's' : ''})</span></div>
+            <div class="name">${escapeHtml(r.code)} — ${escapeHtml(r.hostName)} <span class="mono" style="color:var(--text-dim);font-size:11px;">${t('publicRooms.playerCount', { count: r.playerCount, max: r.maxPlayers })}</span></div>
           </div>
-          <button class="btn btn-gold btn-sm" style="width:auto;flex-shrink:0;" data-act="join-public-room" data-code="${escapeHtml(r.code)}">Rejoindre</button>
+          <button class="btn btn-gold btn-sm" style="width:auto;flex-shrink:0;" data-act="join-public-room" data-code="${escapeHtml(r.code)}">${t('publicRooms.join')}</button>
         </div>`).join('')}
   </div>`;
 }
@@ -833,65 +834,65 @@ function renderLobby() {
     ${renderBgPremium()}
     ${connectionBanner()}
     <div class="topbar">
-      <div class="code-pill">${room.code} <button data-act="copy-code">copier</button></div>
+      <div class="code-pill">${room.code} <button data-act="copy-code">${t('lobby.copy')}</button></div>
       <button class="iconbtn" data-act="leave">✕</button>
     </div>
-    <h2 style="margin-bottom:4px;">Salon d'attente</h2>
-    <p class="subtitle" style="margin-top:0;">Partage le code <b class="mono" style="color:var(--gold)">${room.code}</b> avec tes amis, sur le même Wi-Fi.</p>
+    <h2 style="margin-bottom:4px;">${t('lobby.title')}</h2>
+    <p class="subtitle" style="margin-top:0;">${t('lobby.shareCode', { code: `<b class="mono" style="color:var(--gold)">${room.code}</b>` })}</p>
 
     <div class="card-section" style="margin-top:18px;">
-      <h3>Joueurs (${room.players.length}${room.maxPlayers ? ' / ' + room.maxPlayers : ''})</h3>
+      <h3>${t('lobby.players')} (${room.players.length}${room.maxPlayers ? ' / ' + room.maxPlayers : ''})</h3>
       ${room.players.map(p => `
         <div class="player-chip ${isMe(p.id) ? 'you' : ''}" style="justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="dot" style="background:${p.isBot || p.ready ? 'var(--teal)' : 'var(--red)'};"></div>
-            <div class="name" style="color:${p.color || '#8B93A6'};">${escapeHtml(p.name)}${isMe(p.id) ? ' (toi)' : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
+            <div class="name" style="color:${p.color || '#8B93A6'};">${escapeHtml(p.name)}${isMe(p.id) ? t('lobby.you') : ''}${p.id === room.hostId ? ' 👑' : ''}${listenMode === 'together' && p.id === djId ? ' 🎚️' : ''}</div>
           </div>
           ${isHost && p.id !== room.hostId && !p.isBot ? `<button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="kick-player" data-pid="${p.id}">🚫</button>` : ''}
         </div>`).join('')}
-      ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">🧪 Ajouter un bot pour tester seul</button>` : ''}
-      ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">Retirer le bot de test</button>` : ''}
-      ${!isHost ? `<p class="subtitle" style="margin:8px 0 0;">👑 ${escapeHtml(room.players.find(p => p.id === room.hostId)?.name || '?')} est l'hôte — seul·e à pouvoir changer les réglages et lancer la partie.</p>` : ''}
-      <button class="btn ${myself && myself.ready ? 'btn-ghost' : 'btn-gold'} btn-sm" style="margin-top:10px;width:100%;" data-act="toggle-ready">${myself && myself.ready ? '⏳ Se marquer non prêt(e)' : '✅ Prêt(e) (active le son)'}</button>
+      ${room.players.length === 1 ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="add-bot">${t('lobby.addBot')}</button>` : ''}
+      ${hasBot ? `<button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" data-act="remove-bot">${t('lobby.removeBot')}</button>` : ''}
+      ${!isHost ? `<p class="subtitle" style="margin:8px 0 0;">${t('lobby.hostOnly', { host: escapeHtml(room.players.find(p => p.id === room.hostId)?.name || '?') })}</p>` : ''}
+      <button class="btn ${myself && myself.ready ? 'btn-ghost' : 'btn-gold'} btn-sm" style="margin-top:10px;width:100%;" data-act="toggle-ready">${myself && myself.ready ? t('lobby.notReady') : t('lobby.ready')}</button>
     </div>
 
     <button class="recap-toggle" data-act="toggle-recap">
-      <span>Résumé des options</span>
+      <span>${t('lobby.optionsRecap')}</span>
       <span class="recap-arrow ${state.showRecap ? 'open' : ''}">▾</span>
     </button>
     ${state.showRecap ? `
     <div class="options-recap">
-      <div class="recap-chip recap-chip-mode">${{ original: '🎵', hardcore: '🩸', enemies: '😈' }[room.gameMode || 'original']} ${{ original: 'Original', hardcore: 'Hardcore', enemies: 'Ennemis' }[room.gameMode || 'original']}</div>
+      <div class="recap-chip recap-chip-mode">${{ original: '🎵', hardcore: '🩸', enemies: '😈' }[room.gameMode || 'original']} ${{ original: t('modes.original.title'), hardcore: t('modes.hardcore.title'), enemies: t('modes.enemies.title') }[room.gameMode || 'original']}</div>
       <div class="recap-chip">🏆 ${cardsToWin}</div>
       <div class="recap-chip">🪙 ${startTokens}</div>
-      <div class="recap-chip">👥 ${room.maxPlayers || '∞'}</div>
-      <div class="recap-chip">${visibility === 'public' ? '🌐' : '🔒'} ${visibility === 'public' ? 'Public' : 'Privé'}</div>
-      <div class="recap-chip">${listenMode === 'together' ? '🎉' : '🏠'} ${listenMode === 'together' ? 'Ensemble' : 'Solo'}</div>
-      <div class="recap-chip">${audioMode === 'loop' ? '🔁' : '⏹️'} ${audioMode === 'loop' ? 'Boucle' : '30s'}</div>
+      <div class="recap-chip">👥 ${room.maxPlayers || t('recap.unlimited')}</div>
+      <div class="recap-chip">${visibility === 'public' ? '🌐' : '🔒'} ${visibility === 'public' ? t('recap.public') : t('recap.private')}</div>
+      <div class="recap-chip">${listenMode === 'together' ? '🎉' : '🏠'} ${listenMode === 'together' ? t('recap.together') : t('recap.solo')}</div>
+      <div class="recap-chip">${audioMode === 'loop' ? '🔁' : '⏹️'} ${audioMode === 'loop' ? t('ecoute.loop').replace('🔁 ', '') : '30s'}</div>
       <div class="recap-chip">⏱️ ${room.revealDelaySeconds || 15}s</div>
       <div class="recap-chip">⏳ ${room.turnDecisionSeconds || 60}s</div>
-      <div class="recap-chip">⏭️ ${room.autoDrawSeconds ? room.autoDrawSeconds + 's' : 'Manuel'}</div>
-      <div class="recap-chip">${room.freeCardEnabled ? '🛒' : '🚫'} Achat direct</div>
-      <div class="recap-chip">${room.partialGuessBonus ? '🎯' : '🚫'} Bonus partiel</div>
+      <div class="recap-chip">⏭️ ${room.autoDrawSeconds ? room.autoDrawSeconds + 's' : t('recap.manual')}</div>
+      <div class="recap-chip">${room.freeCardEnabled ? '🛒' : '🚫'} ${t('recap.directBuy')}</div>
+      <div class="recap-chip">${room.partialGuessBonus ? '🎯' : '🚫'} ${t('recap.partialBonus')}</div>
     </div>` : ''}
-    <button class="btn btn-ghost" style="margin-top:10px;" data-act="open-options">⚙️ Options de la partie</button>
+    <button class="btn btn-ghost" style="margin-top:10px;" data-act="open-options">${t('lobby.gameOptions')}</button>
 
     ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ``}
 
     ${isHost ? `
     <button class="btn btn-primary" style="margin-top:14px;" data-act="start-game" ${room.players.length < 2 ? 'disabled' : ''}>
-      ${room.players.length < 2 ? "En attente d'un 2e joueur…" : `Lancer la partie (${room.players.filter(p => p.isBot || p.ready).length}/${room.players.length} prêts)`}
+      ${room.players.length < 2 ? t('lobby.waitingSecondPlayer') : t('lobby.startGame', { ready: room.players.filter(p => p.isBot || p.ready).length, total: room.players.length })}
     </button>` : `
-    <button class="btn btn-primary" style="margin-top:14px;" disabled>En attente que l'hôte lance la partie…</button>`}
+    <button class="btn btn-primary" style="margin-top:14px;" disabled>${t('lobby.waitingHostStart')}</button>`}
     <div class="row" style="margin-top:10px;">
-      <button class="btn btn-ghost btn-sm" data-act="show-rules">Règles</button>
-      <button class="btn btn-ghost btn-sm" data-act="show-library">📚 Bibliothèque (${state.catalog ? state.catalog.length : '…'})</button>
+      <button class="btn btn-ghost btn-sm" data-act="show-rules">${t('lobby.rules')}</button>
+      <button class="btn btn-ghost btn-sm" data-act="show-library">${t('lobby.library', { count: state.catalog ? state.catalog.length : '…' })}</button>
     </div>
 
     ${room.history.length ? `
     <div class="card-section" style="margin-top:18px;">
-      <h3>Parties précédentes dans ce salon</h3>
-      ${room.history.slice(0, 5).map(h => `<div class="log-line"><b>${escapeHtml(h.winnerName)}</b> a gagné — ${h.ts}</div>`).join('')}
+      <h3>${t('lobby.previousGames')}</h3>
+      ${room.history.slice(0, 5).map(h => `<div class="log-line"><b>${escapeHtml(h.winnerName)}</b> ${t('lobby.won')} — ${h.ts}</div>`).join('')}
     </div>` : ``}
 
     ${state.showRules ? renderRulesModal() : ''}
@@ -923,16 +924,16 @@ function renderOptionsModal(room) {
         <div class="mode-card-desc">${desc}</div>
       </button>`;
     body = `
-      <p class="subtitle" style="margin:0 0 12px;">Des préréglages qui appliquent d'un coup une combinaison des réglages ci-contre — rien de nouveau, juste plus rapide à mettre en place.</p>
-      ${modeCard('original', '🎵', 'Original', '10 cartes pour gagner, 2 jetons de départ, 15s pour révéler, 60s pour répondre. Les réglages par défaut.')}
-      ${modeCard('hardcore', '🩸', 'Hardcore', '0 jeton de départ (donc pas moyen de passer au début), 5s seulement pour révéler, 15s pour répondre. En plus : chaque erreur fait perdre une carte au hasard de sa propre frise, remise dans la pioche.')}
-      ${modeCard('enemies', '😈', 'Fais-toi des ennemis', '12 cartes pour gagner, 4 jetons de départ, délai de révélation allongé à 20s — de quoi défier bien plus souvent avant que ça se referme.')}
-      ${!isHost ? `<p class="subtitle" style="margin-top:10px;">Seul l'hôte peut changer le mode.</p>` : ''}
+      <p class="subtitle" style="margin:0 0 12px;">${t('modes.intro')}</p>
+      ${modeCard('original', '🎵', t('modes.original.title'), t('modes.original.desc'))}
+      ${modeCard('hardcore', '🩸', t('modes.hardcore.title'), t('modes.hardcore.desc'))}
+      ${modeCard('enemies', '😈', t('modes.enemies.title'), t('modes.enemies.desc'))}
+      ${!isHost ? `<p class="subtitle" style="margin-top:10px;">${t('modes.hostOnly')}</p>` : ''}
     `;
   } else if (tab === 'partie') {
     body = `
-      <h3>Cartes pour gagner</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Le premier à ce nombre de chansons bien placées remporte la partie.</p>
+      <h3>${t('partie.cardsToWinTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('partie.cardsToWinDesc')}</p>
       ${isHost ? `
       <div class="row" style="align-items:center;">
         <button class="btn btn-ghost btn-sm" data-act="cards-to-win-minus" ${cardsToWin <= 4 ? 'disabled' : ''}>−1</button>
@@ -940,8 +941,8 @@ function renderOptionsModal(room) {
         <button class="btn btn-ghost btn-sm" data-act="cards-to-win-plus" ${cardsToWin >= 20 ? 'disabled' : ''}>+1</button>
       </div>` : `<div class="code-pill" style="justify-content:center;">${cardsToWin}</div>`}
 
-      <h3 style="margin-top:18px;">Jetons de départ</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Le nombre de jetons que chaque joueur a au début de la partie.</p>
+      <h3 style="margin-top:18px;">${t('partie.startTokensTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('partie.startTokensDesc')}</p>
       ${isHost ? `
       <div class="row" style="align-items:center;">
         <button class="btn btn-ghost btn-sm" data-act="start-tokens-minus" ${startTokens <= 0 ? 'disabled' : ''}>−1</button>
@@ -949,67 +950,67 @@ function renderOptionsModal(room) {
         <button class="btn btn-ghost btn-sm" data-act="start-tokens-plus" ${startTokens >= 10 ? 'disabled' : ''}>+1</button>
       </div>` : `<div class="code-pill" style="justify-content:center;">${startTokens}</div>`}
 
-      <h3 style="margin-top:18px;">Nombre de joueurs maximum</h3>
+      <h3 style="margin-top:18px;">${t('partie.maxPlayersTitle')}</h3>
       ${isHost ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
         ${[2, 3, 4, 5, 6].map(n => `<button class="btn ${room.maxPlayers === n ? 'btn-gold' : 'btn-ghost'} btn-sm" style="width:auto;flex:1;min-width:44px;" data-act="set-max-players" data-max="${n}">${n}</button>`).join('')}
-        <button class="btn ${!room.maxPlayers ? 'btn-gold' : 'btn-ghost'} btn-sm" style="width:auto;flex:1;min-width:70px;" data-act="set-max-players" data-max="">Illimité</button>
+        <button class="btn ${!room.maxPlayers ? 'btn-gold' : 'btn-ghost'} btn-sm" style="width:auto;flex:1;min-width:70px;" data-act="set-max-players" data-max="">${t('partie.unlimited')}</button>
       </div>
       <div class="row" style="margin-top:8px;">
-        <input id="inp-max-custom" type="number" min="2" max="20" placeholder="Personnalisé (2-20)" value="${escapeHtml(state.maxPlayersInput)}" style="flex:1;min-width:0;box-sizing:border-box;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;"/>
-        <button class="btn btn-ghost btn-sm" style="width:auto;" data-act="set-max-players-custom">Valider</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.maxPlayers ? room.maxPlayers + ' joueurs max' : 'Illimité'}</div>`}
+        <input id="inp-max-custom" type="number" min="2" max="20" placeholder="${t('partie.customPlaceholder')}" value="${escapeHtml(state.maxPlayersInput)}" style="flex:1;min-width:0;box-sizing:border-box;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;"/>
+        <button class="btn btn-ghost btn-sm" style="width:auto;" data-act="set-max-players-custom">${t('partie.validate')}</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.maxPlayers ? t('partie.maxPlayersSuffix', { count: room.maxPlayers }) : t('partie.unlimited')}</div>`}
 
-      <h3 style="margin-top:18px;">Visibilité</h3>
+      <h3 style="margin-top:18px;">${t('partie.visibilityTitle')}</h3>
       ${isHost ? `
       <div class="row" style="margin-top:8px;">
-        <button class="btn ${visibility === 'private' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-visibility-private">🔒 Privé</button>
-        <button class="btn ${visibility === 'public' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-visibility-public">🌐 Public</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${visibility === 'public' ? '🌐 Public' : '🔒 Privé'}</div>`}
+        <button class="btn ${visibility === 'private' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-visibility-private">${t('home.private')}</button>
+        <button class="btn ${visibility === 'public' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-visibility-public">${t('home.public')}</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${visibility === 'public' ? t('home.public') : t('home.private')}</div>`}
 
-      <h3 style="margin-top:18px;">Achat direct de carte</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Échanger 3 jetons pour poser une carte directement sur sa frise, sans l'écouter ni la deviner.</p>
+      <h3 style="margin-top:18px;">${t('partie.freeCardTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('partie.freeCardDesc')}</p>
       ${isHost ? `
       <div class="row" style="margin-top:8px;">
-        <button class="btn ${!room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-off">🚫 Désactivé</button>
-        <button class="btn ${room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-on">🛒 Activé</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.freeCardEnabled ? '🛒 Activé' : '🚫 Désactivé'}</div>`}
+        <button class="btn ${!room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-off">${t('partie.disabled')}</button>
+        <button class="btn ${room.freeCardEnabled ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-free-card-on">${t('partie.freeCardEnabled')}</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.freeCardEnabled ? t('partie.freeCardEnabled') : t('partie.disabled')}</div>`}
 
-      <h3 style="margin-top:18px;">Bonus partiel titre/artiste</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Trouver seulement le titre OU seulement l'artiste (pas les deux) rapporte quand même +0,5 jeton, au lieu de rien.</p>
+      <h3 style="margin-top:18px;">${t('partie.partialBonusTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('partie.partialBonusDesc')}</p>
       ${isHost ? `
       <div class="row" style="margin-top:8px;">
-        <button class="btn ${!room.partialGuessBonus ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-partial-guess-off">🚫 Désactivé</button>
-        <button class="btn ${room.partialGuessBonus ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-partial-guess-on">🎯 Activé</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.partialGuessBonus ? '🎯 Activé' : '🚫 Désactivé'}</div>`}`;
+        <button class="btn ${!room.partialGuessBonus ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-partial-guess-off">${t('partie.disabled')}</button>
+        <button class="btn ${room.partialGuessBonus ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-partial-guess-on">${t('partie.partialBonusEnabled')}</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${room.partialGuessBonus ? t('partie.partialBonusEnabled') : t('partie.disabled')}</div>`}`;
   } else if (tab === 'ecoute') {
     body = `
-      <h3>Où êtes-vous ?</h3>
+      <h3>${t('ecoute.whereTitle')}</h3>
       ${isHost ? `
       <div class="row" style="margin-top:8px;">
-        <button class="btn ${listenMode === 'together' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-together">🎉 Tous ensemble</button>
-        <button class="btn ${listenMode === 'remote' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-remote">🏠 Chacun chez soi</button>
-      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${listenMode === 'together' ? '🎉 Tous ensemble' : '🏠 Chacun chez soi'}</div>`}
-      <p class="subtitle" style="margin:10px 0 0;">${listenMode === 'together' ? 'Un DJ unique diffuse la musique à voix haute pour toute la pièce.' : 'Pas de DJ — chaque joueur entend l\'extrait directement sur son propre téléphone.'}</p>
+        <button class="btn ${listenMode === 'together' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-together">${t('ecoute.together')}</button>
+        <button class="btn ${listenMode === 'remote' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-listen-remote">${t('ecoute.remote')}</button>
+      </div>` : `<div class="code-pill" style="margin-top:8px;justify-content:center;">${listenMode === 'together' ? t('ecoute.together') : t('ecoute.remote')}</div>`}
+      <p class="subtitle" style="margin:10px 0 0;">${listenMode === 'together' ? t('ecoute.togetherDesc') : t('ecoute.remoteDesc')}</p>
 
       ${listenMode === 'together' ? `
-      <h3 style="margin-top:18px;">DJ actuel</h3>
+      <h3 style="margin-top:18px;">${t('ecoute.currentDj')}</h3>
       <div class="row">
         <div class="code-pill" style="justify-content:center;">🎚️ ${escapeHtml(getDjName(room))}</div>
-        ${isHost ? `<button class="btn btn-ghost btn-sm" data-act="open-dj">Changer</button>` : ''}
+        ${isHost ? `<button class="btn btn-ghost btn-sm" data-act="open-dj">${t('ecoute.change')}</button>` : ''}
       </div>` : ''}
 
-      <h3 style="margin-top:18px;">Musique</h3>
-      <p class="subtitle" style="margin:0 0 8px;">L'extrait audio tourne en boucle, ou s'arrête après 30 secondes.</p>
+      <h3 style="margin-top:18px;">${t('ecoute.musicTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('ecoute.musicDesc')}</p>
       ${isHost ? `
       <div class="row">
-        <button class="btn ${audioMode === 'loop' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-audio-loop">🔁 En boucle</button>
-        <button class="btn ${audioMode === 'once' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-audio-once">⏹️ 30 secondes</button>
-      </div>` : `<div class="code-pill" style="justify-content:center;">${audioMode === 'loop' ? '🔁 En boucle' : '⏹️ 30 secondes'}</div>`}`;
+        <button class="btn ${audioMode === 'loop' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-audio-loop">${t('ecoute.loop')}</button>
+        <button class="btn ${audioMode === 'once' ? 'btn-gold' : 'btn-ghost'} btn-sm" data-act="set-audio-once">${t('ecoute.once')}</button>
+      </div>` : `<div class="code-pill" style="justify-content:center;">${audioMode === 'loop' ? t('ecoute.loop') : t('ecoute.once')}</div>`}`;
   } else if (tab === 'temps') {
     body = `
-      <h3>Délai avant de pouvoir révéler</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Le temps laissé aux autres pour défier avant que la carte puisse être révélée.</p>
+      <h3>${t('temps.revealDelayTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('temps.revealDelayDesc')}</p>
       ${isHost ? `
       <div class="row" style="align-items:center;">
         <button class="btn btn-ghost btn-sm" data-act="reveal-delay-minus" ${revealDelay <= 5 ? 'disabled' : ''}>−5s</button>
@@ -1017,8 +1018,8 @@ function renderOptionsModal(room) {
         <button class="btn btn-ghost btn-sm" data-act="reveal-delay-plus" ${revealDelay >= 60 ? 'disabled' : ''}>+5s</button>
       </div>` : `<div class="code-pill" style="justify-content:center;">${revealDelay}s</div>`}
 
-      <h3 style="margin-top:18px;">Temps pour répondre à une carte</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Passé ce délai après la pioche, la chanson est défaussée et le tour passe automatiquement.</p>
+      <h3 style="margin-top:18px;">${t('temps.decisionTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('temps.decisionDesc')}</p>
       ${isHost ? `
       <div class="row" style="align-items:center;">
         <button class="btn btn-ghost btn-sm" data-act="turn-decision-minus" ${turnDecisionSeconds <= 15 ? 'disabled' : ''}>−15s</button>
@@ -1026,42 +1027,42 @@ function renderOptionsModal(room) {
         <button class="btn btn-ghost btn-sm" data-act="turn-decision-plus" ${turnDecisionSeconds >= 180 ? 'disabled' : ''}>+15s</button>
       </div>` : `<div class="code-pill" style="justify-content:center;">${turnDecisionSeconds}s</div>`}
 
-      <h3 style="margin-top:18px;">Pioche automatique</h3>
-      <p class="subtitle" style="margin:0 0 8px;">Si personne ne pioche, la prochaine chanson se lance seule après ce délai. "Désactivé" laisse le temps qu'il faut.</p>
+      <h3 style="margin-top:18px;">${t('temps.autoDrawTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('temps.autoDrawDesc')}</p>
       ${isHost ? `
       <div class="row" style="align-items:center;">
         <button class="btn btn-ghost btn-sm" data-act="auto-draw-minus" ${autoDrawSeconds <= 0 ? 'disabled' : ''}>−5s</button>
-        <div class="code-pill" style="justify-content:center;">${autoDrawSeconds > 0 ? autoDrawSeconds + 's' : 'Désactivé'}</div>
+        <div class="code-pill" style="justify-content:center;">${autoDrawSeconds > 0 ? autoDrawSeconds + 's' : t('temps.disabled')}</div>
         <button class="btn btn-ghost btn-sm" data-act="auto-draw-plus" ${autoDrawSeconds >= 30 ? 'disabled' : ''}>+5s</button>
-      </div>` : `<div class="code-pill" style="justify-content:center;">${autoDrawSeconds > 0 ? autoDrawSeconds + 's' : 'Désactivé'}</div>`}`;
+      </div>` : `<div class="code-pill" style="justify-content:center;">${autoDrawSeconds > 0 ? autoDrawSeconds + 's' : t('temps.disabled')}</div>`}`;
   } else if (tab === 'chansons') {
     const f = room.filters || { brackets: [] };
     const chip = (active) => `padding:8px 12px;border-radius:999px;font-size:13px;border:1px solid ${active ? 'var(--pink)' : 'var(--line)'};background:${active ? 'rgba(255,79,129,0.15)' : 'var(--surface2)'};color:${active ? 'var(--pink)' : 'var(--text)'};`;
     body = `
-      <h3>Périodes</h3>
-      <p class="subtitle" style="margin:0 0 8px;">${matchCount(room) === null ? '…' : matchCount(room)} chanson${matchCount(room) === 1 ? '' : 's'} disponible${matchCount(room) === 1 ? '' : 's'} — rien coché = tout est inclus.</p>
+      <h3>${t('chansons.periodsTitle')}</h3>
+      <p class="subtitle" style="margin:0 0 8px;">${t('chansons.available', { count: matchCount(room) })}</p>
       ${isHost ? `
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
         ${(state.brackets || []).map(b => `
           <button data-act="toggle-bracket" data-from="${b.from}" data-to="${b.to}" style="${chip(f.brackets.some(x => x.from === b.from && x.to === b.to))}">${b.label}</button>
         `).join('')}
       </div>
-      <button class="btn btn-ghost btn-sm" style="margin-top:12px;" data-act="reset-filters">Réinitialiser</button>` : ''}`;
+      <button class="btn btn-ghost btn-sm" style="margin-top:12px;" data-act="reset-filters">${t('chansons.reset')}</button>` : ''}`;
   }
 
   return `
   <div class="modal-bg" data-act="close-options">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>Options de la partie</h2>
+      <h2>${t('options.title')}</h2>
       <div class="opt-tabs">
-        ${tabBtn('modes', '🎮 Modes')}
-        ${tabBtn('partie', '⚙️ Partie')}
-        ${tabBtn('ecoute', '🔊 Écoute')}
-        ${tabBtn('temps', '⏱️ Temps')}
-        ${tabBtn('chansons', '🎵 Chansons')}
+        ${tabBtn('modes', t('options.tabModes'))}
+        ${tabBtn('partie', t('options.tabPartie'))}
+        ${tabBtn('ecoute', t('options.tabEcoute'))}
+        ${tabBtn('temps', t('options.tabTemps'))}
+        ${tabBtn('chansons', t('options.tabChansons'))}
       </div>
       <div class="opt-tab-body">${body}</div>
-      <button class="btn btn-gold" style="margin-top:18px;" data-act="close-options">Fermer</button>
+      <button class="btn btn-gold" style="margin-top:18px;" data-act="close-options">${t('options.close')}</button>
     </div>
   </div>`;
 }
@@ -1084,7 +1085,7 @@ function renderGame() {
     <div class="topbar">
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="code-pill">${room.code}</div>
-        ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="Changer le DJ">🎚️</button>` : ''}
+        ${(room.listenMode || 'together') === 'together' ? `<button class="iconbtn" data-act="open-dj" title="${t('game.changeDj')}">🎚️</button>` : ''}
       </div>
       <button class="iconbtn" data-act="leave">✕</button>
     </div>
@@ -1093,10 +1094,10 @@ function renderGame() {
       <div class="now-playing">
         <div class="vinyl ${pend ? 'spin' : ''}"></div>
         <div class="info">
-          <div class="status">${isActive ? "C'est ton tour" : 'Tour de'}</div>
+          <div class="status">${isActive ? t('game.yourTurn') : t('game.turnOf')}</div>
           <div class="who">${escapeHtml(active.name)}</div>
         </div>
-        ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">🏠 chacun chez soi</div>`}
+        ${(room.listenMode || 'together') === 'together' ? `<div class="subtitle" style="margin:0;">🎚️ ${escapeHtml(getDjName(room))}</div>` : `<div class="subtitle" style="margin:0;">${t('game.remoteMode')}</div>`}
       </div>
 
       ${renderTurnAction(room, pend, isActive, myself)}
@@ -1136,8 +1137,8 @@ function renderQuickActionFabs(room, pend, isActive, myself, active) {
   if (reactionMenuOpen && !modalOpen) return '';
   return `
   <div class="quick-fab-stack ${modalOpen ? 'muted' : ''}">
-    ${canPlace ? `<button class="quick-fab" data-act="open-placement" title="Placer la carte" ${modalOpen ? 'disabled' : ''}>🤘🏻</button>` : ''}
-    ${canChallenge ? `<button class="quick-fab quick-fab-challenge" data-act="open-challenge" title="Défier" ${modalOpen ? 'disabled' : ''}>🔪</button>` : ''}
+    ${canPlace ? `<button class="quick-fab" data-act="open-placement" title="${t('quickFab.place')}" ${modalOpen ? 'disabled' : ''}>🤘🏻</button>` : ''}
+    ${canChallenge ? `<button class="quick-fab quick-fab-challenge" data-act="open-challenge" title="${t('quickFab.challenge')}" ${modalOpen ? 'disabled' : ''}>🔪</button>` : ''}
   </div>`;
 }
 
@@ -1173,10 +1174,10 @@ function renderTurnAction(room, pend, isActive, myself) {
 
   if (!pend) {
     if (active.isBot) {
-      return `<div class="stack" style="margin-top:14px;"><button class="btn btn-gold" data-act="bot-play">🤖 Faire jouer le Bot</button></div>`;
+      return `<div class="stack" style="margin-top:14px;"><button class="btn btn-gold" data-act="bot-play">${t('turnAction.botPlay')}</button></div>`;
     }
     if (!isActive) {
-      return `<p class="subtitle" style="margin-top:10px;">En attente que ${escapeHtml(active.name)} pioche une chanson…</p>`;
+      return `<p class="subtitle" style="margin-top:10px;">${t('turnAction.waitingDraw', { name: escapeHtml(active.name) })}</p>`;
     }
     const canFree = room.freeCardEnabled && myself.tokens >= 3 && (room.deck.length > 0 || room.discard.length > 0);
     const autoDrawFill = renderAutoDrawFill(room);
@@ -1184,9 +1185,9 @@ function renderTurnAction(room, pend, isActive, myself) {
       <div class="stack" style="margin-top:14px;">
         <button class="btn btn-primary reveal-btn" data-act="draw-card">
           ${autoDrawFill}
-          <span class="reveal-label">🎵 Piocher et écouter</span>
+          <span class="reveal-label">${t('turnAction.drawBtn')}</span>
         </button>
-        ${canFree ? `<button class="btn btn-ghost btn-sm" data-act="free-card">Échanger 3 🪙 contre une carte posée directement</button>` : ''}
+        ${canFree ? `<button class="btn btn-ghost btn-sm" data-act="free-card">${t('turnAction.freeCardBtn')}</button>` : ''}
       </div>`;
   }
 
@@ -1205,10 +1206,10 @@ function renderTurnAction(room, pend, isActive, myself) {
       <div class="yt-wrap" style="aspect-ratio:auto;background:var(--surface2);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
         <div id="audio-slot" data-key="${pend.card.deezerId}-${pend.card.year}" data-src="${escapeHtml(pend.card.previewUrl)}"></div>
         ${renderSoundBars()}
-        <button class="btn ${audioAutoplayBlocked ? 'btn-gold play-nudge' : 'btn-ghost'} btn-sm" data-act="play-preview">🔊 ${audioAutoplayBlocked ? 'Appuie ici pour le son' : 'Appuyer si pas de son'}</button>
+        <button class="btn ${audioAutoplayBlocked ? 'btn-gold play-nudge' : 'btn-ghost'} btn-sm" data-act="play-preview">${audioAutoplayBlocked ? t('turnAction.tapForSound') : '🔊 ' + t('turnAction.tapIfNoSound')}</button>
       </div>`;
     } else {
-      html += `<p class="subtitle" style="margin-top:10px;">🔇 Aperçu audio indisponible pour cette chanson sur Deezer — devinez à partir du titre/artiste une fois révélé, ou passez-la.</p>`;
+      html += `<p class="subtitle" style="margin-top:10px;">${t('turnAction.noPreview')}</p>`;
     }
   }
 
@@ -1217,12 +1218,12 @@ function renderTurnAction(room, pend, isActive, myself) {
     if (isActivePlayerTurn) {
       html += `
       <div class="row" style="margin-top:12px;">
-        <button class="btn btn-gold" data-act="open-placement">Placer la carte</button>
-        ${myself.tokens >= 1 ? `<button class="btn btn-ghost btn-sm" data-act="skip-card">Passer (1 🪙)</button>` : ''}
+        <button class="btn btn-gold" data-act="open-placement">${t('turnAction.placeCard')}</button>
+        ${myself.tokens >= 1 ? `<button class="btn btn-ghost btn-sm" data-act="skip-card">${t('turnAction.skipCard')}</button>` : ''}
       </div>`;
-      if (!isRemote && !isDj && !active.isBot) html += `<p class="subtitle" style="margin-top:8px;">🔊 Écoute sur l'appareil du DJ (${escapeHtml(getDjName(room))}).</p>`;
+      if (!isRemote && !isDj && !active.isBot) html += `<p class="subtitle" style="margin-top:8px;">${t('turnAction.listeningOnDjDevice', { dj: escapeHtml(getDjName(room)) })}</p>`;
     } else if (!isRemote && !isDj && !active.isBot) {
-      html += `<p class="subtitle" style="margin-top:10px;">🔊 La chanson joue chez ${escapeHtml(getDjName(room))} — ${escapeHtml(active.name)} réfléchit à son placement…</p>`;
+      html += `<p class="subtitle" style="margin-top:10px;">${t('turnAction.songPlayingAt', { dj: escapeHtml(getDjName(room)), name: escapeHtml(active.name) })}</p>`;
     }
   }
 
@@ -1230,10 +1231,10 @@ function renderTurnAction(room, pend, isActive, myself) {
     if (isActivePlayerTurn && !guessFullyDone) {
       html += `
       <div class="guess-box">
-        <input id="inp-title" placeholder="Titre ?" value="${escapeHtml(state.guessTitle)}" ${pend.guessTitleOk ? 'disabled class="guess-found"' : ''}/>
-        <input id="inp-artist" placeholder="Artiste ?" value="${escapeHtml(state.guessArtist)}" ${pend.guessArtistOk ? 'disabled class="guess-found"' : ''}/>
+        <input id="inp-title" placeholder="${t('turnAction.titlePlaceholder')}" value="${escapeHtml(state.guessTitle)}" ${pend.guessTitleOk ? 'disabled class="guess-found"' : ''}/>
+        <input id="inp-artist" placeholder="${t('turnAction.artistPlaceholder')}" value="${escapeHtml(state.guessArtist)}" ${pend.guessArtistOk ? 'disabled class="guess-found"' : ''}/>
       </div>
-      <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">Valider titre ${room.partialGuessBonus ? 'ou' : 'et'} artiste</button>`;
+      <button class="btn btn-teal btn-sm" style="margin-top:8px;" data-act="submit-guess">${t('turnAction.validateGuess', { conj: room.partialGuessBonus ? t('turnAction.conjOr') : t('turnAction.conjAnd') })}</button>`;
     }
     if (pend.guessBy && pend.guessBy !== 'bot-na') {
       // Re-flashes whenever the BEST result reached changes (wrong -> partial
@@ -1244,17 +1245,17 @@ function renderTurnAction(room, pend, isActive, myself) {
       const isFirstGuessRender = lastAnimatedGuessKey !== guessKey;
       if (isFirstGuessRender) lastAnimatedGuessKey = guessKey;
       const guessFlashCls = isFirstGuessRender ? (level === 'attempt' ? 'flash-wrong' : 'flash-correct') : '';
-      const label = pend.guessCorrect ? '✔ Titre et artiste trouvés — jeton gagné.'
-        : pend.guessPartial ? '🟡 Un des deux trouvé — jeton partiel gagné, essaie encore pour le reste !'
-        : '✘ Pas trouvé cette fois — réessaie.';
+      const label = pend.guessCorrect ? t('turnAction.guessFull')
+        : pend.guessPartial ? t('turnAction.guessPartial')
+        : t('turnAction.guessWrong');
       html += `<div class="guess-ok ${guessFlashCls}">${label}</div>`;
     }
   }
 
   if (pend.stage === 'placed') {
     html += `<div class="card-section compact" style="margin-top:8px;background:var(--surface2);">
-      <h3 style="font-size:12px;">Carte en jeu</h3>
-      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">${escapeHtml(active.name)} a placé sa carte. Quelqu'un pense que c'est faux ?</p>
+      <h3 style="font-size:12px;">${t('turnAction.cardInPlay')}</h3>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 8px;">${t('turnAction.placedQuestion', { name: escapeHtml(active.name) })}</p>
       ${renderPendingParticipants(room, pend)}
     </div>`;
   }
@@ -1269,11 +1270,10 @@ function renderDecisionTimer(room, pend, active, isActivePlayerTurn) {
   const secondsLeft = Math.ceil(remaining / 1000);
   const durationS = (delayMs / 1000).toFixed(2);
   const negDelayS = (-(elapsed / 1000)).toFixed(3);
-  const suffix = isActivePlayerTurn ? 's pour répondre' : `s restantes pour ${escapeHtml(active.name)}`;
   return `
   <div class="decision-timer">
     <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
-    <span class="decision-timer-label">⏱️ <span class="tick-seconds" data-timer="decision">${secondsLeft}</span>${suffix}</span>
+    <span class="decision-timer-label">⏱️ <span class="tick-seconds" data-timer="decision">${secondsLeft}</span>${isActivePlayerTurn ? t('decisionTimer.forYouSuffix') : t('decisionTimer.forOtherSuffix', { name: escapeHtml(active.name) })}</span>
   </div>`;
 }
 
@@ -1320,16 +1320,16 @@ function renderPendingParticipants(room, pend) {
   let html = '<div class="stack" style="gap:8px;margin-top:6px;">';
 
   if (activeIsBot) {
-    if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier le Bot (1 🪙)</button>`;
-    if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">🚨 ${escapeHtml(challenger.name)} a défié le Bot.</p>`;
-    html += renderRevealButton(room, pend, '🤖 Révéler pour le Bot');
+    if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">${t('pending.challengeBot')}</button>`;
+    if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">${t('pending.challengedBot', { name: escapeHtml(challenger.name) })}</p>`;
+    html += renderRevealButton(room, pend, t('pending.revealForBot'));
   } else if (iAmActive) {
-    if (challenger) html += `<p class="subtitle" style="margin:0 0 8px;color:var(--pink);font-weight:600;">🚨 ${escapeHtml(challenger.name)} a défié ${escapeHtml(activePl.name)} !</p>`;
-    html += renderRevealButton(room, pend, 'Révéler la carte');
+    if (challenger) html += `<p class="subtitle" style="margin:0 0 8px;color:var(--pink);font-weight:600;">${t('pending.challengedYouExcl', { challenger: escapeHtml(challenger.name), active: escapeHtml(activePl.name) })}</p>`;
+    html += renderRevealButton(room, pend, t('pending.revealCard'));
   } else {
     html += renderRevealInfoTimer(room, pend, activePl);
-    if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">🚨 Défier (1 🪙)</button>`;
-    if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">🚨 ${escapeHtml(challenger.name)} a défié ${escapeHtml(activePl.name)}.</p>`;
+    if (!pend.challenge && meObj.tokens >= 1) html += `<button class="btn btn-ghost btn-sm" data-act="open-challenge">${t('pending.challengeBtn')}</button>`;
+    if (challenger) html += `<p class="subtitle" style="margin:6px 0 0;">${t('pending.challenged', { challenger: escapeHtml(challenger.name), active: escapeHtml(activePl.name) })}</p>`;
     // Clicking this no longer reveals alone — it marks the person ready.
     // Once everyone else (excluding the active player) has done the same,
     // the reveal fires right away instead of waiting out the timer.
@@ -1339,8 +1339,8 @@ function renderPendingParticipants(room, pend) {
     const iAmReady = readyList.includes(state.playerId);
     const remaining = eligibleVoters.length - readyCount;
     html += iAmReady
-      ? `<button class="btn btn-gold btn-sm" disabled>✅ En attente des autres (${readyCount}/${eligibleVoters.length})</button>`
-      : `<button class="btn btn-gold btn-sm" data-act="reveal">✅ Ça a l'air bon${eligibleVoters.length > 1 ? ` — encore ${remaining}/${eligibleVoters.length} joueur${remaining > 1 ? 's' : ''} pour révéler` : ', révéler maintenant'}</button>`;
+      ? `<button class="btn btn-gold btn-sm" disabled>${t('pending.waitingOthers', { ready: readyCount, total: eligibleVoters.length })}</button>`
+      : `<button class="btn btn-gold btn-sm" data-act="reveal">${t('pending.looksGood')}${eligibleVoters.length > 1 ? t('pending.looksGoodWithCount', { remaining, total: eligibleVoters.length }) : t('pending.revealNow')}</button>`;
   }
   html += '</div>';
   return html;
@@ -1357,7 +1357,7 @@ function renderRevealInfoTimer(room, pend, activePl) {
   return `
   <div class="decision-timer">
     <div class="decision-timer-fill" style="animation: revealFill ${durationS}s linear ${negDelayS}s forwards;"></div>
-    <span class="decision-timer-label">⏱️ <span class="tick-seconds" data-timer="reveal-info">${secondsLeft}</span>s avant que ${escapeHtml(activePl.name)} puisse révéler</span>
+    <span class="decision-timer-label">⏱️ <span class="tick-seconds" data-timer="reveal-info">${secondsLeft}</span>${t('revealInfo.beforeSuffix', { name: escapeHtml(activePl.name) })}</span>
   </div>`;
 }
 
@@ -1383,11 +1383,11 @@ function renderResultPopup(room, r) {
   const flashCls = isFirstRender ? (r.kind === 'wrong' ? 'popup-flash-wrong' : 'popup-flash-correct') : '';
   const activeColor = r.activeColor || '#8B93A6';
   let statusLine;
-  if (r.kind === 'wrong') statusLine = `❌ Mal placée — carte défaussée.`;
-  else if (r.kind === 'stolen') statusLine = `🎯 ${escapeHtml(r.activeName)} s'est trompé — <span style="color:${r.extraColor || '#8B93A6'};font-weight:700;">${escapeHtml(r.extraName)}</span> vole la carte !`;
-  else statusLine = `✅ Bien placée !`;
+  if (r.kind === 'wrong') statusLine = t('result.wrong');
+  else if (r.kind === 'stolen') statusLine = t('result.stolen', { active: escapeHtml(r.activeName), extra: `<span style="color:${r.extraColor || '#8B93A6'};font-weight:700;">${escapeHtml(r.extraName)}</span>` });
+  else statusLine = t('result.correct');
   const penalty = r.hardcorePenalty
-    ? `<div style="margin-top:6px;font-size:12.5px;color:var(--pink);font-weight:700;">🩸 Hardcore : ${escapeHtml(r.hardcorePenalty.playerName)} perd aussi "${escapeHtml(r.hardcorePenalty.title)}" (${r.hardcorePenalty.year}) de sa frise !</div>`
+    ? `<div style="margin-top:6px;font-size:12.5px;color:var(--pink);font-weight:700;">${t('result.hardcorePenalty', { name: escapeHtml(r.hardcorePenalty.playerName), title: escapeHtml(r.hardcorePenalty.title), year: r.hardcorePenalty.year })}</div>`
     : '';
   return `
   <div class="result-popup-bg">
@@ -1455,7 +1455,7 @@ function renderAllTimelines(room) {
   return orderedPlayers.map(p => {
     const sorted = p.timeline.slice().sort((a, b) => a.year - b.year);
     let markers = [];
-    if (pend && pend.activePlayerId === p.id && pend.placement) markers.push({ gapIndex: pend.placement.gapIndex, cls: 'pending', label: 'En attente' });
+    if (pend && pend.activePlayerId === p.id && pend.placement) markers.push({ gapIndex: pend.placement.gapIndex, cls: 'pending', label: t('timeline.pending') });
     if (pend && pend.activePlayerId === p.id && pend.challenge) {
       const challenger = room.players.find(pl => pl.id === pend.challenge.playerId);
       markers.push({ gapIndex: pend.challenge.gapIndex, cls: 'challenge', label: `${challenger ? challenger.name : '?'} ?` });
@@ -1467,16 +1467,16 @@ function renderAllTimelines(room) {
     return `
     <div class="card-section compact ${isTurn ? 'turn-active' : 'turn-inactive'}" id="timeline-${p.id}" style="--player-glow:${dotColor};border-left:3px solid ${dotColor};background:color-mix(in srgb, ${dotColor} ${isTurn ? '28%' : '16%'}, var(--surface));${isTurn ? `animation-delay:${(-((Date.now() % 4000) / 1000)).toFixed(3)}s;` : ''}">
       <div class="timeline-owner">
-        <span><span class="player-dot" style="background:${dotColor};"></span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? ' (toi)' : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
+        <span><span class="player-dot" style="background:${dotColor};"></span>${isTurn ? '▶ ' : ''}<b style="color:var(--text)">${escapeHtml(p.name)}</b>${p.id === state.playerId ? t('timeline.you') : ''} — ${p.timeline.length}/${room.cardsToWin || CARDS_TO_WIN}</span>
         <span class="mono" style="color:var(--gold)">${p.tokens} 🪙</span>
       </div>
       <div class="ribbon">
-        ${items.length === 0 ? '<div class="empty">Pas encore de carte</div>' :
+        ${items.length === 0 ? `<div class="empty">${t('timeline.noCard')}</div>` :
           items.map(it => {
             if (it.type !== 'card') return `<div class="ticket ${it.cls}"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(it.label)}</div></div></div>`;
             const isWonCard = wonPlayerName === p.name && it.card.title === lr.title && it.card.year === lr.year;
             const wonCls = isWonCard ? (lr.kind === 'stolen' ? 'ticket-stolen' : 'ticket-won') : (it.card.stolenFrom ? 'ticket-stolen-permanent' : '');
-            const stolenNote = it.card.stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(it.card.stolenFrom)}</div>` : '';
+            const stolenNote = it.card.stolenFrom ? `<div class="meta-stolen">${t('timeline.stolenFrom', { name: escapeHtml(it.card.stolenFrom) })}</div>` : '';
             return `<div class="ticket ${wonCls}" data-act="show-card-detail" data-title="${escapeHtml(it.card.title)}" data-artist="${escapeHtml(it.card.artist)}" data-year="${it.card.year}" data-cover="${escapeHtml(it.card.cover || '')}" data-stolen="${escapeHtml(it.card.stolenFrom || '')}"><div class="year">${it.card.year}</div><div class="meta"><div class="meta-title">${escapeHtml(it.card.title)}</div><div class="meta-artist">${escapeHtml(it.card.artist)}</div>${stolenNote}</div></div>`;
           }).join('')}
       </div>
@@ -1495,16 +1495,16 @@ function renderFinished() {
   <div class="screen center">
     ${renderBgPremium()}
     <div class="brand"><img src="/logo.png" class="brand-logo" alt="Chronolozik"/></div>
-    <h1 class="title-xl">🏆 ${escapeHtml(last.winnerName)} gagne !</h1>
+    <h1 class="title-xl">${t('finished.wins', { name: escapeHtml(last.winnerName) })}</h1>
     <div class="stack" style="margin-top:18px;">
       ${room.players.slice().sort((a, b) => b.timeline.length - a.timeline.length).map(p => `
-        <div class="player-chip"><div class="dot"></div><div class="name">${escapeHtml(p.name)}</div><div class="cards mono">${p.timeline.length} cartes</div></div>
+        <div class="player-chip"><div class="dot"></div><div class="name">${escapeHtml(p.name)}</div><div class="cards mono">${t('finished.cards', { count: p.timeline.length })}</div></div>
       `).join('')}
     </div>
-    <button class="btn btn-ghost btn-sm" style="margin-top:14px;" data-act="toggle-final-timelines">${state.showFinalTimelines ? '▲ Masquer les frises' : '📊 Revoir les frises de tout le monde'}</button>
+    <button class="btn btn-ghost btn-sm" style="margin-top:14px;" data-act="toggle-final-timelines">${state.showFinalTimelines ? t('finished.hideTimelines') : t('finished.showTimelines')}</button>
     ${state.showFinalTimelines ? `<div class="stack" style="margin-top:12px;text-align:left;width:100%;">${renderAllTimelines(room)}</div>` : ''}
-    <button class="btn btn-primary" style="margin-top:22px;" data-act="play-again">Rejouer dans ce salon</button>
-    <button class="btn btn-ghost" style="margin-top:10px;" data-act="leave">Quitter</button>
+    <button class="btn btn-primary" style="margin-top:22px;" data-act="play-again">${t('finished.playAgain')}</button>
+    <button class="btn btn-ghost" style="margin-top:10px;" data-act="leave">${t('finished.leave')}</button>
   </div>`;
 }
 
@@ -1521,28 +1521,28 @@ function renderPlacementModal(room) {
     const isExcluded = i === excludeGap;
     const selected = state.selectedGap === i;
     if (selected) {
-      slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">Ici</div></div></div>`;
+      slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">${t('timeline.here')}</div></div></div>`;
     } else if (isExcluded) {
       // This is exactly where the active player already placed their guess —
       // show it as a reference marker (same "En attente" look used in the
       // main ribbon) instead of a normal "+", so the challenger can actually
       // SEE what they're disagreeing with, not just have that slot disabled.
-      slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(target.name)}</div><div class="meta-artist">a placé ici</div></div></div>`;
+      slots += `<div class="ticket pending"><div class="year">?</div><div class="meta"><div class="meta-title">${escapeHtml(target.name)}</div><div class="meta-artist">${t('placement.placedHere')}</div></div></div>`;
     } else {
       slots += `<div class="slot"><button data-act="select-gap" data-gap="${i}" ${plusStyle}>+</button></div>`;
     }
-    if (i < sorted.length) slots += `<div class="ticket ${sorted[i].stolenFrom ? 'ticket-stolen-permanent' : ''}"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div>${sorted[i].stolenFrom ? `<div class="meta-stolen">Volée à ${escapeHtml(sorted[i].stolenFrom)}</div>` : ''}</div></div>`;
+    if (i < sorted.length) slots += `<div class="ticket ${sorted[i].stolenFrom ? 'ticket-stolen-permanent' : ''}"><div class="year">${sorted[i].year}</div><div class="meta"><div class="meta-title">${escapeHtml(sorted[i].title)}</div><div class="meta-artist">${escapeHtml(sorted[i].artist)}</div>${sorted[i].stolenFrom ? `<div class="meta-stolen">${t('timeline.stolenFrom', { name: escapeHtml(sorted[i].stolenFrom) })}</div>` : ''}</div></div>`;
   }
 
   return `
   <div class="modal-bg" data-act="close-modal">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>${isChallenge ? 'Où penses-tu que ça se place ?' : 'Place ta carte'}</h2>
-      <p class="subtitle" style="margin-top:0;">Sur la frise de ${escapeHtml(target.name)} — ${isChallenge ? `la carte marquée "a placé ici" montre son choix — appuie sur un + ailleurs pour proposer un autre emplacement, puis valide.` : `appuie sur un + pour choisir l'emplacement, puis valide.`}</p>
+      <h2>${isChallenge ? t('placement.challengeTitle') : t('placement.placeTitle')}</h2>
+      <p class="subtitle" style="margin-top:0;">${t('placement.onTimelineOf', { name: escapeHtml(target.name) })} ${isChallenge ? t('placement.challengeDesc') : t('placement.placeDesc')}</p>
       <div class="ribbon" style="margin-top:14px;">${slots}</div>
       <div class="row" style="margin-top:14px;">
-        <button class="btn btn-ghost" data-act="close-modal">Annuler</button>
-        <button class="btn btn-gold" data-act="confirm-gap" ${state.selectedGap === null ? 'disabled' : ''}>Valider</button>
+        <button class="btn btn-ghost" data-act="close-modal">${t('placement.cancel')}</button>
+        <button class="btn btn-gold" data-act="confirm-gap" ${state.selectedGap === null ? 'disabled' : ''}>${t('placement.validate')}</button>
       </div>
     </div>
   </div>`;
@@ -1553,16 +1553,16 @@ function renderDjModal(room) {
   return `
   <div class="modal-bg" data-act="close-dj">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>Qui est le DJ ?</h2>
-      <p class="subtitle" style="margin-top:0;">Le DJ fait jouer la musique sur son appareil pour toute la salle.</p>
+      <h2>${t('dj.title')}</h2>
+      <p class="subtitle" style="margin-top:0;">${t('dj.desc')}</p>
       <div class="stack" style="margin-top:14px;">
         ${room.players.filter(p => !p.isBot).map(p => `
           <div class="player-chip ${p.id === djId ? 'you' : ''}" style="justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:10px;"><div class="dot"></div><div class="name">${escapeHtml(p.name)}${p.id === djId ? ' 🎚️' : ''}</div></div>
-            ${p.id !== djId ? `<button class="btn btn-ghost btn-sm" data-act="pick-dj" data-pid="${p.id}">Nommer DJ</button>` : ''}
+            ${p.id !== djId ? `<button class="btn btn-ghost btn-sm" data-act="pick-dj" data-pid="${p.id}">${t('dj.nameDj')}</button>` : ''}
           </div>`).join('')}
       </div>
-      <button class="btn btn-ghost" style="margin-top:14px;" data-act="close-dj">Fermer</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" data-act="close-dj">${t('common.close')}</button>
     </div>
   </div>`;
 }
@@ -1572,51 +1572,51 @@ function renderLibraryModal() {
   return `
   <div class="modal-bg" data-act="close-library">
     <div class="modal" onclick="event.stopPropagation()">
-      <h2>Bibliothèque de chansons</h2>
-      <p class="subtitle" style="margin-top:0;">Stockée sur ce serveur — visible par tous ceux qui s'y connectent.</p>
+      <h2>${t('library.title')}</h2>
+      <p class="subtitle" style="margin-top:0;">${t('library.desc')}</p>
 
       <div class="card-section" style="background:var(--surface2);margin-top:14px;">
-        <h3>Ajouter une chanson</h3>
+        <h3>${t('library.addSong')}</h3>
         <div class="stack" style="gap:8px;margin-top:0;">
-          <input id="lib-title" placeholder="Titre" value="${escapeHtml(state.newSong.title)}"/>
-          <input id="lib-artist" placeholder="Artiste" value="${escapeHtml(state.newSong.artist)}"/>
-          <input id="lib-year" placeholder="Année (ex. 1999)" inputmode="numeric" value="${escapeHtml(state.newSong.year)}"/>
+          <input id="lib-title" placeholder="${t('library.titlePlaceholder')}" value="${escapeHtml(state.newSong.title)}"/>
+          <input id="lib-artist" placeholder="${t('library.artistPlaceholder')}" value="${escapeHtml(state.newSong.artist)}"/>
+          <input id="lib-year" placeholder="${t('library.yearPlaceholder')}" inputmode="numeric" value="${escapeHtml(state.newSong.year)}"/>
           ${state.libError ? `<div class="error-box">${escapeHtml(state.libError)}</div>` : ''}
-          <button class="btn btn-gold btn-sm" data-act="add-song" ${state.libBusy ? 'disabled' : ''}>${state.libBusy ? 'Recherche sur Deezer…' : 'Ajouter à la bibliothèque'}</button>
+          <button class="btn btn-gold btn-sm" data-act="add-song" ${state.libBusy ? 'disabled' : ''}>${state.libBusy ? t('library.searching') : t('library.addToLibrary')}</button>
         </div>
       </div>
 
-      <h3 style="margin-top:16px;">${list.length} chanson${list.length > 1 ? 's' : ''}</h3>
+      <h3 style="margin-top:16px;">${t('library.songCount', { count: list.length })}</h3>
       <div style="max-height:220px;overflow-y:auto;">
         ${list.map(s => `<div class="log-line"><b>${s.year}</b> — ${escapeHtml(s.title)} · ${escapeHtml(s.artist)}</div>`).join('')}
       </div>
 
       <div class="row" style="margin-top:14px;">
-        <button class="btn btn-ghost btn-sm" data-act="export-catalog">⬇ Exporter en JSON</button>
-        <button class="btn btn-ghost btn-sm" data-act="toggle-import">⬆ Importer un JSON</button>
+        <button class="btn btn-ghost btn-sm" data-act="export-catalog">${t('library.export')}</button>
+        <button class="btn btn-ghost btn-sm" data-act="toggle-import">${t('library.import')}</button>
       </div>
       ${state.showImport ? `
       <div class="stack" style="margin-top:10px;">
         <textarea id="lib-import" rows="5" placeholder='[{"title":"...","artist":"...","year":1999,"yt":"..."}]' style="width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font-size:13px;font-family:'IBM Plex Mono',monospace;"></textarea>
         ${state.importError ? `<div class="error-box">${escapeHtml(state.importError)}</div>` : ''}
-        <button class="btn btn-teal btn-sm" data-act="import-catalog">Fusionner dans la bibliothèque</button>
+        <button class="btn btn-teal btn-sm" data-act="import-catalog">${t('library.merge')}</button>
       </div>` : ''}
 
       <div class="card-section" style="background:var(--surface2);margin-top:14px;">
-        <h3>Vérifier les extraits audio</h3>
-        <p class="subtitle" style="margin:0 0 10px;">Interroge Deezer en direct pour chaque chanson — peut prendre une minute pour ${list.length} titres.</p>
-        <button class="btn btn-teal btn-sm" data-act="check-health" ${state.healthChecking ? 'disabled' : ''}>${state.healthChecking ? 'Vérification en cours…' : '🔍 Vérifier la bibliothèque'}</button>
+        <h3>${t('library.checkPreviewsTitle')}</h3>
+        <p class="subtitle" style="margin:0 0 10px;">${t('library.checkPreviewsDesc', { count: list.length })}</p>
+        <button class="btn btn-teal btn-sm" data-act="check-health" ${state.healthChecking ? 'disabled' : ''}>${state.healthChecking ? t('library.checking') : t('library.checkLibraryBtn')}</button>
         ${renderHealthReport()}
       </div>
 
       <div class="card-section" style="background:var(--surface2);margin-top:14px;">
-        <h3>Vérifier les associations Deezer</h3>
-        <p class="subtitle" style="margin:0 0 10px;">Recontrôle que chaque chanson pointe bien vers la bonne piste sur Deezer (titre + artiste), pas juste qu'elle a un extrait audio — corrige automatiquement les mauvaises associations trouvées.</p>
-        <button class="btn btn-teal btn-sm" data-act="start-deezer-audit" ${state.auditRunning ? 'disabled' : ''}>${state.auditRunning ? `Vérification en cours… (${state.auditReport ? state.auditReport.checked : 0}/${state.auditReport ? state.auditReport.total : '?'})` : '🔎 Vérifier les associations'}</button>
+        <h3>${t('library.checkAssocTitle')}</h3>
+        <p class="subtitle" style="margin:0 0 10px;">${t('library.checkAssocDesc')}</p>
+        <button class="btn btn-teal btn-sm" data-act="start-deezer-audit" ${state.auditRunning ? 'disabled' : ''}>${state.auditRunning ? t('library.checkingProgress', { checked: state.auditReport ? state.auditReport.checked : 0, total: state.auditReport ? state.auditReport.total : '?' }) : t('library.checkAssocBtn')}</button>
         ${renderAuditReport()}
       </div>
 
-      <button class="btn btn-ghost" style="margin-top:14px;" data-act="close-library">Fermer</button>
+      <button class="btn btn-ghost" style="margin-top:14px;" data-act="close-library">${t('common.close')}</button>
     </div>
   </div>`;
 }
@@ -1625,20 +1625,20 @@ function renderAuditReport() {
   const r = state.auditReport;
   if (!r) return '';
   if (r.running) {
-    return `<p class="subtitle" style="margin-top:10px;">${r.checked}/${r.total} vérifiées…</p>`;
+    return `<p class="subtitle" style="margin-top:10px;">${t('audit.progress', { checked: r.checked, total: r.total })}</p>`;
   }
   const mismatches = r.mismatches || [];
   return `
     <div style="margin-top:12px;">
       <p style="font-size:13px;color:${mismatches.length ? 'var(--red)' : 'var(--teal)'};margin:0 0 8px;font-weight:600;">
-        ${mismatches.length === 0 ? `Aucun désaccord trouvé sur ${r.total} chansons vérifiées.` : `${mismatches.length} mauvaise${mismatches.length > 1 ? 's' : ''} association${mismatches.length > 1 ? 's' : ''} trouvée${mismatches.length > 1 ? 's' : ''} et corrigée${mismatches.length > 1 ? 's' : ''} (sur ${r.total}) — se re-résoudront au prochain démarrage.`}
+        ${mismatches.length === 0 ? t('audit.noMismatch', { total: r.total }) : t('audit.mismatchFound', { count: mismatches.length, total: r.total })}
       </p>
       ${mismatches.length ? `
       <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
         ${mismatches.map(m => `
           <div class="log-line">
-            <b>Attendu :</b> ${escapeHtml(m.expectedTitle)} · ${escapeHtml(m.expectedArtist)}<br>
-            <span style="color:var(--red);">Deezer avait :</span> ${escapeHtml(m.gotTitle)} · ${escapeHtml(m.gotArtist)}
+            <b>${t('audit.expected')}</b> ${escapeHtml(m.expectedTitle)} · ${escapeHtml(m.expectedArtist)}<br>
+            <span style="color:var(--red);">${t('audit.deezerHad')}</span> ${escapeHtml(m.gotTitle)} · ${escapeHtml(m.gotArtist)}
           </div>
         `).join('')}
       </div>` : ''}
@@ -1648,18 +1648,18 @@ function renderAuditReport() {
 function renderHealthReport() {
   const r = state.healthReport;
   if (!r) return '';
-  const problems = [...r.noMatch.map(s => ({ ...s, reason: 'Aucune correspondance Deezer' })), ...r.noPreview.map(s => ({ ...s, reason: 'Pas d\'extrait audio disponible' }))];
+  const problems = [...r.noMatch.map(s => ({ ...s, reason: t('health.noMatchReason') })), ...r.noPreview.map(s => ({ ...s, reason: t('health.noPreviewReason') }))];
   return `
     <div style="margin-top:12px;">
       <p style="font-size:13px;color:${problems.length ? 'var(--red)' : 'var(--teal)'};margin:0 0 8px;font-weight:600;">
-        ${r.ok} / ${r.total} chansons ont un extrait audio confirmé jouable en ce moment.
+        ${t('health.summary', { ok: r.ok, total: r.total })}
       </p>
-      ${problems.length === 0 ? '<p class="subtitle" style="margin:0;">Tout est bon, aucune chanson à corriger.</p>' : `
+      ${problems.length === 0 ? `<p class="subtitle" style="margin:0;">${t('health.allGood')}</p>` : `
       <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
         ${problems.map(s => `
           <div class="log-line" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
             <span><b>${s.year}</b> — ${escapeHtml(s.title)} · ${escapeHtml(s.artist)}<br><span style="color:var(--red);font-size:11px;">${s.reason}</span></span>
-            <button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="remove-song" data-title="${escapeHtml(s.title)}" data-artist="${escapeHtml(s.artist)}">Retirer</button>
+            <button class="btn btn-danger btn-sm" style="width:auto;flex-shrink:0;" data-act="remove-song" data-title="${escapeHtml(s.title)}" data-artist="${escapeHtml(s.artist)}">${t('health.remove')}</button>
           </div>
         `).join('')}
       </div>`}
@@ -1682,7 +1682,7 @@ function renderCardDetailModal() {
         <div class="card-detail-year">${escapeHtml(String(c.year))}</div>
         <div class="card-detail-title">${escapeHtml(c.title)}</div>
         <div class="card-detail-artist">${escapeHtml(c.artist)}</div>
-        ${c.stolenFrom ? `<div class="card-detail-stolen">Volée à ${escapeHtml(c.stolenFrom)}</div>` : ''}
+        ${c.stolenFrom ? `<div class="card-detail-stolen">${t('timeline.stolenFrom', { name: escapeHtml(c.stolenFrom) })}</div>` : ''}
       </div>
     </div>
   </div>`;
@@ -1692,15 +1692,15 @@ function renderRulesModal() {
   return `
   <div class="modal-bg" data-act="close-rules">
     <div class="modal rules" onclick="event.stopPropagation()">
-      <h2>Règles</h2>
-      <p><b>But :</b> être le premier à placer correctement ${CARDS_TO_WIN} chansons sur sa frise chronologique.</p>
-      <p><b>Tour :</b> le joueur actif pioche une chanson, l'écoute (jouée par le DJ, pour toute la salle), puis la place sur sa propre frise en devinant si elle est avant, après ou entre les chansons déjà posées.</p>
-      <p><b>Révélation :</b> une fois la carte placée, elle est révélée. Bien placée → elle reste sur la frise. Mal placée → elle est défaussée.</p>
-      <p><b>Défi :</b> les autres joueurs peuvent parier 1 jeton qu'ils devinent mieux l'emplacement. S'ils ont raison, ils volent la carte.</p>
-      <p><b>Passer :</b> 1 jeton pour changer de chanson sans la placer.</p>
-      <p><b>Carte gratuite :</b> 3 jetons pour poser une carte directement, sans écouter ni deviner.</p>
-      <p><b>Gagner un jeton :</b> devine le titre ET l'artiste de la chanson en jeu, max 5 jetons.</p>
-      <button class="btn btn-ghost" style="margin-top:6px;" data-act="close-rules">Fermer</button>
+      <h2>${t('rules.title')}</h2>
+      <p>${t('rules.goal', { count: CARDS_TO_WIN })}</p>
+      <p>${t('rules.turn')}</p>
+      <p>${t('rules.reveal')}</p>
+      <p>${t('rules.challenge')}</p>
+      <p>${t('rules.skip')}</p>
+      <p>${t('rules.freeCard')}</p>
+      <p>${t('rules.earnToken')}</p>
+      <button class="btn btn-ghost" style="margin-top:6px;" data-act="close-rules">${t('common.close')}</button>
     </div>
   </div>`;
 }
@@ -1756,7 +1756,7 @@ function attachHandlers() {
       else if (act === 'refresh-public-rooms') loadPublicRooms();
       else if (act === 'join-public-room') {
         const name = state.nameInput.trim();
-        if (!name) { setError('Entre ton prénom d\'abord.'); return; }
+        if (!name) { setError(t('errors.enterNameFirst')); return; }
         state.codeInput = elm.getAttribute('data-code');
         state.busy = true; render();
         socket.emit('join-room', { code: state.codeInput, name, color: state.playerColor, colorExplicit: state.colorExplicit });
@@ -1801,7 +1801,7 @@ function attachHandlers() {
       else if (act === 'remove-song') removeSong(elm.getAttribute('data-title'), elm.getAttribute('data-artist'));
       else if (act === 'add-bot') addTestBot();
       else if (act === 'remove-bot') removeTestBot();
-      else if (act === 'kick-player') { if (confirm('Exclure ce joueur du salon ?')) socket.emit('kick-player', { playerId: elm.getAttribute('data-pid') }); }
+      else if (act === 'kick-player') { if (confirm(t('lobby.kickPlayer'))) socket.emit('kick-player', { playerId: elm.getAttribute('data-pid') }); }
       else if (act === 'show-card-detail') {
         state.cardDetail = {
           title: elm.getAttribute('data-title'),
@@ -1825,7 +1825,7 @@ function attachHandlers() {
       else if (act === 'set-max-players-custom') {
         const v = document.getElementById('inp-max-custom');
         const n = v ? parseInt(v.value, 10) : NaN;
-        if (!Number.isFinite(n)) { setError('Entre un nombre entre 2 et 20.'); return; }
+        if (!Number.isFinite(n)) { setError(t('errors.enterNumberRange')); return; }
         socket.emit('set-max-players', { max: n });
       }
       else if (act === 'open-dj') { state.showDjPicker = true; render(); }
