@@ -1409,3 +1409,31 @@ couverts par la recherche Deezer. Catalogue total : 2352 → 2532 chansons,
 dont 2391 jouables.
 
 150/150 tests, exécutés deux fois, aucun échec.
+
+## v4.2.0 — +1004 chansons (dont 158 italiennes)
+
+Même pipeline que la v3.9.0/v4.1.0 : liste générée à partir d'une bonne
+connaissance générale de la musique, dédupliquée contre le catalogue
+existant (title+artiste normalisés, accents/casse/ponctuation ignorés),
+fusionnée dans `songs.json` **sans `deezerId`**, résolue par
+`verifyAndPrepareCatalog()` — aucune logique de matching dupliquée.
+
+Le catalogue existant s'est révélé beaucoup plus saturé en tubes évidents
+que lors des lots précédents : une première liste de 515 titres généralistes
+n'en a laissé passer que 97 après déduplication (81% de doublons). Il a
+fallu creuser plus loin que les hits les plus connus — genres jusqu'ici peu
+représentés (country, reggae, latino/reggaeton, K-pop, metal, punk), scène
+rap/variété française plus en profondeur (IAM, NTM, Booba, Nekfeu, Orelsan,
+Diam's, Sexion d'Assaut...), chanson française d'avant les années 60
+(Piaf, Brassens, Trenet, Brel), jazz/blues américain (Ella Fitzgerald,
+Nat King Cole, Duke Ellington, Muddy Waters...), et scène 2020 plus large
+(Chappell Roan, Ice Spice, NewJeans, Rosalía, Bad Bunny, Kendrick Lamar) —
+pour finalement obtenir 846 titres généralistes utilisables sur 1814
+candidats proposés (46%). Le lot italien (198 candidats, ciblant des
+artistes/titres différents des 180 déjà ajoutés en v4.1.0 — cantautori en
+profondeur, scène 2020 récente) a mieux résisté : 158 retenus (80%).
+
+Résultat : 3195/3536 chansons résolues sur Deezer (90%), soit 804 des 1004
+nouveaux titres. Catalogue total : 2532 → 3536 chansons, dont 3195 jouables.
+
+150/150 tests, exécutés deux fois, aucun échec.
